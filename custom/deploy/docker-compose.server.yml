@@ -1,0 +1,61 @@
+# new-api 服务器部署（独立 PG/Redis，与 x2api 同机共存）
+# 用法见 custom/deploy/README.md
+#   cd custom/deploy && cp .env.example .env && 改密码 && docker compose -f docker-compose.server.yml up -d
+name: newapi
+
+services:
+  new-api:
+    # N1 先用官方镜像快速验证；接入自建代码后(N4)改成你的阿里云 ACR 地址
+    image: ${NEWAPI_IMAGE:-calciumion/new-api:latest}
+    container_name: newapi
+    restart: always
+    command: --log-dir /app/logs
+    # x2api 占 8080，这里用 3000（如需仅本机+反代：改 "127.0.0.1:3000:3000"）
+    ports:
+      - "${NEWAPI_PORT:-3000}:3000"
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logs
+    environment:
+      - SQL_DSN=postgresql://newapi:${PG_PASSWORD}@newapi-postgres:5432/new-api
+      - REDIS_CONN_STRING=redis://:${REDIS_PASSWORD}@newapi-redis:6379
+      - TZ=Asia/Shanghai
+      - ERROR_LOG_ENABLED=true
+      - BATCH_UPDATE_ENABLED=true
+      - SESSION_SECRET=${SESSION_SECRET}   # 多实例/重启保持会话，务必改成随机串
+      - NODE_NAME=newapi-node-1
+    depends_on:
+      - redis
+      - postgres
+    networks: [newapi-network]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/status | grep -o '\"success\":\\s*true' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7
+    container_name: newapi-redis
+    restart: always
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    networks: [newapi-network]
+
+  postgres:
+    image: postgres:15
+    container_name: newapi-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: newapi
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: new-api
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks: [newapi-network]
+
+volumes:
+  pg_data:
+
+networks:
+  newapi-network:
+    driver: bridge
