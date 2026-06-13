@@ -1,5 +1,15 @@
-// Package vclm 实现腾讯云 VCLM（视频创作大模型）可灵图生视频的任务适配器。
+// Package vclm 实现腾讯云 VCLM（视频创作大模型）任务适配器（派发式）。
+//
 // 上游：vclm.tencentcloudapi.com，TC3-HMAC-SHA256 签名，异步 submit/query。
+// 一个渠道类型(9001) 内按「模型族 + 有无图」自动派发到对应 VCLM Action：
+//   - Kling      : 有图→SubmitImageToVideoJob / 无图→SubmitTextToVideoJob
+//   - Vidu       : 有图→SubmitImageToVideoViduJob / 无图→SubmitTextToVideoViduJob
+//   - Hunyuan    : SubmitHunyuanToVideoJob
+//   - General    : SubmitImageToVideoGeneralJob
+// 其它能力（换脸/数字人/模板/视频编辑等）可后续往 modelDefs / buildRequest 里加。
+//
+// task.Action 存「提交 Action 名」，轮询时 FetchTask 据此推出对应 Describe Action。
+// 各 Action 特有参数可由调用方通过 metadata（PascalCase 键）透传/覆盖。
 // apiKey 格式：SecretId|SecretKey
 package vclm
 
@@ -20,7 +30,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relay/channel"
@@ -30,36 +39,73 @@ import (
 )
 
 const (
-	vclmHost     = "vclm.tencentcloudapi.com"
-	vclmService  = "vclm"
-	vclmVersion  = "2024-05-23"
-	vclmRegion   = "ap-guangzhou"
-	actionSubmit = "SubmitImageToVideoJob"
-	actionQuery  = "DescribeImageToVideoJob"
+	vclmHost    = "vclm.tencentcloudapi.com"
+	vclmService = "vclm"
+	vclmVersion = "2024-05-23"
+	vclmRegion  = "ap-guangzhou"
 
 	ctxPayloadKey = "vclm_payload"
+	ctxActionKey  = "vclm_action"
 )
 
-// ============================ 请求 / 响应结构 ============================
+// modelDef 定义一个对外模型名属于哪个能力族、以及映射到 VCLM 的 Model 参数值。
+type modelDef struct {
+	family    string // kling | vidu | hunyuan | general
+	vclmModel string // VCLM Model 参数值；为空表示该 Action 不接受 Model
+}
+
+var modelDefs = map[string]modelDef{
+	// Kling（Model 用版本码）
+	"kling-v1":          {"kling", "v1.0"},
+	"kling-v1-5":        {"kling", "v1.5"},
+	"kling-v1-6":        {"kling", "v1.6"},
+	"kling-v2-master":   {"kling", "v2.0"},
+	"kling-v2-1":        {"kling", "v2.1"},
+	"kling-v2-1-master": {"kling", "v2.1m"},
+	"kling-v2-5-turbo":  {"kling", "v2.5"},
+	"kling-v2-6":        {"kling", "v2.6"},
+	"kling-v3":          {"kling", "v3.0"},
+	// Vidu
+	"vidu-q1":  {"vidu", "viduq1"},
+	"vidu-q2":  {"vidu", "viduq2"},
+	"vidu-2.0": {"vidu", "vidu2.0"},
+	"vidu-1.5": {"vidu", "vidu1.5"},
+	// 混元生视频
+	"hunyuan-video": {"hunyuan", ""},
+	// 通用图生视频
+	"general-i2v": {"general", ""},
+}
+
+// resolveSubmitAction 按模型族 + 是否有图，选出 VCLM 提交 Action。
+func resolveSubmitAction(modelName string, hasImage bool) (string, bool) {
+	d, ok := modelDefs[modelName]
+	if !ok {
+		return "", false
+	}
+	switch d.family {
+	case "kling":
+		if hasImage {
+			return "SubmitImageToVideoJob", true
+		}
+		return "SubmitTextToVideoJob", true
+	case "vidu":
+		if hasImage {
+			return "SubmitImageToVideoViduJob", true
+		}
+		return "SubmitTextToVideoViduJob", true
+	case "hunyuan":
+		return "SubmitHunyuanToVideoJob", true
+	case "general":
+		return "SubmitImageToVideoGeneralJob", true
+	}
+	return "", false
+}
+
+// ============================ 响应结构（各 video Action 通用）============================
 
 type tcImage struct {
 	Url    string `json:"Url,omitempty"`
 	Base64 string `json:"Base64,omitempty"`
-}
-
-// submitPayload 对应 SubmitImageToVideoJob 入参（常用字段；高级字段经 metadata 透传）
-type submitPayload struct {
-	Model          string   `json:"Model,omitempty"`
-	Image          *tcImage `json:"Image,omitempty"`
-	ImageTail      *tcImage `json:"ImageTail,omitempty"`
-	Prompt         string   `json:"Prompt,omitempty"`
-	NegativePrompt string   `json:"NegativePrompt,omitempty"`
-	Duration       string   `json:"Duration,omitempty"`
-	Mode           string   `json:"Mode,omitempty"`
-	CfgScale       *float64 `json:"CfgScale,omitempty"`
-	Sound          string   `json:"Sound,omitempty"`
-	CallbackUrl    string   `json:"CallbackUrl,omitempty"`
-	ExternalTaskId string   `json:"ExternalTaskId,omitempty"`
 }
 
 type tcError struct {
@@ -90,20 +136,7 @@ type queryResponse struct {
 	} `json:"Response"`
 }
 
-// new-api 模型名 → VCLM Model 版本码
-var modelMap = map[string]string{
-	"kling-v1":          "v1.0",
-	"kling-v1-5":        "v1.5",
-	"kling-v1-6":        "v1.6",
-	"kling-v2-master":   "v2.0",
-	"kling-v2-1":        "v2.1",
-	"kling-v2-1-master": "v2.1m",
-	"kling-v2-5-turbo":  "v2.5",
-	"kling-v2-6":        "v2.6",
-	"kling-v3":          "v3.0",
-}
-
-// ============================ 适配器实现 ============================
+// ============================ 适配器 ============================
 
 type TaskAdaptor struct {
 	taskcommon.BaseBilling
@@ -118,8 +151,18 @@ func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo) {
 	a.apiKey = info.ApiKey
 }
 
+// ValidateRequestAndSetAction 先窥探模型+是否有图，确定 VCLM 提交 Action，
+// 把它作为 task.Action 存下（轮询时据此推 Describe）。
 func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskError {
-	return relaycommon.ValidateBasicTaskRequest(c, info, constant.TaskActionGenerate)
+	var peek relaycommon.TaskSubmitReq
+	_ = common.UnmarshalBodyReusable(c, &peek)
+	hasImage := strings.TrimSpace(peek.Image) != "" || len(peek.Images) > 0
+	action, ok := resolveSubmitAction(peek.Model, hasImage)
+	if !ok {
+		return service.TaskErrorWrapperLocal(
+			fmt.Errorf("unsupported model: %s", peek.Model), "invalid_model", http.StatusBadRequest)
+	}
+	return relaycommon.ValidateBasicTaskRequest(c, info, action)
 }
 
 func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, error) {
@@ -132,37 +175,82 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 		return nil, fmt.Errorf("request not found in context")
 	}
 	req := v.(relaycommon.TaskSubmitReq)
+	action := info.Action
 
-	p := submitPayload{
-		Prompt:   req.Prompt,
-		Mode:     taskcommon.DefaultString(req.Mode, "std"),
-		Duration: fmt.Sprintf("%d", taskcommon.DefaultInt(req.Duration, 5)),
-		Model:    mapModel(info.UpstreamModelName),
-	}
-	if req.Image != "" {
-		p.Image = &tcImage{Url: req.Image}
-	}
-	// 透传高级字段（NegativePrompt/ImageTail/CfgScale/Sound/CameraControl 等）
-	if err := taskcommon.UnmarshalMetadata(req.Metadata, &p); err != nil {
+	body := buildRequest(action, &req, info.UpstreamModelName)
+
+	// metadata 透传/覆盖（PascalCase 键，供各 Action 特有参数）
+	if err := taskcommon.UnmarshalMetadata(req.Metadata, &body); err != nil {
 		return nil, errors.Wrap(err, "unmarshal metadata failed")
 	}
 
-	data, err := common.Marshal(p)
+	data, err := common.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
-	c.Set(ctxPayloadKey, data) // 供 BuildRequestHeader 做 TC3 签名
+	c.Set(ctxPayloadKey, data)
+	c.Set(ctxActionKey, action)
 	return bytes.NewReader(data), nil
+}
+
+// buildRequest 按 Action 构造 VCLM 请求体（只放该 Action 接受的常用字段）。
+func buildRequest(action string, req *relaycommon.TaskSubmitReq, upstreamModel string) map[string]any {
+	m := map[string]any{}
+	if req.Prompt != "" {
+		m["Prompt"] = req.Prompt
+	}
+	vclmModel := modelDefs[upstreamModel].vclmModel
+	firstImage := req.Image
+	if firstImage == "" && len(req.Images) > 0 {
+		firstImage = req.Images[0]
+	}
+	dur := taskcommon.DefaultInt(req.Duration, 5)
+	mode := taskcommon.DefaultString(req.Mode, "std")
+
+	switch action {
+	case "SubmitImageToVideoJob": // Kling i2v
+		m["Model"] = vclmModel
+		m["Image"] = tcImage{Url: firstImage}
+		m["Duration"] = strconv.Itoa(dur)
+		m["Mode"] = mode
+	case "SubmitTextToVideoJob": // Kling t2v
+		m["Model"] = vclmModel
+		m["Duration"] = strconv.Itoa(dur)
+		m["Mode"] = mode
+	case "SubmitImageToVideoGeneralJob": // 通用 i2v（无 Model）
+		m["Image"] = tcImage{Url: firstImage}
+	case "SubmitHunyuanToVideoJob": // 混元
+		if firstImage != "" {
+			m["Image"] = tcImage{Url: firstImage}
+		}
+	case "SubmitImageToVideoViduJob": // Vidu i2v
+		m["Model"] = vclmModel
+		imgs := req.Images
+		if len(imgs) == 0 && firstImage != "" {
+			imgs = []string{firstImage}
+		}
+		m["Images"] = imgs
+		m["Duration"] = dur
+	case "SubmitTextToVideoViduJob": // Vidu t2v
+		m["Model"] = vclmModel
+		m["Duration"] = dur
+	}
+	return m
 }
 
 func (a *TaskAdaptor) BuildRequestHeader(c *gin.Context, req *http.Request, info *relaycommon.RelayInfo) error {
 	payload, _ := c.Get(ctxPayloadKey)
 	body, _ := payload.([]byte)
+	action, _ := c.Get(ctxActionKey)
+	actStr, _ := action.(string)
+	if actStr == "" {
+		actStr = info.Action
+	}
 	secretId, secretKey, err := splitKey(a.apiKey)
 	if err != nil {
 		return err
 	}
-	for k, v := range signTC3(secretId, secretKey, actionSubmit, body, time.Now().Unix()) {
+	for k, v := range signTC3(secretId, secretKey, actStr, body, time.Now().Unix()) {
 		req.Header.Set(k, v)
 	}
 	return nil
@@ -207,6 +295,12 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 	if !ok {
 		return nil, fmt.Errorf("invalid task_id")
 	}
+	// 提交 Action 存在 task.Action 里；据此推出 Describe Action。
+	submitAction, _ := body["action"].(string)
+	queryAction := strings.Replace(submitAction, "Submit", "Describe", 1)
+	if queryAction == "" || !strings.HasPrefix(queryAction, "Describe") {
+		queryAction = "DescribeImageToVideoJob" // 兜底
+	}
 	secretId, secretKey, err := splitKey(key)
 	if err != nil {
 		return nil, err
@@ -219,7 +313,7 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 	if err != nil {
 		return nil, err
 	}
-	for k, v := range signTC3(secretId, secretKey, actionQuery, payload, time.Now().Unix()) {
+	for k, v := range signTC3(secretId, secretKey, queryAction, payload, time.Now().Unix()) {
 		req.Header.Set(k, v)
 	}
 	client, err := service.GetHttpClientWithProxy(proxy)
@@ -237,7 +331,7 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 	if r.Response.Error != nil {
 		return nil, fmt.Errorf("%s: %s", r.Response.Error.Code, r.Response.Error.Message)
 	}
-	info := &relaycommon.TaskInfo{TaskID: ""}
+	info := &relaycommon.TaskInfo{}
 	switch r.Response.Status {
 	case "WAIT":
 		info.Status = model.TaskStatusSubmitted
@@ -262,25 +356,18 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 }
 
 func (a *TaskAdaptor) GetModelList() []string {
-	return []string{
-		"kling-v1", "kling-v1-5", "kling-v1-6",
-		"kling-v2-master", "kling-v2-1", "kling-v2-1-master",
-		"kling-v2-5-turbo", "kling-v2-6", "kling-v3",
+	out := make([]string, 0, len(modelDefs))
+	for m := range modelDefs {
+		out = append(out, m)
 	}
+	return out
 }
 
 func (a *TaskAdaptor) GetChannelName() string {
 	return "vclm"
 }
 
-// ============================ 辅助 ============================
-
-func mapModel(name string) string {
-	if v, ok := modelMap[name]; ok {
-		return v
-	}
-	return name // 已是 VCLM 版本码（如 v1.6）则直接用
-}
+// ============================ TC3 签名 ============================
 
 func splitKey(apiKey string) (secretId, secretKey string, err error) {
 	parts := strings.Split(apiKey, "|")
@@ -301,7 +388,6 @@ func hmacSha256(s, key []byte) []byte {
 	return m.Sum(nil)
 }
 
-// signTC3 生成腾讯云 TC3-HMAC-SHA256 鉴权头。
 func signTC3(secretId, secretKey, action string, payload []byte, timestamp int64) map[string]string {
 	const algorithm = "TC3-HMAC-SHA256"
 	const contentType = "application/json; charset=utf-8"
