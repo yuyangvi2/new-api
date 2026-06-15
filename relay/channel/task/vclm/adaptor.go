@@ -36,6 +36,7 @@ import (
 	taskcommon "github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 )
 
 const (
@@ -365,6 +366,30 @@ func (a *TaskAdaptor) GetModelList() []string {
 
 func (a *TaskAdaptor) GetChannelName() string {
 	return "vclm"
+}
+
+// AdjustBillingOnComplete 按 VCLM 实际计费单元(FinalUnitDeduction)精确结算。
+// 实际额度 = 计费单元数 × 模型倍率 × 组倍率 × QuotaPerUnit。
+// 此处模型倍率语义 = 「每个计费单元的美元价」（如 ¥1/单元 → 倍率≈0.139）。
+// 这样预扣(modelRatio/2 × QuotaPerUnit ≈ 半美元级)不会爆炸，完成时再按真实用量补/退。
+// 未配倍率则返回 0（回退到预扣额度不变）。
+func (a *TaskAdaptor) AdjustBillingOnComplete(task *model.Task, taskResult *relaycommon.TaskInfo) int {
+	if taskResult == nil || taskResult.TotalTokens <= 0 {
+		return 0
+	}
+	modelName := task.Properties.OriginModelName
+	if bc := task.PrivateData.BillingContext; bc != nil && bc.OriginModelName != "" {
+		modelName = bc.OriginModelName
+	}
+	modelRatio, ok, _ := ratio_setting.GetModelRatio(modelName)
+	if !ok || modelRatio <= 0 {
+		return 0
+	}
+	groupRatio := 1.0
+	if task.Group != "" {
+		groupRatio = ratio_setting.GetGroupRatio(task.Group)
+	}
+	return int(float64(taskResult.TotalTokens) * modelRatio * groupRatio * common.QuotaPerUnit)
 }
 
 // ============================ TC3 签名 ============================
