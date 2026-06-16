@@ -66,11 +66,14 @@ var modelDefs = map[string]modelDef{
 	"kling-v2-5-turbo":  {"kling", "v2.5"},
 	"kling-v2-6":        {"kling", "v2.6"},
 	"kling-v3":          {"kling", "v3.0"},
-	// Vidu
-	"vidu-q1":  {"vidu", "viduq1"},
-	"vidu-q2":  {"vidu", "viduq2"},
-	"vidu-2.0": {"vidu", "vidu2.0"},
-	"vidu-1.5": {"vidu", "vidu1.5"},
+	// Vidu（模型名直接用 VCLM 码；i2v/t2v 支持的码集不同，dispatch 时不支持的会被上游拒）
+	"viduq3-pro":      {"vidu", "viduq3-pro"},      // 图生+文生
+	"viduq3-pro-fast": {"vidu", "viduq3-pro-fast"}, // 图生
+	"viduq3-turbo":    {"vidu", "viduq3-turbo"},    // 图生+文生
+	"viduq2-pro":      {"vidu", "viduq2-pro"},      // 图生
+	"viduq2-pro-fast": {"vidu", "viduq2-pro-fast"}, // 图生
+	"viduq2-turbo":    {"vidu", "viduq2-turbo"},    // 图生
+	"viduq2":          {"vidu", "viduq2"},          // 文生
 	// 混元生视频
 	"hunyuan-video": {"hunyuan", ""},
 	// 通用图生视频
