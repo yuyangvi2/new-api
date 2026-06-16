@@ -345,6 +345,15 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 	case "DONE":
 		info.Status = model.TaskStatusSuccess
 		info.Url = r.Response.ResultVideoUrl
+		// N6 产出转存：把上游临时链接(24h)转存到自有 COS，返回 7 天预签名链接。
+		// 未配 env 则跳过；转存失败回退上游原链接，不影响任务成功。
+		if cfg, ok := cosConfig(); ok && info.Url != "" && !strings.HasPrefix(info.Url, "data:") {
+			if newURL, err := transferToCOS(cfg, info.Url); err == nil {
+				info.Url = newURL
+			} else {
+				common.SysError(fmt.Sprintf("vclm cos transfer failed, fallback to upstream url: %v", err))
+			}
+		}
 		// 计费单元：可灵返回 FinalUnitDeduction(字符串)，Vidu 返回 Credits(数字)。取二者中有效的一个。
 		units := 0.0
 		if d, err := strconv.ParseFloat(r.Response.FinalUnitDeduction, 64); err == nil && d > 0 {
