@@ -135,6 +135,7 @@ type queryResponse struct {
 		VideoId            string   `json:"VideoId"`
 		Duration           string   `json:"Duration"`
 		FinalUnitDeduction string   `json:"FinalUnitDeduction"`
+		Credits            float64  `json:"Credits"` // Vidu 用 Credits 表示计费积分（可灵用 FinalUnitDeduction）
 		RequestId          string   `json:"RequestId"`
 		Error              *tcError `json:"Error,omitempty"`
 	} `json:"Response"`
@@ -344,11 +345,16 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 	case "DONE":
 		info.Status = model.TaskStatusSuccess
 		info.Url = r.Response.ResultVideoUrl
-		if d, err := strconv.ParseFloat(r.Response.FinalUnitDeduction, 64); err == nil {
-			if rounded := int(math.Ceil(d)); rounded > 0 {
-				info.CompletionTokens = rounded
-				info.TotalTokens = rounded
-			}
+		// 计费单元：可灵返回 FinalUnitDeduction(字符串)，Vidu 返回 Credits(数字)。取二者中有效的一个。
+		units := 0.0
+		if d, err := strconv.ParseFloat(r.Response.FinalUnitDeduction, 64); err == nil && d > 0 {
+			units = d
+		} else if r.Response.Credits > 0 {
+			units = r.Response.Credits
+		}
+		if rounded := int(math.Ceil(units)); rounded > 0 {
+			info.CompletionTokens = rounded
+			info.TotalTokens = rounded
 		}
 	case "FAIL":
 		info.Status = model.TaskStatusFailure
