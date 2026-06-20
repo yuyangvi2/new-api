@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -54,6 +55,11 @@ type modelDef struct {
 	family    string // kling | vidu | hunyuan | general
 	vclmModel string // VCLM Model 参数值；为空表示该 Action 不接受 Model
 }
+
+var (
+	base64Std = base64.StdEncoding
+	base64URL = base64.URLEncoding
+)
 
 var modelDefs = map[string]modelDef{
 	// Kling（Model 用版本码）
@@ -208,6 +214,43 @@ func buildTcImage(s string) tcImage {
 	return tcImage{Base64: s}
 }
 
+// ensureImageURL 保证图片是一个可访问的 URL。
+// 如果已经是 http(s) URL 直接返回；如果是 base64 则上传到 COS 后返回预签名 URL。
+// COS 未配置时返回错误。
+func ensureImageURL(s string) (string, error) {
+	if strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") {
+		return s, nil
+	}
+	// base64 → upload to COS
+	cfg, ok := cosConfig()
+	if !ok {
+		return "", fmt.Errorf("COS not configured; Vidu requires image URL but got base64 input")
+	}
+	// Strip optional data URI prefix (e.g. "data:image/png;base64,...")
+	raw := s
+	if idx := strings.Index(raw, ","); idx >= 0 && strings.Contains(raw[:idx], "base64") {
+		raw = raw[idx+1:]
+	}
+	decoded, err := base64Decode(raw)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode base64 image: %w", err)
+	}
+	objectKey := fmt.Sprintf("vclm/img-%d.png", time.Now().UnixNano())
+	if err := cosPut(cfg, objectKey, bytes.NewReader(decoded), int64(len(decoded)), "image/png"); err != nil {
+		return "", fmt.Errorf("COS upload failed: %w", err)
+	}
+	return cosPresignGet(cfg, objectKey), nil
+}
+
+// base64Decode 解码标准 / URL-safe base64（自动尝试两种编码）。
+func base64Decode(s string) ([]byte, error) {
+	// Try standard first, then URL-safe
+	if data, err := base64Std.DecodeString(s); err == nil {
+		return data, nil
+	}
+	return base64URL.DecodeString(s)
+}
+
 // buildRequest 按 Action 构造 VCLM 请求体（只放该 Action 接受的常用字段）。
 func buildRequest(action string, req *relaycommon.TaskSubmitReq, upstreamModel string) map[string]any {
 	m := map[string]any{}
@@ -239,16 +282,24 @@ func buildRequest(action string, req *relaycommon.TaskSubmitReq, upstreamModel s
 			m["Image"] = buildTcImage(firstImage)
 		}
 	case "SubmitImageToVideoViduJob": // Vidu i2v
+		// Vidu API only accepts URL strings in Images (no tcImage struct).
+		// If the input is base64, upload it to COS first and use the URL.
 		m["Model"] = vclmModel
 		imgs := req.Images
 		if len(imgs) == 0 && firstImage != "" {
 			imgs = []string{firstImage}
 		}
-		tcImgs := make([]tcImage, len(imgs))
-		for i, img := range imgs {
-			tcImgs[i] = buildTcImage(img)
+		urlImgs := make([]string, 0, len(imgs))
+		for _, img := range imgs {
+			resolved, err := ensureImageURL(img)
+			if err != nil {
+				common.SysError(fmt.Sprintf("vidu: failed to convert image to URL: %v", err))
+				urlImgs = append(urlImgs, img) // fallback: pass as-is
+			} else {
+				urlImgs = append(urlImgs, resolved)
+			}
 		}
-		m["Images"] = tcImgs
+		m["Images"] = urlImgs
 		m["Duration"] = dur
 	case "SubmitTextToVideoViduJob": // Vidu t2v
 		m["Model"] = vclmModel
