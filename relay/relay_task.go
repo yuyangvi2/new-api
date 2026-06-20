@@ -326,7 +326,7 @@ func sunoFetchRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *dto.Ta
 			return
 		}
 		for _, task := range taskModels {
-			tasks = append(tasks, TaskModel2Dto(task))
+			tasks = append(tasks, TaskModel2UserDto(task))
 		}
 	} else {
 		tasks = make([]any, 0)
@@ -354,7 +354,7 @@ func sunoFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *dt
 
 	respBody, err = common.Marshal(dto.TaskResponse[any]{
 		Code: "success",
-		Data: TaskModel2Dto(originTask),
+		Data: TaskModel2UserDto(originTask),
 	})
 	return
 }
@@ -404,10 +404,17 @@ func videoFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *d
 		return
 	}
 
-	// 通用 TaskDto 格式
+	// 通用格式：体验中心(/pg/)返回精简轮询 DTO，其他返回用户 DTO
+	isPlayground := strings.HasPrefix(c.Request.RequestURI, "/pg/")
+	var data any
+	if isPlayground {
+		data = TaskModel2PollDto(originTask)
+	} else {
+		data = TaskModel2UserDto(originTask)
+	}
 	respBody, err = common.Marshal(dto.TaskResponse[any]{
 		Code: "success",
-		Data: TaskModel2Dto(originTask),
+		Data: data,
 	})
 	if err != nil {
 		taskResp = service.TaskErrorWrapper(err, "marshal_response_failed", http.StatusInternalServerError)
@@ -538,6 +545,7 @@ func mapTaskStatusToSimple(status model.TaskStatus) string {
 	}
 }
 
+// TaskModel2Dto 将 Task 转为完整 DTO（含上游原始 Data），仅限管理员接口使用。
 func TaskModel2Dto(task *model.Task) *dto.TaskDto {
 	return &dto.TaskDto{
 		ID:         task.ID,
@@ -560,5 +568,39 @@ func TaskModel2Dto(task *model.Task) *dto.TaskDto {
 		Properties: task.Properties,
 		Username:   task.Username,
 		Data:       task.Data,
+	}
+}
+
+// TaskModel2UserDto 将 Task 转为用户可见 DTO，不包含上游原始数据、渠道 ID 等内部信息。
+func TaskModel2UserDto(task *model.Task) *dto.TaskDto {
+	return &dto.TaskDto{
+		ID:         task.ID,
+		CreatedAt:  task.CreatedAt,
+		UpdatedAt:  task.UpdatedAt,
+		TaskID:     task.TaskID,
+		Platform:   string(task.Platform),
+		UserId:     task.UserId,
+		Group:      task.Group,
+		Quota:      task.Quota,
+		Action:     task.Action,
+		Status:     string(task.Status),
+		FailReason: task.FailReason,
+		ResultURL:  task.GetResultURL(),
+		SubmitTime: task.SubmitTime,
+		StartTime:  task.StartTime,
+		FinishTime: task.FinishTime,
+		Progress:   task.Progress,
+		Properties: task.Properties,
+	}
+}
+
+// TaskModel2PollDto 将 Task 转为轮询精简 DTO，只包含前端渲染所需的最少字段。
+func TaskModel2PollDto(task *model.Task) *dto.TaskPollDto {
+	return &dto.TaskPollDto{
+		TaskID:     task.TaskID,
+		Status:     string(task.Status),
+		FailReason: task.FailReason,
+		ResultURL:  task.GetResultURL(),
+		Progress:   task.Progress,
 	}
 }
