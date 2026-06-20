@@ -19,7 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ImageIcon, FilmIcon } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import { ArrowLeft, ImageIcon, FilmIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -83,7 +84,6 @@ export function ImageGenerator() {
   const updateImageConfig = imageGen.updateConfig
   const updateVideoConfig = videoGen.updateConfig
 
-  // Default the image model to an image-capable one.
   useEffect(() => {
     if (models.length === 0) return
     if (models.some((m) => m.value === imageModel)) return
@@ -92,7 +92,6 @@ export function ImageGenerator() {
     updateImageConfig('model', next)
   }, [models, imageModel, updateImageConfig])
 
-  // Default the video model to a video-capable one.
   useEffect(() => {
     if (models.length === 0) return
     if (models.some((m) => m.value === videoModel)) return
@@ -101,7 +100,6 @@ export function ImageGenerator() {
     updateVideoConfig('model', next)
   }, [models, videoModel, updateVideoConfig])
 
-  // Default groups for both configs when unavailable.
   useEffect(() => {
     if (groups.length === 0) return
     const fallback =
@@ -114,88 +112,98 @@ export function ImageGenerator() {
     }
   }, [groups, imageGroup, videoGroup, updateImageConfig, updateVideoConfig])
 
-  const tabs: { mode: GeneratorMode; label: string; icon: typeof ImageIcon }[] =
-    [
-      { mode: 'image', label: t('Image'), icon: ImageIcon },
-      { mode: 'video', label: t('Video'), icon: FilmIcon },
-    ]
+  // ---- Icon rail tabs (rendered into the 80px sidebar via portal) ----
+  const railTabs: { mode: GeneratorMode; label: string; icon: typeof ImageIcon }[] = [
+    { mode: 'image', label: t('Image'), icon: ImageIcon },
+    { mode: 'video', label: t('Video'), icon: FilmIcon },
+  ]
 
-  // Sidebar content: mode toggle + config panel
-  const sidebarContent = (
-    <div className='flex h-full flex-col'>
-      {/* Mode toggle */}
-      <div className='flex items-center gap-2 border-b px-3 py-2'>
-        <div className='bg-muted flex w-full gap-1 rounded-lg p-1'>
-          {tabs.map((tab) => {
-            const Icon = tab.icon
-            return (
-              <button
-                key={tab.mode}
-                type='button'
-                onClick={() => setMode(tab.mode)}
-                className={cn(
-                  'flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                  mode === tab.mode
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <Icon size={15} />
-                {tab.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+  const iconRail = (
+    <nav className='flex h-full flex-col items-center'>
+      {/* Back */}
+      <Link
+        to='/dashboard/overview'
+        className='text-muted-foreground hover:text-foreground hover:bg-accent flex w-full flex-col items-center gap-1 border-b px-2 py-3 text-xs transition-colors'
+      >
+        <ArrowLeft size={20} />
+        <span>{t('Back')}</span>
+      </Link>
 
-      {/* Config panel */}
-      <div className='min-h-0 flex-1 overflow-hidden'>
-        {mode === 'image' ? (
-          <GeneratorPanel
-            config={imageGen.config}
-            updateConfig={imageGen.updateConfig}
-            models={models}
-            groups={groups}
-            isModelLoading={isModelLoading}
-            isGenerating={imageGen.isGenerating}
-            onGenerate={imageGen.generate}
-            onCancel={imageGen.cancel}
-          />
-        ) : (
-          <VideoPanel
-            config={videoGen.config}
-            updateConfig={videoGen.updateConfig}
-            models={models}
-            groups={groups}
-            isModelLoading={isModelLoading}
-            isGenerating={videoGen.isGenerating}
-            availableImages={availableImages}
-            onGenerate={videoGen.generate}
-            onCancel={videoGen.cancel}
-          />
-        )}
+      {/* Mode tabs */}
+      <div className='flex w-full flex-1 flex-col items-center gap-1 pt-2'>
+        {railTabs.map((tab) => {
+          const Icon = tab.icon
+          const active = mode === tab.mode
+          return (
+            <button
+              key={tab.mode}
+              type='button'
+              onClick={() => setMode(tab.mode)}
+              className={cn(
+                'flex w-full flex-col items-center gap-1 rounded-md px-2 py-2.5 text-xs transition-colors',
+                active
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+              )}
+            >
+              <Icon size={20} />
+              <span>{tab.label}</span>
+            </button>
+          )
+        })}
       </div>
-    </div>
+    </nav>
   )
 
   return (
     <>
-      {/* Inject config panel into sidebar via portal */}
-      {portalTarget && createPortal(sidebarContent, portalTarget)}
+      {/* Icon rail → sidebar (80px) via portal */}
+      {portalTarget && createPortal(iconRail, portalTarget)}
 
-      {/* Results in main content area */}
-      <div className='size-full'>
-        {mode === 'image' ? (
-          <ResultGallery
-            batches={imageGen.batches}
-            onClearHistory={imageGen.clearHistory}
-          />
-        ) : (
-          <VideoResults
-            batches={videoGen.batches}
-            onClearHistory={videoGen.clearHistory}
-          />
-        )}
+      {/* Main content: 320px config aside + results */}
+      <div className='flex size-full min-h-0'>
+        {/* Config panel */}
+        <aside className='bg-card flex w-[320px] shrink-0 flex-col border-r'>
+          {mode === 'image' ? (
+            <GeneratorPanel
+              config={imageGen.config}
+              updateConfig={imageGen.updateConfig}
+              models={models}
+              groups={groups}
+              isModelLoading={isModelLoading}
+              isGenerating={imageGen.isGenerating}
+              onGenerate={imageGen.generate}
+              onCancel={imageGen.cancel}
+            />
+          ) : (
+            <VideoPanel
+              config={videoGen.config}
+              updateConfig={videoGen.updateConfig}
+              models={models}
+              groups={groups}
+              isModelLoading={isModelLoading}
+              isGenerating={videoGen.isGenerating}
+              availableImages={availableImages}
+              onGenerate={videoGen.generate}
+              onCancel={videoGen.cancel}
+            />
+          )}
+        </aside>
+
+        {/* Results gallery */}
+        <section className='min-w-0 flex-1'>
+          {mode === 'image' ? (
+            <ResultGallery
+              batches={imageGen.batches}
+              onClearHistory={imageGen.clearHistory}
+            />
+          ) : (
+            <VideoResults
+              batches={videoGen.batches}
+              onClearHistory={videoGen.clearHistory}
+            />
+          )}
+        </section>
       </div>
     </>
   )

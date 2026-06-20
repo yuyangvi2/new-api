@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useEffect } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { MOTION_TRANSITION, MOTION_VARIANTS } from '@/lib/motion'
 import { useLayout } from '@/context/layout-provider'
@@ -24,6 +25,11 @@ import { useSidebarView } from '@/hooks/use-sidebar-view'
 import { Sidebar, SidebarContent, SidebarRail } from '@/components/ui/sidebar'
 import { NavGroup } from './nav-group'
 import { SidebarViewHeader } from './sidebar-view-header'
+
+/** Width of the icon-rail sidebar used by portal views (Experience Center). */
+const PORTAL_SIDEBAR_WIDTH = '80px'
+/** Default sidebar width — must match the constant in sidebar.tsx. */
+const DEFAULT_SIDEBAR_WIDTH = '13rem'
 
 /**
  * Application sidebar.
@@ -34,13 +40,8 @@ import { SidebarViewHeader } from './sidebar-view-header'
  * with a `← Back to Dashboard` affordance — instead of stacking the
  * sub-navigation inside the root tree.
  *
- * Architecture:
- *   - View resolution + filtering: {@link useSidebarView}
- *   - View registry: `layout/lib/sidebar-view-registry.ts`
- *   - Per-view header: {@link SidebarViewHeader}
- *
- * Adding a new nested view only requires registering a {@link SidebarView}
- * in the registry; this component requires no changes.
+ * Portal views (e.g. Experience Center) shrink the sidebar to an 80 px
+ * icon rail and let the page component inject its own content.
  */
 export function AppSidebar() {
   const { collapsible, variant } = useLayout()
@@ -48,12 +49,29 @@ export function AppSidebar() {
   const shouldReduce = useReducedMotion()
   const setPortalTarget = useSetSidebarPortalTarget()
 
+  // Override --sidebar-width on the provider wrapper so both the gap
+  // and the fixed container respect the narrower rail width.
+  // Clean up on unmount or when leaving the portal view.
+  const isPortal = !!view?.usePortal
+  useEffect(() => {
+    if (!isPortal) return
+    const wrapper = document.querySelector<HTMLElement>(
+      '[data-slot="sidebar-wrapper"]'
+    )
+    if (!wrapper) return
+    wrapper.style.setProperty('--sidebar-width', PORTAL_SIDEBAR_WIDTH)
+    return () => {
+      wrapper.style.setProperty('--sidebar-width', DEFAULT_SIDEBAR_WIDTH)
+    }
+  }, [isPortal])
+
   return (
     <Sidebar collapsible={collapsible} variant={variant}>
-      {view && <SidebarViewHeader view={view} />}
+      {/* Portal views manage their own back button inside the rail */}
+      {view && !view.usePortal && <SidebarViewHeader view={view} />}
 
       {view?.usePortal ? (
-        /* Portal mode: page component injects content via createPortal */
+        /* Portal mode: narrow icon rail — page injects via createPortal */
         <SidebarContent className='p-0'>
           <div ref={setPortalTarget} className='flex h-full flex-col' />
         </SidebarContent>
