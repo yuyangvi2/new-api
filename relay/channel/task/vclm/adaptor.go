@@ -198,6 +198,16 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	return bytes.NewReader(data), nil
 }
 
+// buildTcImage 根据输入是 URL 还是 base64，放入 VCLM Image 对象对应的字段。
+// 前端上传/复用的图片以 base64（已去掉 data: 前缀）传入；远端会把 Url 字段
+// 当作 URL 校验，若把 base64 塞进 Url 会报 InvalidParameterValue.UrlIllegal。
+func buildTcImage(s string) tcImage {
+	if strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") {
+		return tcImage{Url: s}
+	}
+	return tcImage{Base64: s}
+}
+
 // buildRequest 按 Action 构造 VCLM 请求体（只放该 Action 接受的常用字段）。
 func buildRequest(action string, req *relaycommon.TaskSubmitReq, upstreamModel string) map[string]any {
 	m := map[string]any{}
@@ -215,7 +225,7 @@ func buildRequest(action string, req *relaycommon.TaskSubmitReq, upstreamModel s
 	switch action {
 	case "SubmitImageToVideoJob": // Kling i2v
 		m["Model"] = vclmModel
-		m["Image"] = tcImage{Url: firstImage}
+		m["Image"] = buildTcImage(firstImage)
 		m["Duration"] = strconv.Itoa(dur)
 		m["Mode"] = mode
 	case "SubmitTextToVideoJob": // Kling t2v
@@ -223,10 +233,10 @@ func buildRequest(action string, req *relaycommon.TaskSubmitReq, upstreamModel s
 		m["Duration"] = strconv.Itoa(dur)
 		m["Mode"] = mode
 	case "SubmitImageToVideoGeneralJob": // 通用 i2v（无 Model）
-		m["Image"] = tcImage{Url: firstImage}
+		m["Image"] = buildTcImage(firstImage)
 	case "SubmitHunyuanToVideoJob": // 混元
 		if firstImage != "" {
-			m["Image"] = tcImage{Url: firstImage}
+			m["Image"] = buildTcImage(firstImage)
 		}
 	case "SubmitImageToVideoViduJob": // Vidu i2v
 		m["Model"] = vclmModel
@@ -234,7 +244,11 @@ func buildRequest(action string, req *relaycommon.TaskSubmitReq, upstreamModel s
 		if len(imgs) == 0 && firstImage != "" {
 			imgs = []string{firstImage}
 		}
-		m["Images"] = imgs
+		tcImgs := make([]tcImage, len(imgs))
+		for i, img := range imgs {
+			tcImgs[i] = buildTcImage(img)
+		}
+		m["Images"] = tcImgs
 		m["Duration"] = dur
 	case "SubmitTextToVideoViduJob": // Vidu t2v
 		m["Model"] = vclmModel
