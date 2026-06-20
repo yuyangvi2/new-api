@@ -55,6 +55,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
+import { MultiSelect } from '@/components/multi-select'
 import {
   SideDrawerSection,
   sideDrawerContentClassName,
@@ -326,31 +327,23 @@ export function UsersMutateDrawer({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>{t('Group')}</FormLabel>
-                        <Select
-                          items={[
-                            ...groups.map((group) => ({
+                        <FormControl>
+                          <MultiSelect
+                            options={groups.map((group) => ({
                               value: group,
                               label: group,
-                            })),
-                          ]}
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder={t('Select a group')} />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent alignItemWithTrigger={false}>
-                            <SelectGroup>
-                              {groups.map((group) => (
-                                <SelectItem key={group} value={group}>
-                                  {group}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
+                            }))}
+                            selected={
+                              field.value
+                                ? field.value.split(',').filter(Boolean)
+                                : []
+                            }
+                            onChange={(values) =>
+                              field.onChange(values.join(','))
+                            }
+                            placeholder={t('Select groups')}
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
