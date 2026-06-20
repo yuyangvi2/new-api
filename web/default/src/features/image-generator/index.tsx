@@ -169,7 +169,6 @@ export function ImageGenerator() {
               config={imageGen.config}
               updateConfig={imageGen.updateConfig}
               models={models}
-              groups={groups}
               isModelLoading={isModelLoading}
               isGenerating={imageGen.isGenerating}
               onGenerate={imageGen.generate}
@@ -180,7 +179,6 @@ export function ImageGenerator() {
               config={videoGen.config}
               updateConfig={videoGen.updateConfig}
               models={models}
-              groups={groups}
               isModelLoading={isModelLoading}
               isGenerating={videoGen.isGenerating}
               availableImages={availableImages}

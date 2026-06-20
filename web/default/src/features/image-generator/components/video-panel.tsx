@@ -18,22 +18,24 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { FilmIcon, SquareIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { ModelGroupSelector } from '@/components/model-group-selector'
+import { ModelSelector } from '@/components/model-group-selector'
 import {
   MAX_PROMPT_LENGTH,
   VIDEO_DURATIONS,
   VIDEO_SIZE_PRESETS,
 } from '../constants'
-import type {
-  GroupOption,
-  ImageSourceType,
-  ModelOption,
-  VideoConfig,
-} from '../types'
+import type { ImageSourceType, ModelOption, VideoConfig } from '../types'
 import { ImageSourceInput } from './image-source-input'
 
 interface VideoPanelProps {
@@ -43,7 +45,6 @@ interface VideoPanelProps {
     value: VideoConfig[K]
   ) => void
   models: ModelOption[]
-  groups: GroupOption[]
   isModelLoading: boolean
   isGenerating: boolean
   availableImages: { id: string; src: string }[]
@@ -55,7 +56,6 @@ export function VideoPanel({
   config,
   updateConfig,
   models,
-  groups,
   isModelLoading,
   isGenerating,
   availableImages,
@@ -73,6 +73,11 @@ export function VideoPanel({
 
   return (
     <div className='flex h-full flex-col'>
+      {/* Title */}
+      <div className='border-b px-4 py-3'>
+        <h2 className='text-sm font-semibold'>{t('Video Generation')}</h2>
+      </div>
+
       <div className='flex-1 space-y-5 overflow-y-auto p-4'>
         {/* Input image */}
         <div className='space-y-2'>
@@ -86,37 +91,29 @@ export function VideoPanel({
           />
         </div>
 
-        {/* Model + group */}
+        {/* Model */}
         <div className='space-y-2'>
           <Label className='text-sm font-medium'>{t('Model')}</Label>
-          <ModelGroupSelector
+          <ModelSelector
             className='w-full'
             selectedModel={config.model}
             models={models}
             onModelChange={(value) => updateConfig('model', value)}
-            selectedGroup={config.group}
-            groups={groups}
-            onGroupChange={(value) => updateConfig('group', value)}
             disabled={isModelLoading}
           />
         </div>
 
         {/* Motion prompt (optional) */}
         <div className='space-y-2'>
-          <div className='flex items-center justify-between'>
-            <Label className='text-sm font-medium'>
-              {t('Motion prompt (optional)')}
-            </Label>
-            <span className='text-muted-foreground text-xs'>
-              {config.prompt.length}/{MAX_PROMPT_LENGTH}
-            </span>
-          </div>
+          <Label className='text-sm font-medium'>
+            {t('Motion prompt (optional)')}
+          </Label>
           <Textarea
             value={config.prompt}
             onChange={(e) =>
               updateConfig('prompt', e.target.value.slice(0, MAX_PROMPT_LENGTH))
             }
-            placeholder={t('Describe how the image should move...')}
+            placeholder={t('Describe how the image should move')}
             className='min-h-[80px] resize-y'
             disabled={isGenerating}
           />
@@ -125,66 +122,58 @@ export function VideoPanel({
         {/* Duration */}
         <div className='space-y-2'>
           <Label className='text-sm font-medium'>{t('Duration (sec)')}</Label>
-          <div className='grid grid-cols-2 gap-2'>
-            {VIDEO_DURATIONS.map((d) => {
-              const active = config.duration === d
-              return (
-                <button
-                  key={d}
-                  type='button'
-                  disabled={isGenerating}
-                  onClick={() => updateConfig('duration', d)}
-                  className={cn(
-                    'rounded-lg border py-2 text-sm transition-colors disabled:opacity-50',
-                    active
-                      ? 'border-primary bg-primary/5'
-                      : 'hover:border-muted-foreground/40'
-                  )}
-                >
-                  {d}s
-                </button>
-              )
-            })}
-          </div>
+          <Select
+            items={VIDEO_DURATIONS.map((d) => ({
+              value: String(d),
+              label: `${d}s`,
+            }))}
+            onValueChange={(v) => updateConfig('duration', Number(v))}
+            value={String(config.duration)}
+            disabled={isGenerating}
+          >
+            <SelectTrigger className='w-full'>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {VIDEO_DURATIONS.map((d) => (
+                  <SelectItem key={d} value={String(d)}>
+                    {d}s
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Aspect ratio */}
         <div className='space-y-2'>
           <Label className='text-sm font-medium'>{t('Aspect ratio')}</Label>
-          <div className='grid grid-cols-3 gap-2'>
-            {VIDEO_SIZE_PRESETS.map((preset) => {
-              const sizeValue = `${preset.width}x${preset.height}`
-              const active = config.size === sizeValue
-              return (
-                <button
-                  key={sizeValue}
-                  type='button'
-                  disabled={isGenerating}
-                  onClick={() => updateConfig('size', sizeValue)}
-                  className={cn(
-                    'flex flex-col items-center gap-1.5 rounded-lg border p-2 transition-colors disabled:opacity-50',
-                    active
-                      ? 'border-primary bg-primary/5'
-                      : 'hover:border-muted-foreground/40'
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'rounded-sm border',
-                      active ? 'border-primary' : 'border-muted-foreground/50'
-                    )}
-                    style={{
-                      width: preset.ratio >= 1 ? 24 : 24 * preset.ratio,
-                      height: preset.ratio >= 1 ? 24 / preset.ratio : 24,
-                    }}
-                  />
-                  <span className='text-[11px] leading-none'>
-                    {preset.ratioLabel}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
+          <Select
+            items={VIDEO_SIZE_PRESETS.map((p) => ({
+              value: `${p.width}x${p.height}`,
+              label: `${p.ratioLabel} (${p.width}x${p.height})`,
+            }))}
+            onValueChange={(v) => updateConfig('size', v)}
+            value={config.size}
+            disabled={isGenerating}
+          >
+            <SelectTrigger className='w-full'>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {VIDEO_SIZE_PRESETS.map((p) => {
+                  const val = `${p.width}x${p.height}`
+                  return (
+                    <SelectItem key={val} value={val}>
+                      {p.ratioLabel} ({val})
+                    </SelectItem>
+                  )
+                })}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
