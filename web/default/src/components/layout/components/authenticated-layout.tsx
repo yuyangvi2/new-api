@@ -20,6 +20,7 @@ import { getCookie } from '@/lib/cookies'
 import { cn } from '@/lib/utils'
 import { LayoutProvider } from '@/context/layout-provider'
 import { SearchProvider } from '@/context/search-provider'
+import { SidebarPortalProvider } from '@/context/sidebar-portal'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { AnimatedOutlet } from '@/components/page-transition'
 import { SkipToMain } from '@/components/skip-to-main'
@@ -36,12 +37,13 @@ export function AuthenticatedLayout(props: AuthenticatedLayoutProps) {
   return (
     <LayoutProvider>
       <SearchProvider>
-        <SidebarProvider defaultOpen={defaultOpen} className='flex-col'>
-          <SkipToMain />
-          <AppHeader />
-          <div className='flex min-h-0 w-full flex-1'>
-            <AppSidebar />
-            <SidebarInset
+        <SidebarPortalProvider>
+          <SidebarProvider defaultOpen={defaultOpen} className='flex-col'>
+            <SkipToMain />
+            <AppHeader />
+            <div className='flex min-h-0 w-full flex-1'>
+              <AppSidebar />
+              <SidebarInset
               className={cn(
                 '@container/content',
                 'h-[calc(100svh-var(--app-header-height,0px))]',
@@ -49,10 +51,11 @@ export function AuthenticatedLayout(props: AuthenticatedLayoutProps) {
                 'peer-data-[variant=inset]:h-[calc(100svh-var(--app-header-height,0px)-(var(--spacing)*4))]'
               )}
             >
-              {props.children ?? <AnimatedOutlet />}
-            </SidebarInset>
-          </div>
-        </SidebarProvider>
+                {props.children ?? <AnimatedOutlet />}
+              </SidebarInset>
+            </div>
+          </SidebarProvider>
+        </SidebarPortalProvider>
       </SearchProvider>
     </LayoutProvider>
   )

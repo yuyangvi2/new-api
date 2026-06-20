@@ -120,6 +120,12 @@ export type SidebarView = {
   parent: SidebarViewParent
   /** Nav group builder, called per render with the active translator */
   getNavGroups: (t: TFunction) => NavGroup[]
+  /**
+   * When true, the sidebar renders an empty portal target instead of
+   * nav groups — the page component injects custom content via
+   * `createPortal` + `useSidebarPortalTarget()`.
+   */
+  usePortal?: boolean
 }
 
 /**

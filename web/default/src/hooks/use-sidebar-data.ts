@@ -58,9 +58,10 @@ export function useSidebarData(): SidebarData {
             icon: FlaskConical,
           },
           {
-            title: t('Image Generator'),
+            title: t('Experience Center'),
             url: '/image-generator',
             icon: ImagePlus,
+            activeUrls: ['/image-generator'],
           },
           {
             title: t('Chat'),

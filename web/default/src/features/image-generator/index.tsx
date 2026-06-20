@@ -17,11 +17,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ImageIcon, FilmIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useSidebarPortalTarget } from '@/context/sidebar-portal'
 import { getUserGroups, getUserModels } from './api'
 import { GeneratorPanel } from './components/generator-panel'
 import { ResultGallery } from './components/result-gallery'
@@ -37,6 +39,7 @@ const VIDEO_MODEL_RE =
 export function ImageGenerator() {
   const { t } = useTranslation()
   const [mode, setMode] = useState<GeneratorMode>('image')
+  const portalTarget = useSidebarPortalTarget()
 
   const imageGen = useImageGenerator()
   const videoGen = useVideoGenerator()
@@ -117,11 +120,12 @@ export function ImageGenerator() {
       { mode: 'video', label: t('Video'), icon: FilmIcon },
     ]
 
-  return (
-    <div className='flex size-full flex-col overflow-hidden'>
+  // Sidebar content: mode toggle + config panel
+  const sidebarContent = (
+    <div className='flex h-full flex-col'>
       {/* Mode toggle */}
-      <div className='flex items-center gap-2 border-b px-4 py-2'>
-        <div className='bg-muted flex gap-1 rounded-lg p-1'>
+      <div className='flex items-center gap-2 border-b px-3 py-2'>
+        <div className='bg-muted flex w-full gap-1 rounded-lg p-1'>
           {tabs.map((tab) => {
             const Icon = tab.icon
             return (
@@ -130,7 +134,7 @@ export function ImageGenerator() {
                 type='button'
                 onClick={() => setMode(tab.mode)}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                  'flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                   mode === tab.mode
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
@@ -144,50 +148,55 @@ export function ImageGenerator() {
         </div>
       </div>
 
-      <div className='flex min-h-0 flex-1'>
-        {/* Control panel */}
-        <aside className='bg-card flex w-full max-w-[340px] shrink-0 flex-col border-r'>
-          {mode === 'image' ? (
-            <GeneratorPanel
-              config={imageGen.config}
-              updateConfig={imageGen.updateConfig}
-              models={models}
-              groups={groups}
-              isModelLoading={isModelLoading}
-              isGenerating={imageGen.isGenerating}
-              onGenerate={imageGen.generate}
-              onCancel={imageGen.cancel}
-            />
-          ) : (
-            <VideoPanel
-              config={videoGen.config}
-              updateConfig={videoGen.updateConfig}
-              models={models}
-              groups={groups}
-              isModelLoading={isModelLoading}
-              isGenerating={videoGen.isGenerating}
-              availableImages={availableImages}
-              onGenerate={videoGen.generate}
-              onCancel={videoGen.cancel}
-            />
-          )}
-        </aside>
-
-        {/* Results */}
-        <section className='min-w-0 flex-1'>
-          {mode === 'image' ? (
-            <ResultGallery
-              batches={imageGen.batches}
-              onClearHistory={imageGen.clearHistory}
-            />
-          ) : (
-            <VideoResults
-              batches={videoGen.batches}
-              onClearHistory={videoGen.clearHistory}
-            />
-          )}
-        </section>
+      {/* Config panel */}
+      <div className='min-h-0 flex-1 overflow-hidden'>
+        {mode === 'image' ? (
+          <GeneratorPanel
+            config={imageGen.config}
+            updateConfig={imageGen.updateConfig}
+            models={models}
+            groups={groups}
+            isModelLoading={isModelLoading}
+            isGenerating={imageGen.isGenerating}
+            onGenerate={imageGen.generate}
+            onCancel={imageGen.cancel}
+          />
+        ) : (
+          <VideoPanel
+            config={videoGen.config}
+            updateConfig={videoGen.updateConfig}
+            models={models}
+            groups={groups}
+            isModelLoading={isModelLoading}
+            isGenerating={videoGen.isGenerating}
+            availableImages={availableImages}
+            onGenerate={videoGen.generate}
+            onCancel={videoGen.cancel}
+          />
+        )}
       </div>
     </div>
+  )
+
+  return (
+    <>
+      {/* Inject config panel into sidebar via portal */}
+      {portalTarget && createPortal(sidebarContent, portalTarget)}
+
+      {/* Results in main content area */}
+      <div className='size-full'>
+        {mode === 'image' ? (
+          <ResultGallery
+            batches={imageGen.batches}
+            onClearHistory={imageGen.clearHistory}
+          />
+        ) : (
+          <VideoResults
+            batches={videoGen.batches}
+            onClearHistory={videoGen.clearHistory}
+          />
+        )}
+      </div>
+    </>
   )
 }
