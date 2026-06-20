@@ -100,6 +100,10 @@ export async function submitVideoTask(
 
 /**
  * Poll a video task's status by id.
+ *
+ * The backend wraps the task payload inside `{ code, message, data }`.
+ * We unwrap `.data` and normalise `result_url` → `url` so the polling
+ * loop can consume a flat {@link VideoTaskResponse}.
  */
 export async function fetchVideoTask(
   taskId: string,
@@ -111,5 +115,16 @@ export async function fetchVideoTask(
     disableDuplicate: true,
     signal,
   } as Record<string, unknown>)
-  return res.data as VideoTaskResponse
+
+  // Unwrap the standard { code, message, data } envelope.
+  const raw = (res.data?.data ?? res.data) as Record<string, unknown>
+
+  return {
+    task_id: (raw.task_id as string) || taskId,
+    status: (raw.status as string) || '',
+    url: (raw.result_url as string) || (raw.url as string) || undefined,
+    error: raw.fail_reason
+      ? { message: raw.fail_reason as string }
+      : undefined,
+  } as VideoTaskResponse
 }
