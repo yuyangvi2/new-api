@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { GeneratorConfig, VideoConfig } from './types'
+import type { FamilyParam, GeneratorConfig, ModelFamily, VideoConfig } from './types'
 
 // API endpoints
 export const API_ENDPOINTS = {
@@ -127,8 +127,78 @@ export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
   imageSourceType: 'upload',
   duration: 5,
   size: '1280x720',
+  metadata: {},
 }
 
 // Terminal task statuses reported by the backend (case-insensitive).
 export const VIDEO_SUCCESS_STATUSES = ['succeeded', 'success', 'completed']
 export const VIDEO_FAILED_STATUSES = ['failed', 'error', 'cancelled', 'canceled']
+
+// ---------------------------------------------------------------------------
+// Model-family detection & per-family parameter schemas
+// ---------------------------------------------------------------------------
+
+const KLING_RE = /kling/i
+const VIDU_RE = /vidu/i
+
+export function detectModelFamily(model: string): ModelFamily {
+  if (KLING_RE.test(model)) return 'kling'
+  if (VIDU_RE.test(model)) return 'vidu'
+  return 'unknown'
+}
+
+export const FAMILY_PARAMS: Record<ModelFamily, FamilyParam[]> = {
+  kling: [
+    {
+      key: 'Mode',
+      label: 'Generation mode',
+      type: 'select',
+      default: 'std',
+      options: [
+        { label: 'Standard', value: 'std' },
+        { label: 'Pro', value: 'pro' },
+      ],
+    },
+    {
+      key: 'CfgScale',
+      label: 'Prompt adherence',
+      type: 'slider',
+      default: 0.5,
+      min: 0,
+      max: 1,
+      step: 0.1,
+    },
+    {
+      key: 'NegativePrompt',
+      label: 'Negative prompt',
+      type: 'text',
+      default: '',
+    },
+  ],
+  vidu: [
+    {
+      key: 'Resolution',
+      label: 'Resolution',
+      type: 'select',
+      default: '720p',
+      options: [
+        { label: '540p', value: '540p' },
+        { label: '720p', value: '720p' },
+        { label: '1080p', value: '1080p' },
+      ],
+    },
+    {
+      key: 'MovementAmplitude',
+      label: 'Movement amplitude',
+      type: 'select',
+      default: 'auto',
+      options: [
+        { label: 'Auto', value: 'auto' },
+        { label: 'Small', value: 'small' },
+        { label: 'Medium', value: 'medium' },
+        { label: 'Large', value: 'large' },
+      ],
+    },
+  ],
+  unknown: [],
+}

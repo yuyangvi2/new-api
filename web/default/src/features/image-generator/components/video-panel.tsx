@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useMemo } from 'react'
 import { FilmIcon, SquareIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -28,9 +29,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Slider } from '@/components/ui/slider'
 import { Textarea } from '@/components/ui/textarea'
 import { ModelSelector } from '@/components/model-group-selector'
 import {
+  detectModelFamily,
+  FAMILY_PARAMS,
   MAX_PROMPT_LENGTH,
   VIDEO_DURATIONS,
   VIDEO_SIZE_PRESETS,
@@ -66,7 +70,17 @@ export function VideoPanel({
 }: VideoPanelProps) {
   const { t } = useTranslation()
 
+  const family = useMemo(() => detectModelFamily(config.model), [config.model])
+  const familyParams = useMemo(() => FAMILY_PARAMS[family], [family])
+
   const canGenerate = !!config.image && !isGenerating
+
+  const updateMeta = (key: string, value: unknown) => {
+    updateConfig('metadata', { ...config.metadata, [key]: value })
+  }
+
+  const getMetaValue = (key: string, defaultValue: unknown) =>
+    config.metadata[key] ?? defaultValue
 
   const handleImageChange = (src: string, sourceType: ImageSourceType) => {
     updateConfig('image', src)
@@ -177,6 +191,71 @@ export function VideoPanel({
             </SelectContent>
           </Select>
         </div>
+
+        {/* Model-family specific parameters */}
+        {familyParams.length > 0 && (
+          <>
+            <div className='border-muted-foreground/20 border-t pt-4'>
+              <Label className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+                {t('Advanced')}
+              </Label>
+            </div>
+            {familyParams.map((param) => (
+              <div key={param.key} className='space-y-2'>
+                <Label className='text-sm font-medium'>{t(param.label)}</Label>
+                {param.type === 'select' && param.options && (
+                  <Select
+                    items={param.options.map((o) => ({
+                      value: o.value,
+                      label: t(o.label),
+                    }))}
+                    onValueChange={(v) => updateMeta(param.key, v)}
+                    value={String(getMetaValue(param.key, param.default))}
+                    disabled={isGenerating}
+                  >
+                    <SelectTrigger className='w-full'>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {param.options.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {t(o.label)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                )}
+                {param.type === 'slider' && (
+                  <div className='flex items-center gap-3'>
+                    <Slider
+                      min={param.min ?? 0}
+                      max={param.max ?? 1}
+                      step={param.step ?? 0.1}
+                      value={[Number(getMetaValue(param.key, param.default))]}
+                      onValueChange={([v]) => updateMeta(param.key, v)}
+                      disabled={isGenerating}
+                      className='flex-1'
+                    />
+                    <span className='text-muted-foreground w-8 text-right text-xs'>
+                      {Number(getMetaValue(param.key, param.default)).toFixed(1)}
+                    </span>
+                  </div>
+                )}
+                {param.type === 'text' && (
+                  <Textarea
+                    value={String(getMetaValue(param.key, param.default))}
+                    onChange={(e) => updateMeta(param.key, e.target.value)}
+                    placeholder={t(param.label)}
+                    className='min-h-[60px] resize-y'
+                    disabled={isGenerating}
+                  />
+                )}
+              </div>
+            ))}
+          </>
+        )}
       </div>
 
       {/* Sticky generate button */}

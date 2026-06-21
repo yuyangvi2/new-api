@@ -137,6 +137,16 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
         (p) => `${p.width}x${p.height}` === config.size
       )
 
+      // Collect non-empty metadata entries for model-family-specific params.
+      const meta: Record<string, unknown> = {}
+      if (config.metadata) {
+        for (const [k, v] of Object.entries(config.metadata)) {
+          if (v !== '' && v !== undefined && v !== null) {
+            meta[k] = v
+          }
+        }
+      }
+
       const submit = await submitVideoTask(
         {
           model: config.model,
@@ -146,6 +156,7 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
           duration: config.duration,
           width: preset?.width,
           height: preset?.height,
+          ...(Object.keys(meta).length > 0 ? { metadata: meta } : {}),
         },
         controller.signal
       )

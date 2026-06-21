@@ -111,6 +111,7 @@ export interface VideoGenerationRequest {
   duration?: number
   width?: number
   height?: number
+  metadata?: Record<string, unknown>
 }
 
 // Response of submitting a video task
@@ -152,4 +153,25 @@ export interface VideoConfig {
   imageSourceType: ImageSourceType
   duration: number
   size: string
+  // Model-family-specific parameters, keyed by PascalCase upstream names.
+  metadata: Record<string, unknown>
+}
+
+// ---------------------------------------------------------------------------
+// Model-family dynamic parameters
+// ---------------------------------------------------------------------------
+
+export type ModelFamily = 'kling' | 'vidu' | 'unknown'
+
+export type ParamType = 'select' | 'slider' | 'text' | 'switch'
+
+export interface FamilyParam {
+  key: string          // PascalCase key sent in metadata (e.g. "Mode")
+  label: string        // i18n display label
+  type: ParamType
+  default: unknown
+  options?: { label: string; value: string }[]  // for select
+  min?: number         // for slider
+  max?: number
+  step?: number
 }
