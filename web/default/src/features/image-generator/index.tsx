@@ -25,7 +25,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useSidebarPortalTarget } from '@/context/sidebar-portal'
-import { getUserGroups, getUserModels } from './api'
+import { getUserModels } from './api'
 import { GeneratorPanel } from './components/generator-panel'
 import { ResultGallery } from './components/result-gallery'
 import { VideoPanel } from './components/video-panel'
@@ -57,17 +57,6 @@ export function ImageGenerator() {
     },
   })
 
-  const { data: groups = [] } = useQuery({
-    queryKey: ['image-generator-groups'],
-    queryFn: async () => {
-      try {
-        return await getUserGroups()
-      } catch {
-        return []
-      }
-    },
-  })
-
   // Filter models by tab type so image tab only shows image models, etc.
   const imageModels = useMemo(
     () => models.filter((m) => IMAGE_MODEL_RE.test(m.value)),
@@ -87,49 +76,28 @@ export function ImageGenerator() {
     [imageGen.batches]
   )
 
-  const imageModel = imageGen.config.model
-  const videoModel = videoGen.config.model
-  const updateImageConfig = imageGen.updateConfig
-  const updateVideoConfig = videoGen.updateConfig
-
-  // Helper: set model + auto-resolve its group from the models list
-  const setModelWithGroup = useCallback(
-    (
-      updater: typeof updateImageConfig,
-      modelValue: string,
-      modelsList: typeof models
-    ) => {
-      updater('model', modelValue)
-      const found = modelsList.find((m) => m.value === modelValue)
-      if (found?.group) {
-        updater('group', found.group)
-      }
-    },
-    []
-  )
-
   const handleImageModelChange = useCallback(
-    (value: string) => setModelWithGroup(updateImageConfig, value, imageModels),
-    [imageModels, updateImageConfig, setModelWithGroup]
+    (value: string) => imageGen.updateConfig('model', value),
+    [imageGen.updateConfig]
   )
 
   const handleVideoModelChange = useCallback(
-    (value: string) => setModelWithGroup(updateVideoConfig, value, videoModels),
-    [videoModels, updateVideoConfig, setModelWithGroup]
+    (value: string) => videoGen.updateConfig('model', value),
+    [videoGen.updateConfig]
   )
 
-  // Auto-select initial model (+ group) when models load
+  // Auto-select initial model when models load
   useEffect(() => {
     if (imageModels.length === 0) return
-    if (imageModels.some((m) => m.value === imageModel)) return
-    setModelWithGroup(updateImageConfig, imageModels[0].value, imageModels)
-  }, [imageModels, imageModel, updateImageConfig, setModelWithGroup])
+    if (imageModels.some((m) => m.value === imageGen.config.model)) return
+    imageGen.updateConfig('model', imageModels[0].value)
+  }, [imageModels, imageGen.config.model, imageGen.updateConfig])
 
   useEffect(() => {
     if (videoModels.length === 0) return
-    if (videoModels.some((m) => m.value === videoModel)) return
-    setModelWithGroup(updateVideoConfig, videoModels[0].value, videoModels)
-  }, [videoModels, videoModel, updateVideoConfig, setModelWithGroup])
+    if (videoModels.some((m) => m.value === videoGen.config.model)) return
+    videoGen.updateConfig('model', videoModels[0].value)
+  }, [videoModels, videoGen.config.model, videoGen.updateConfig])
 
   // ---- Icon rail tabs (rendered into the 80px sidebar via portal) ----
   const railTabs: { mode: GeneratorMode; label: string; icon: typeof ImageIcon }[] = [

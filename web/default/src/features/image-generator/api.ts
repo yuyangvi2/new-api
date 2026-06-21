@@ -39,12 +39,10 @@ export async function getUserModels(): Promise<ModelOption[]> {
     return []
   }
 
-  return data.data.map((item: { model: string; group: string } | string) => {
-    if (typeof item === 'string') {
-      return { label: item, value: item }
-    }
-    return { label: item.model, value: item.model, group: item.group }
-  })
+  return data.data.map((model: string) => ({
+    label: model,
+    value: model,
+  }))
 }
 
 /**
