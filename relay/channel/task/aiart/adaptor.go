@@ -1,12 +1,10 @@
-// Package aiart 实现腾讯云 AIART（大模型图像创作引擎）任务适配器。
+// Package aiart 实现腾讯云 AIART（大模型图像创作引擎）任务适配器（派发式）。
 //
 // 上游：aiart.tencentcloudapi.com，TC3-HMAC-SHA256 签名，异步 submit/query。
-// 支持模型：
-//   - Image-GI   : Nano Banana Pro（文+图 → 图）
-//   - Image-GI2  : Nano Banana 2 （文+图 → 图）
-//
-// 提交 Action：SubmitContentToImageGIJob
-// 查询 Action：DescribeContentToImageGIJob
+// 一个渠道类型(9002) 内按模型名自动派发到对应 AIART Action：
+//   - image-gi      : SubmitContentToImageGIJob / DescribeContentToImageGIJob (Nano Banana Pro)
+//   - image-gi2     : SubmitContentToImageGIJob / DescribeContentToImageGIJob (Nano Banana 2)
+//   - hunyuan-image : SubmitTextToImageJob / QueryTextToImageJob (混元生图 3.0)
 //
 // apiKey 格式：SecretId|SecretKey
 package aiart
@@ -41,17 +39,47 @@ const (
 	aiartVersion = "2022-12-29"
 	aiartRegion  = "ap-guangzhou"
 
-	submitAction = "SubmitContentToImageGIJob"
-	queryAction  = "DescribeContentToImageGIJob"
-
 	ctxPayloadKey = "aiart_payload"
+	ctxActionKey  = "aiart_action"
 )
 
-// modelDefs maps external model names to upstream AIART Model parameter values.
-var modelDefs = map[string]string{
-	"image-gi":  "Image-GI",  // Nano Banana Pro
-	"image-gi2": "Image-GI2", // Nano Banana 2
+// modelDef 定义一个对外模型名的 AIART 参数映射。
+type modelDef struct {
+	aiartModel  string // 上游 Model 参数值；为空表示该 Action 不接受 Model
+	submit      string // 提交 Action
+	query       string // 查询 Action
+	needModel   bool   // 请求体是否需要 Model 字段
 }
+
+var modelDefs = map[string]modelDef{
+	"image-gi": {
+		aiartModel: "Image-GI",
+		submit:     "SubmitContentToImageGIJob",
+		query:      "DescribeContentToImageGIJob",
+		needModel:  true,
+	},
+	"image-gi2": {
+		aiartModel: "Image-GI2",
+		submit:     "SubmitContentToImageGIJob",
+		query:      "DescribeContentToImageGIJob",
+		needModel:  true,
+	},
+	"hunyuan-image": {
+		aiartModel: "",
+		submit:     "SubmitTextToImageJob",
+		query:      "QueryTextToImageJob",
+		needModel:  false,
+	},
+}
+
+// submitToQuery 从 modelDefs 构造 submitAction → queryAction 反查表。
+var submitToQuery = func() map[string]string {
+	m := make(map[string]string, len(modelDefs))
+	for _, def := range modelDefs {
+		m[def.submit] = def.query
+	}
+	return m
+}()
 
 // ============================ 响应结构 ============================
 
@@ -80,7 +108,7 @@ type queryResponse struct {
 		JobErrorCode  string   `json:"JobErrorCode"`
 		JobErrorMsg   string   `json:"JobErrorMsg"`
 		ResultImage   []string `json:"ResultImage"`
-		RevisedPrompt string   `json:"RevisedPrompt"`
+		RevisedPrompt any      `json:"RevisedPrompt"`
 		RequestId     string   `json:"RequestId"`
 		Error         *tcError `json:"Error,omitempty"`
 	} `json:"Response"`
@@ -105,12 +133,18 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 	var peek relaycommon.TaskSubmitReq
 	_ = common.UnmarshalBodyReusable(c, &peek)
 	upModel := strings.ToLower(peek.Model)
-	if _, ok := modelDefs[upModel]; !ok {
+	def, ok := modelDefs[upModel]
+	if !ok {
+		supported := make([]string, 0, len(modelDefs))
+		for k := range modelDefs {
+			supported = append(supported, k)
+		}
 		return service.TaskErrorWrapperLocal(
-			fmt.Errorf("unsupported model: %s (supported: image-gi, image-gi2)", peek.Model),
+			fmt.Errorf("unsupported model: %s (supported: %s)", peek.Model, strings.Join(supported, ", ")),
 			"invalid_model", http.StatusBadRequest)
 	}
-	return relaycommon.ValidateBasicTaskRequest(c, info, submitAction)
+	c.Set(ctxActionKey, def.submit)
+	return relaycommon.ValidateBasicTaskRequest(c, info, def.submit)
 }
 
 func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, error) {
@@ -139,37 +173,55 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	return bytes.NewReader(data), nil
 }
 
-// buildRequest 构造 AIART 请求体。
+// buildRequest 构造 AIART 请求体，按模型族区分字段。
 func buildRequest(req *relaycommon.TaskSubmitReq, upstreamModel string) map[string]any {
 	m := map[string]any{}
+	def := modelDefs[strings.ToLower(upstreamModel)]
 
-	// Prompt
+	// Prompt (all models)
 	if req.Prompt != "" {
 		m["Prompt"] = req.Prompt
 	}
 
-	// Model: map external name → upstream enum
-	aiartModel := modelDefs[strings.ToLower(upstreamModel)]
-	if aiartModel == "" {
-		aiartModel = "Image-GI2" // default
-	}
-	m["Model"] = aiartModel
-
-	// Images: collect from req.Image (single) and req.Images (multi)
-	var images []tcImage
-	if req.Image != "" {
-		images = append(images, buildTcImage(req.Image))
-	}
-	for _, img := range req.Images {
-		images = append(images, buildTcImage(img))
-	}
-	if len(images) > 0 {
-		m["Images"] = images
+	// Model field (only for Image-GI)
+	if def.needModel && def.aiartModel != "" {
+		m["Model"] = def.aiartModel
 	}
 
-	// Size → AspectRatio (e.g. "1024x1024" → "1:1", or pass through if already ratio format)
+	// Images / reference images
+	if def.needModel {
+		// Image-GI: Images as array of {Url, Base64} objects
+		var images []tcImage
+		if req.Image != "" {
+			images = append(images, buildTcImage(req.Image))
+		}
+		for _, img := range req.Images {
+			images = append(images, buildTcImage(img))
+		}
+		if len(images) > 0 {
+			m["Images"] = images
+		}
+	} else {
+		// 混元生图: Images as array of strings (URL or base64)
+		var images []string
+		if req.Image != "" {
+			images = append(images, req.Image)
+		}
+		images = append(images, req.Images...)
+		if len(images) > 0 {
+			m["Images"] = images
+		}
+	}
+
+	// Size → Resolution or AspectRatio depending on model
 	if req.Size != "" {
-		m["AspectRatio"] = sizeToAspectRatio(req.Size)
+		if def.needModel {
+			// Image-GI uses AspectRatio (e.g. "1:1")
+			m["AspectRatio"] = sizeToAspectRatio(req.Size)
+		} else {
+			// 混元生图 uses Resolution (e.g. "1024:1024")
+			m["Resolution"] = sizeToResolution(req.Size)
+		}
 	}
 
 	// LogoAdd: default 0 (no watermark) for API usage
@@ -205,6 +257,19 @@ func sizeToAspectRatio(size string) string {
 	return size // fallback: pass as-is
 }
 
+// sizeToResolution converts size formats to 混元生图 Resolution (e.g. "1024:1024").
+func sizeToResolution(size string) string {
+	// Already in colon format (e.g. "1024:1024")
+	if strings.Contains(size, ":") {
+		return size
+	}
+	// Convert WxH to W:H
+	if strings.Contains(strings.ToLower(size), "x") {
+		return strings.Replace(strings.ToLower(size), "x", ":", 1)
+	}
+	return size
+}
+
 func gcd(a, b int) int {
 	for b != 0 {
 		a, b = b, a%b
@@ -215,11 +280,16 @@ func gcd(a, b int) int {
 func (a *TaskAdaptor) BuildRequestHeader(c *gin.Context, req *http.Request, info *relaycommon.RelayInfo) error {
 	payload, _ := c.Get(ctxPayloadKey)
 	body, _ := payload.([]byte)
+	action, _ := c.Get(ctxActionKey)
+	actionStr, _ := action.(string)
+	if actionStr == "" {
+		return fmt.Errorf("missing action in context")
+	}
 	secretId, secretKey, err := splitKey(a.apiKey)
 	if err != nil {
 		return err
 	}
-	for k, v := range signTC3(secretId, secretKey, submitAction, body, time.Now().Unix()) {
+	for k, v := range signTC3(secretId, secretKey, actionStr, body, time.Now().Unix()) {
 		req.Header.Set(k, v)
 	}
 	return nil
@@ -264,6 +334,12 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 	if !ok {
 		return nil, fmt.Errorf("invalid task_id")
 	}
+	// 从提交 Action 反查对应的查询 Action
+	submitAction, _ := body["action"].(string)
+	qAction, ok := submitToQuery[submitAction]
+	if !ok || qAction == "" {
+		qAction = "DescribeContentToImageGIJob" // 兜底
+	}
 	secretId, secretKey, err := splitKey(key)
 	if err != nil {
 		return nil, err
@@ -276,7 +352,7 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 	if err != nil {
 		return nil, err
 	}
-	for k, v := range signTC3(secretId, secretKey, queryAction, payload, time.Now().Unix()) {
+	for k, v := range signTC3(secretId, secretKey, qAction, payload, time.Now().Unix()) {
 		req.Header.Set(k, v)
 	}
 	client, err := service.GetHttpClientWithProxy(proxy)

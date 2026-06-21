@@ -40,6 +40,7 @@ import {
   detectImageModelFamily,
   GPT_IMAGE_QUALITY_OPTIONS,
   GPT_IMAGE_SIZE_PRESETS,
+  HUNYUAN_IMAGE_RESOLUTIONS,
   IMAGE_FAMILY_PARAMS,
   MAX_PROMPT_LENGTH,
   QUALITY_OPTIONS,
@@ -80,6 +81,7 @@ export function GeneratorPanel({
   const isDallE3 = family === 'dall-e'
   const isGptImage = family === 'gpt-image'
   const isImageGI = family === 'image-gi' || family === 'image-gi2'
+  const isHunyuanImage = family === 'hunyuan-image'
   const hasRefImages = supportsReferenceImages(family)
   const canGenerate = !!config.prompt.trim() && !isGenerating
 
@@ -91,23 +93,25 @@ export function GeneratorPanel({
     config.metadata[key] ?? defaultValue
 
   // Determine which size presets to show
-  const sizeOptions = isImageGI
-    ? AIART_ASPECT_RATIOS
-    : isGptImage
-      ? GPT_IMAGE_SIZE_PRESETS.map((p) => ({
-          label: p.ratioLabel ? `${p.ratioLabel} (${p.value})` : p.label,
-          value: p.value,
-        }))
-      : SIZE_PRESETS.map((p) => ({
-          label: `${p.ratioLabel} (${p.value})`,
-          value: p.value,
-        }))
+  const sizeOptions = isHunyuanImage
+    ? HUNYUAN_IMAGE_RESOLUTIONS.map((p) => ({ label: p.label, value: p.value }))
+    : isImageGI
+      ? AIART_ASPECT_RATIOS
+      : isGptImage
+        ? GPT_IMAGE_SIZE_PRESETS.map((p) => ({
+            label: p.ratioLabel ? `${p.ratioLabel} (${p.value})` : p.label,
+            value: p.value,
+          }))
+        : SIZE_PRESETS.map((p) => ({
+            label: `${p.ratioLabel} (${p.value})`,
+            value: p.value,
+          }))
 
   // Quality options vary by family
   const qualityOptions = isGptImage ? GPT_IMAGE_QUALITY_OPTIONS : QUALITY_OPTIONS
 
   // Show count selector only for models that support n > 1
-  const showCount = !isDallE3 && !isImageGI
+  const showCount = !isDallE3 && !isImageGI && !isHunyuanImage
 
   return (
     <div className='flex h-full flex-col'>
@@ -160,7 +164,7 @@ export function GeneratorPanel({
         {/* Aspect ratio / size */}
         <div className='space-y-2'>
           <Label className='text-sm font-medium'>
-            {isImageGI ? t('Aspect ratio') : t('Size')}
+            {isImageGI ? t('Aspect ratio') : isHunyuanImage ? t('Resolution') : t('Size')}
           </Label>
           <Select
             items={sizeOptions.map((p) => ({

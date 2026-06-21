@@ -160,10 +160,12 @@ const DALLE_RE = /dall-e/i
 const GPT_IMAGE_RE = /gpt-image/i
 const IMAGE_GI2_RE = /image-gi-?2/i
 const IMAGE_GI_RE = /image-gi/i
+const HUNYUAN_IMAGE_RE = /hunyuan-image/i
 
 export function detectImageModelFamily(model: string): ImageModelFamily {
   if (GPT_IMAGE_RE.test(model)) return 'gpt-image'
   if (DALLE_RE.test(model)) return 'dall-e'
+  if (HUNYUAN_IMAGE_RE.test(model)) return 'hunyuan-image'
   if (IMAGE_GI2_RE.test(model)) return 'image-gi2'
   if (IMAGE_GI_RE.test(model)) return 'image-gi'
   return 'generic-image'
@@ -171,12 +173,12 @@ export function detectImageModelFamily(model: string): ImageModelFamily {
 
 /** Whether the model uses async task-based generation (submit/poll) */
 export function isTaskBasedImageModel(family: ImageModelFamily): boolean {
-  return family === 'image-gi' || family === 'image-gi2'
+  return family === 'image-gi' || family === 'image-gi2' || family === 'hunyuan-image'
 }
 
 /** Whether the model supports reference image input */
 export function supportsReferenceImages(family: ImageModelFamily): boolean {
-  return family === 'image-gi' || family === 'image-gi2'
+  return family === 'image-gi' || family === 'image-gi2' || family === 'hunyuan-image'
 }
 
 /** AIART aspect ratio presets (different from dall-e WxH format) */
@@ -188,6 +190,17 @@ export const AIART_ASPECT_RATIOS = [
   { label: '9:16', value: '9:16' },
   { label: '2:3', value: '2:3' },
   { label: '3:2', value: '3:2' },
+] as const
+
+/** 混元生图 3.0 resolution presets (pixel-based, W:H format) */
+export const HUNYUAN_IMAGE_RESOLUTIONS = [
+  { label: '1024x1024 (1:1)', value: '1024:1024' },
+  { label: '768x1024 (3:4)', value: '768:1024' },
+  { label: '1024x768 (4:3)', value: '1024:768' },
+  { label: '1280x720 (16:9)', value: '1280:720' },
+  { label: '720x1280 (9:16)', value: '720:1280' },
+  { label: '768x1152 (2:3)', value: '768:1152' },
+  { label: '1152x768 (3:2)', value: '1152:768' },
 ] as const
 
 /** gpt-image size presets */
@@ -252,6 +265,7 @@ export const IMAGE_FAMILY_PARAMS: Record<ImageModelFamily, FamilyParam[]> = {
       default: false,
     },
   ],
+  'hunyuan-image': [],
   'generic-image': [],
 }
 

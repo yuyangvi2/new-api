@@ -176,7 +176,7 @@ export interface VideoConfig {
 // ---------------------------------------------------------------------------
 
 // Image model families
-export type ImageModelFamily = 'dall-e' | 'gpt-image' | 'image-gi' | 'image-gi2' | 'generic-image'
+export type ImageModelFamily = 'dall-e' | 'gpt-image' | 'image-gi' | 'image-gi2' | 'hunyuan-image' | 'generic-image'
 
 export type ModelFamily = 'kling' | 'vidu' | 'unknown'
 

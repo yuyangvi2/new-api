@@ -83,11 +83,13 @@ export function ImageGenerator() {
       const newFamily = detectImageModelFamily(value)
       imageGen.updateConfig('model', value)
       // Reset size when switching between families with different size formats
-      if (isTaskBasedImageModel(oldFamily) !== isTaskBasedImageModel(newFamily)) {
-        imageGen.updateConfig(
-          'size',
-          isTaskBasedImageModel(newFamily) ? '1:1' : '1024x1024'
-        )
+      if (oldFamily !== newFamily) {
+        const defaultSize = newFamily === 'hunyuan-image'
+          ? '1024:1024'
+          : newFamily === 'image-gi' || newFamily === 'image-gi2'
+            ? '1:1'
+            : '1024x1024'
+        imageGen.updateConfig('size', defaultSize)
       }
       // Clear metadata when switching families
       if (oldFamily !== newFamily) {
