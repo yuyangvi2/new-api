@@ -199,6 +199,11 @@ export const CHANNEL_OPTIONS = [
     color: 'blue',
     label: 'AIART (Image-GI)',
   },
+  {
+    value: 9003,
+    color: 'green',
+    label: 'vip123 (Wan2.7/Seedance)',
+  },
 ];
 
 // Channel types that support upstream model list fetching in UI.

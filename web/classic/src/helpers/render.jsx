@@ -403,6 +403,8 @@ export function getChannelIcon(channelType) {
       return <Kling.Color size={iconSize} />;
     case 9002: // AIART Image-GI (腾讯云)
       return <Kling.Color size={iconSize} />;
+    case 9003: // vip123 (Wan2.7/Seedance)
+      return <Kling.Color size={iconSize} />;
     case 51: // 即梦 Jimeng
       return <Jimeng.Color size={iconSize} />;
     case 54: // 豆包视频 Doubao Video
