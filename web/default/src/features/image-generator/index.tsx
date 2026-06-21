@@ -68,6 +68,16 @@ export function ImageGenerator() {
     },
   })
 
+  // Filter models by tab type so image tab only shows image models, etc.
+  const imageModels = useMemo(
+    () => models.filter((m) => IMAGE_MODEL_RE.test(m.value)),
+    [models]
+  )
+  const videoModels = useMemo(
+    () => models.filter((m) => VIDEO_MODEL_RE.test(m.value)),
+    [models]
+  )
+
   // Completed images from Image mode, offered as video input sources.
   const availableImages = useMemo(
     () =>
@@ -99,29 +109,27 @@ export function ImageGenerator() {
   )
 
   const handleImageModelChange = useCallback(
-    (value: string) => setModelWithGroup(updateImageConfig, value, models),
-    [models, updateImageConfig, setModelWithGroup]
+    (value: string) => setModelWithGroup(updateImageConfig, value, imageModels),
+    [imageModels, updateImageConfig, setModelWithGroup]
   )
 
   const handleVideoModelChange = useCallback(
-    (value: string) => setModelWithGroup(updateVideoConfig, value, models),
-    [models, updateVideoConfig, setModelWithGroup]
+    (value: string) => setModelWithGroup(updateVideoConfig, value, videoModels),
+    [videoModels, updateVideoConfig, setModelWithGroup]
   )
 
   // Auto-select initial model (+ group) when models load
   useEffect(() => {
-    if (models.length === 0) return
-    if (models.some((m) => m.value === imageModel)) return
-    const next = models.find((m) => IMAGE_MODEL_RE.test(m.value)) ?? models[0]
-    setModelWithGroup(updateImageConfig, next.value, models)
-  }, [models, imageModel, updateImageConfig, setModelWithGroup])
+    if (imageModels.length === 0) return
+    if (imageModels.some((m) => m.value === imageModel)) return
+    setModelWithGroup(updateImageConfig, imageModels[0].value, imageModels)
+  }, [imageModels, imageModel, updateImageConfig, setModelWithGroup])
 
   useEffect(() => {
-    if (models.length === 0) return
-    if (models.some((m) => m.value === videoModel)) return
-    const next = models.find((m) => VIDEO_MODEL_RE.test(m.value)) ?? models[0]
-    setModelWithGroup(updateVideoConfig, next.value, models)
-  }, [models, videoModel, updateVideoConfig, setModelWithGroup])
+    if (videoModels.length === 0) return
+    if (videoModels.some((m) => m.value === videoModel)) return
+    setModelWithGroup(updateVideoConfig, videoModels[0].value, videoModels)
+  }, [videoModels, videoModel, updateVideoConfig, setModelWithGroup])
 
   // ---- Icon rail tabs (rendered into the 80px sidebar via portal) ----
   const railTabs: { mode: GeneratorMode; label: string; icon: typeof ImageIcon }[] = [
@@ -180,7 +188,7 @@ export function ImageGenerator() {
               config={imageGen.config}
               updateConfig={imageGen.updateConfig}
               onModelChange={handleImageModelChange}
-              models={models}
+              models={imageModels}
               isModelLoading={isModelLoading}
               isGenerating={imageGen.isGenerating}
               onGenerate={imageGen.generate}
@@ -191,7 +199,7 @@ export function ImageGenerator() {
               config={videoGen.config}
               updateConfig={videoGen.updateConfig}
               onModelChange={handleVideoModelChange}
-              models={models}
+              models={videoModels}
               isModelLoading={isModelLoading}
               isGenerating={videoGen.isGenerating}
               availableImages={availableImages}
