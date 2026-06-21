@@ -64,7 +64,12 @@ export function ImageGenerator() {
     [models]
   )
   const videoModels = useMemo(
-    () => models.filter((m) => VIDEO_MODEL_RE.test(m.value)),
+    // Exclude image models that also match a video keyword (e.g. wan2.7-image-pro
+    // contains "wan") so the video tab only lists real video models.
+    () =>
+      models.filter(
+        (m) => VIDEO_MODEL_RE.test(m.value) && !IMAGE_MODEL_RE.test(m.value)
+      ),
     [models]
   )
 
