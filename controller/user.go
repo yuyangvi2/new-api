@@ -585,18 +585,26 @@ func GetUserModels(c *gin.Context) {
 		return
 	}
 	groups := service.GetUserUsableGroups(user.Group)
-	var models []string
+
+	type modelWithGroup struct {
+		Model string `json:"model"`
+		Group string `json:"group"`
+	}
+
+	seen := make(map[string]bool)
+	var result []modelWithGroup
 	for group := range groups {
-		for _, g := range model.GetGroupEnabledModels(group) {
-			if !common.StringsContains(models, g) {
-				models = append(models, g)
+		for _, m := range model.GetGroupEnabledModels(group) {
+			if !seen[m] {
+				seen[m] = true
+				result = append(result, modelWithGroup{Model: m, Group: group})
 			}
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
-		"data":    models,
+		"data":    result,
 	})
 	return
 }

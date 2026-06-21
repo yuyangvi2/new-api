@@ -90,13 +90,14 @@ const ModelTriggerButton = React.forwardRef<
     disabled={isDisabled}
     className={cn(
       'flex h-8 items-center gap-2 border px-3 font-medium',
-      'justify-center p-0 sm:w-auto sm:justify-start sm:px-3',
-      'w-8',
+      'w-8 justify-center p-0',
+      'sm:w-auto sm:justify-start sm:px-3',
       'bg-background text-foreground',
       'hover:bg-accent transition-colors',
       'focus:!ring-0 focus:!outline-none',
       'shadow-none',
-      triggerClassName
+      triggerClassName,
+      triggerClassName?.includes('w-full') && 'sm:w-full'
     )}
     {...props}
   >

@@ -45,6 +45,7 @@ interface GeneratorPanelProps {
     key: K,
     value: GeneratorConfig[K]
   ) => void
+  onModelChange: (value: string) => void
   models: ModelOption[]
   isModelLoading: boolean
   isGenerating: boolean
@@ -55,6 +56,7 @@ interface GeneratorPanelProps {
 export function GeneratorPanel({
   config,
   updateConfig,
+  onModelChange,
   models,
   isModelLoading,
   isGenerating,
@@ -81,7 +83,7 @@ export function GeneratorPanel({
             className='w-full'
             selectedModel={config.model}
             models={models}
-            onModelChange={(value) => updateConfig('model', value)}
+            onModelChange={onModelChange}
             disabled={isModelLoading}
           />
         </div>

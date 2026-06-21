@@ -44,6 +44,7 @@ interface VideoPanelProps {
     key: K,
     value: VideoConfig[K]
   ) => void
+  onModelChange: (value: string) => void
   models: ModelOption[]
   isModelLoading: boolean
   isGenerating: boolean
@@ -55,6 +56,7 @@ interface VideoPanelProps {
 export function VideoPanel({
   config,
   updateConfig,
+  onModelChange,
   models,
   isModelLoading,
   isGenerating,
@@ -98,7 +100,7 @@ export function VideoPanel({
             className='w-full'
             selectedModel={config.model}
             models={models}
-            onModelChange={(value) => updateConfig('model', value)}
+            onModelChange={onModelChange}
             disabled={isModelLoading}
           />
         </div>

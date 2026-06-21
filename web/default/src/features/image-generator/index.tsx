@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
@@ -79,38 +79,49 @@ export function ImageGenerator() {
 
   const imageModel = imageGen.config.model
   const videoModel = videoGen.config.model
-  const imageGroup = imageGen.config.group
-  const videoGroup = videoGen.config.group
   const updateImageConfig = imageGen.updateConfig
   const updateVideoConfig = videoGen.updateConfig
 
+  // Helper: set model + auto-resolve its group from the models list
+  const setModelWithGroup = useCallback(
+    (
+      updater: typeof updateImageConfig,
+      modelValue: string,
+      modelsList: typeof models
+    ) => {
+      updater('model', modelValue)
+      const found = modelsList.find((m) => m.value === modelValue)
+      if (found?.group) {
+        updater('group', found.group)
+      }
+    },
+    []
+  )
+
+  const handleImageModelChange = useCallback(
+    (value: string) => setModelWithGroup(updateImageConfig, value, models),
+    [models, updateImageConfig, setModelWithGroup]
+  )
+
+  const handleVideoModelChange = useCallback(
+    (value: string) => setModelWithGroup(updateVideoConfig, value, models),
+    [models, updateVideoConfig, setModelWithGroup]
+  )
+
+  // Auto-select initial model (+ group) when models load
   useEffect(() => {
     if (models.length === 0) return
     if (models.some((m) => m.value === imageModel)) return
-    const next =
-      models.find((m) => IMAGE_MODEL_RE.test(m.value))?.value ?? models[0].value
-    updateImageConfig('model', next)
-  }, [models, imageModel, updateImageConfig])
+    const next = models.find((m) => IMAGE_MODEL_RE.test(m.value)) ?? models[0]
+    setModelWithGroup(updateImageConfig, next.value, models)
+  }, [models, imageModel, updateImageConfig, setModelWithGroup])
 
   useEffect(() => {
     if (models.length === 0) return
     if (models.some((m) => m.value === videoModel)) return
-    const next =
-      models.find((m) => VIDEO_MODEL_RE.test(m.value))?.value ?? models[0].value
-    updateVideoConfig('model', next)
-  }, [models, videoModel, updateVideoConfig])
-
-  useEffect(() => {
-    if (groups.length === 0) return
-    const fallback =
-      groups.find((g) => g.value === 'default')?.value ?? groups[0].value
-    if (!groups.some((g) => g.value === imageGroup)) {
-      updateImageConfig('group', fallback)
-    }
-    if (!groups.some((g) => g.value === videoGroup)) {
-      updateVideoConfig('group', fallback)
-    }
-  }, [groups, imageGroup, videoGroup, updateImageConfig, updateVideoConfig])
+    const next = models.find((m) => VIDEO_MODEL_RE.test(m.value)) ?? models[0]
+    setModelWithGroup(updateVideoConfig, next.value, models)
+  }, [models, videoModel, updateVideoConfig, setModelWithGroup])
 
   // ---- Icon rail tabs (rendered into the 80px sidebar via portal) ----
   const railTabs: { mode: GeneratorMode; label: string; icon: typeof ImageIcon }[] = [
@@ -168,6 +179,7 @@ export function ImageGenerator() {
             <GeneratorPanel
               config={imageGen.config}
               updateConfig={imageGen.updateConfig}
+              onModelChange={handleImageModelChange}
               models={models}
               isModelLoading={isModelLoading}
               isGenerating={imageGen.isGenerating}
@@ -178,6 +190,7 @@ export function ImageGenerator() {
             <VideoPanel
               config={videoGen.config}
               updateConfig={videoGen.updateConfig}
+              onModelChange={handleVideoModelChange}
               models={models}
               isModelLoading={isModelLoading}
               isGenerating={videoGen.isGenerating}
