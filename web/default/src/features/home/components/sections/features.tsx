@@ -215,22 +215,22 @@ export function Features(_props: FeaturesProps) {
           ))}
         </div>
 
-        {/* Additional features row */}
-        <div className='mt-12 grid grid-cols-2 gap-8 md:grid-cols-4 md:gap-12'>
+        {/* Additional features row — horizontal bordered cards (icon left, text right) */}
+        <div className='mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4'>
           {additionalFeatures.map((f, i) => (
             <AnimateInView
               key={f.title}
               delay={i * 100}
               animation='fade-up'
-              className='flex flex-col items-center text-center'
+              className='border-border/50 hover:border-border hover:bg-muted/20 flex items-start gap-3 rounded-xl border p-4 transition-colors'
             >
-              <div className='text-muted-foreground border-border/50 bg-muted/30 group-hover:text-foreground mb-3 flex size-12 items-center justify-center rounded-xl border transition-colors'>
-                {f.icon}
+              <div className='shrink-0 text-blue-500'>{f.icon}</div>
+              <div>
+                <h3 className='text-sm font-semibold'>{f.title}</h3>
+                <p className='text-muted-foreground mt-0.5 text-xs leading-relaxed'>
+                  {f.desc}
+                </p>
               </div>
-              <h3 className='mb-1.5 text-sm font-semibold'>{f.title}</h3>
-              <p className='text-muted-foreground max-w-[200px] text-xs leading-relaxed'>
-                {f.desc}
-              </p>
             </AnimateInView>
           ))}
         </div>

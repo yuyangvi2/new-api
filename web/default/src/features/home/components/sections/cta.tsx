@@ -35,47 +35,49 @@ export function CTA(props: CTAProps) {
   }
 
   return (
-    <section className='relative z-10 overflow-hidden px-6 py-24 md:py-32'>
-      {/* Gradient mesh background */}
-      <div
-        aria-hidden
-        className='absolute inset-0 -z-10 opacity-20 dark:opacity-[0.08]'
-        style={{
-          background: [
-            'radial-gradient(ellipse 50% 50% at 30% 50%, oklch(0.7 0.15 250 / 70%) 0%, transparent 70%)',
-            'radial-gradient(ellipse 40% 40% at 70% 40%, oklch(0.65 0.12 200 / 50%) 0%, transparent 70%)',
-          ].join(', '),
-        }}
-      />
-
+    <section className='relative z-10 px-6 py-16 md:py-24'>
       <AnimateInView
-        className='mx-auto max-w-2xl text-center'
+        className='bg-primary text-primary-foreground relative mx-auto max-w-6xl overflow-hidden rounded-3xl px-6 py-16 text-center md:px-12 md:py-20'
         animation='scale-in'
       >
-        <h2 className='text-2xl leading-tight font-bold tracking-tight md:text-4xl'>
-          {t('Ready to simplify')}
-          <br />
-          <span className='bg-gradient-to-r from-blue-400 via-violet-400 to-purple-500 bg-clip-text text-transparent'>
+        {/* Subtle radial glow inside the dark card */}
+        <div
+          aria-hidden
+          className='pointer-events-none absolute inset-0 -z-0 opacity-[0.14]'
+          style={{
+            background: [
+              'radial-gradient(ellipse 50% 60% at 30% 40%, oklch(0.72 0.16 250) 0%, transparent 70%)',
+              'radial-gradient(ellipse 40% 50% at 75% 60%, oklch(0.66 0.13 200) 0%, transparent 70%)',
+            ].join(', '),
+          }}
+        />
+        <div className='relative z-10'>
+          <h2 className='text-2xl leading-tight font-bold tracking-tight md:text-4xl'>
+            {t('Ready to simplify')}
+            <br />
             {t('your AI integration?')}
-          </span>
-        </h2>
-        <p className='text-muted-foreground/80 mx-auto mt-5 max-w-md text-sm leading-relaxed md:text-base'>
-          {t(
-            'Deploy your own gateway and start routing requests through your configured upstream services.'
-          )}
-        </p>
-        <div className='mt-8 flex items-center justify-center gap-3'>
-          <Button className='group rounded-lg' render={<Link to='/sign-up' />}>
-            {t('Get Started')}
-            <ArrowRight className='ml-1 size-3.5 transition-transform duration-200 group-hover:translate-x-0.5' />
-          </Button>
-          <Button
-            variant='outline'
-            className='border-border/50 hover:border-border hover:bg-muted/50 rounded-lg'
-            render={<Link to='/pricing' />}
-          >
-            {t('View Pricing')}
-          </Button>
+          </h2>
+          <p className='text-primary-foreground/70 mx-auto mt-5 max-w-xl text-sm leading-relaxed md:text-base'>
+            {t(
+              'Deploy your own gateway and start routing requests through your configured upstream services.'
+            )}
+          </p>
+          <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
+            <Button
+              className='bg-background text-foreground hover:bg-background/90 group h-11 rounded-lg px-6 font-medium'
+              render={<Link to='/sign-up' />}
+            >
+              {t('Get Started')}
+              <ArrowRight className='ml-1 size-3.5 transition-transform duration-200 group-hover:translate-x-0.5' />
+            </Button>
+            <Button
+              variant='outline'
+              className='border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground h-11 rounded-lg bg-transparent px-6 font-medium'
+              render={<Link to='/pricing' />}
+            >
+              {t('View Pricing')}
+            </Button>
+          </div>
         </div>
       </AnimateInView>
     </section>
