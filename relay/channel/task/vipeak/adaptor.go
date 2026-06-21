@@ -1,4 +1,4 @@
-// Package vip123 实现 vip123（www.123vips.com）第三方生成服务的任务型适配器（派发式）。
+// Package vipeak 实现 vipeak（www.123vips.com）第三方生成服务的任务型适配器（派发式）。
 //
 // 上游：https://www.123vips.com，Bearer 鉴权，异步 submit → 轮询 generation-records。
 // 一个渠道类型(9003) 内按模型名自动派发到对应 provider / 端点：
@@ -13,7 +13,7 @@
 //   - 上游在 Cloudflare 后面，Go 默认 UA "Go-http-client/1.1" 会被 1010 拦截，必须带浏览器 UA。
 //   - 生成的视频 URL 24 小时后过期，结果应及时转存。
 //   - apiKey 格式：直接是 Bearer token（sk-...），无需切分。
-package vip123
+package vipeak
 
 import (
 	"bytes"
@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	vip123BaseURL = "https://www.123vips.com"
+	vipeakBaseURL = "https://www.123vips.com"
 
 	// 浏览器 UA，绕过 Cloudflare 1010（数据中心 IP + 默认 Go UA 会被拦）。
 	browserUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
@@ -45,7 +45,7 @@ const (
 	epImageEdit = "/api/wan27/image-edit"
 )
 
-// modelDef 定义一个对外模型名的 vip123 参数映射。
+// modelDef 定义一个对外模型名的 vipeak 参数映射。
 type modelDef struct {
 	provider string // 上游 provider 字段
 	endpoint string // 提交端点
@@ -132,7 +132,7 @@ func (a *TaskAdaptor) base() string {
 	if a.baseURL != "" {
 		return strings.TrimRight(a.baseURL, "/")
 	}
-	return vip123BaseURL
+	return vipeakBaseURL
 }
 
 func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskError {
@@ -184,7 +184,7 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	return bytes.NewReader(data), nil
 }
 
-// buildRequest 按 provider 构造 vip123 请求体。标准字段做基础映射，
+// buildRequest 按 provider 构造 vipeak 请求体。标准字段做基础映射，
 // 其余 provider 特有参数由 metadata 透传补充/覆盖。
 func buildRequest(req *relaycommon.TaskSubmitReq, upstreamModel string) map[string]any {
 	def := modelDefs[strings.ToLower(upstreamModel)]
@@ -327,7 +327,7 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 	}
 	base := strings.TrimRight(baseUrl, "/")
 	if base == "" {
-		base = vip123BaseURL
+		base = vipeakBaseURL
 	}
 	url := base + "/api/generation-records/" + taskID
 	req, err := http.NewRequest(http.MethodGet, url, nil)
@@ -517,5 +517,5 @@ func (a *TaskAdaptor) GetModelList() []string {
 }
 
 func (a *TaskAdaptor) GetChannelName() string {
-	return "vip123"
+	return "vipeak"
 }

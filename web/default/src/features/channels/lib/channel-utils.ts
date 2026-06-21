@@ -103,7 +103,7 @@ export function getChannelTypeIcon(type: number): string {
     56: 'Replicate', // Replicate
     9001: 'Kling', // VCLM (Kling)
     9002: 'Tencent', // AIART (Image-GI)
-    9003: 'vip123', // vip123 (Wan2.7/Seedance)
+    9003: 'vipeak', // vipeak (Wan2.7/Seedance)
 
     // Tools & Platforms
     37: 'Dify', // Dify

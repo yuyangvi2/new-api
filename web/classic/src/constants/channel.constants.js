@@ -202,7 +202,7 @@ export const CHANNEL_OPTIONS = [
   {
     value: 9003,
     color: 'green',
-    label: 'vip123 (Wan2.7/Seedance)',
+    label: 'vipeak (Wan2.7/Seedance)',
   },
 ];
 

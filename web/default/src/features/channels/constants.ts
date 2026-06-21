@@ -78,7 +78,7 @@ export const CHANNEL_TYPES = {
   57: 'ChatGPT Subscription (Codex)',
   9001: 'VCLM (Kling)',
   9002: 'AIART (Image-GI)',
-  9003: 'vip123 (Wan2.7/Seedance)',
+  9003: 'vipeak (Wan2.7/Seedance)',
 } as const
 
 const CHANNEL_TYPE_DISPLAY_ORDER: number[] = [

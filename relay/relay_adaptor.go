@@ -39,7 +39,7 @@ import (
 	tasksora "github.com/QuantumNous/new-api/relay/channel/task/sora"
 	"github.com/QuantumNous/new-api/relay/channel/task/suno"
 	taskaiart "github.com/QuantumNous/new-api/relay/channel/task/aiart"
-	taskvip123 "github.com/QuantumNous/new-api/relay/channel/task/vip123"
+	taskvipeak "github.com/QuantumNous/new-api/relay/channel/task/vipeak"
 	taskvclm "github.com/QuantumNous/new-api/relay/channel/task/vclm"
 	taskvertex "github.com/QuantumNous/new-api/relay/channel/task/vertex"
 	taskVidu "github.com/QuantumNous/new-api/relay/channel/task/vidu"
@@ -166,8 +166,8 @@ func GetTaskAdaptor(platform constant.TaskPlatform) channel.TaskAdaptor {
 			return &taskvclm.TaskAdaptor{}
 		case constant.ChannelTypeAIArt:
 			return &taskaiart.TaskAdaptor{}
-		case constant.ChannelTypeVip123:
-			return &taskvip123.TaskAdaptor{}
+		case constant.ChannelTypeVipeak:
+			return &taskvipeak.TaskAdaptor{}
 		}
 	}
 	return nil
