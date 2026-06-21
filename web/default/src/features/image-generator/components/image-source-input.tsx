@@ -16,44 +16,48 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useRef, useState } from 'react'
-import { UploadCloudIcon, XIcon } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { UploadIcon, XIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { MAX_IMAGE_UPLOAD_BYTES } from '../constants'
 import type { ImageSourceType } from '../types'
-
-interface AvailableImage {
-  id: string
-  src: string
-}
 
 interface ImageSourceInputProps {
   value: string
   sourceType: ImageSourceType
   onChange: (src: string, sourceType: ImageSourceType) => void
-  availableImages: AvailableImage[]
+  /** @deprecated No longer used in the new layout. Kept for API compat. */
+  availableImages?: { id: string; src: string }[]
   disabled?: boolean
+  placeholder?: string
 }
 
-const TABS: { type: ImageSourceType; label: string }[] = [
-  { type: 'upload', label: 'Upload' },
-  { type: 'generated', label: 'From gallery' },
-  { type: 'url', label: 'URL' },
-]
-
+/**
+ * Compact image input: a text field (for pasting a URL) with an upload
+ * icon-button on the right. Below the field, a preview thumbnail appears
+ * once an image is set, with a close button to clear it.
+ */
 export function ImageSourceInput({
   value,
   sourceType,
   onChange,
-  availableImages,
   disabled,
+  placeholder,
 }: ImageSourceInputProps) {
   const { t } = useTranslation()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [urlText, setUrlText] = useState(sourceType === 'url' ? value : '')
+
+  // The text shown in the input: either the URL or a short label for uploads.
+  const [inputText, setInputText] = useState(() => displayText(value, sourceType))
+
+  // Keep the displayed text in sync when the value is changed externally.
+  useEffect(() => {
+    setInputText(displayText(value, sourceType))
+  }, [value, sourceType])
+
+  // ---- handlers ----
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -68,41 +72,63 @@ export function ImageSourceInput({
       return
     }
     const reader = new FileReader()
-    reader.onload = () => onChange(String(reader.result), 'upload')
+    reader.onload = () => {
+      const dataUri = String(reader.result)
+      onChange(dataUri, 'upload')
+    }
     reader.onerror = () => toast.error(t('Failed to read the image'))
     reader.readAsDataURL(file)
   }
 
-  const switchTab = (type: ImageSourceType) => {
-    if (disabled) return
-    // Clear the selection when switching source kinds to avoid confusion.
-    if (type !== sourceType) onChange('', type)
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputText(e.target.value)
+  }
+
+  const commitUrl = () => {
+    const url = inputText.trim()
+    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+      onChange(url, 'url')
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      commitUrl()
+    }
+  }
+
+  const clear = () => {
+    onChange('', 'upload')
+    setInputText('')
   }
 
   return (
     <div className='space-y-2'>
-      {/* Source tabs */}
-      <div className='bg-muted flex gap-1 rounded-lg p-1'>
-        {TABS.map((tab) => (
-          <button
-            key={tab.type}
-            type='button'
-            disabled={disabled}
-            onClick={() => switchTab(tab.type)}
-            className={cn(
-              'flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50',
-              sourceType === tab.type
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            {t(tab.label)}
-          </button>
-        ))}
+      {/* Input row: text field + upload button */}
+      <div className='relative flex items-center'>
+        <Input
+          value={inputText}
+          onChange={handleInputChange}
+          onBlur={commitUrl}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder ?? t('Paste image URL')}
+          disabled={disabled}
+          className='pr-9'
+        />
+        <button
+          type='button'
+          disabled={disabled}
+          onClick={() => fileRef.current?.click()}
+          className='text-muted-foreground hover:text-foreground absolute right-1.5 rounded-md p-1 transition-colors disabled:opacity-50'
+          aria-label={t('Upload image')}
+        >
+          <UploadIcon size={16} />
+        </button>
       </div>
 
-      {/* Current selection preview */}
-      {value ? (
+      {/* Preview */}
+      {value && (
         <div className='bg-muted/40 relative overflow-hidden rounded-lg border'>
           <img
             src={value}
@@ -112,66 +138,17 @@ export function ImageSourceInput({
           {!disabled && (
             <button
               type='button'
-              onClick={() => onChange('', sourceType)}
-              className='bg-background/80 hover:bg-background absolute top-1.5 right-1.5 rounded-full border p-1'
+              onClick={clear}
+              className='bg-background/80 hover:bg-background absolute top-1.5 right-1.5 rounded-full border p-1 transition-colors'
               aria-label={t('Remove image')}
             >
               <XIcon size={14} />
             </button>
           )}
         </div>
-      ) : (
-        <>
-          {sourceType === 'upload' && (
-            <button
-              type='button'
-              disabled={disabled}
-              onClick={() => fileRef.current?.click()}
-              className='border-muted-foreground/30 hover:border-muted-foreground/60 text-muted-foreground flex w-full flex-col items-center gap-2 rounded-lg border border-dashed p-6 text-sm transition-colors disabled:opacity-50'
-            >
-              <UploadCloudIcon size={22} />
-              {t('Click to upload an image')}
-            </button>
-          )}
-
-          {sourceType === 'generated' &&
-            (availableImages.length === 0 ? (
-              <p className='text-muted-foreground rounded-lg border border-dashed p-4 text-center text-xs'>
-                {t('No generated images yet. Create some in Image mode first.')}
-              </p>
-            ) : (
-              <div className='grid max-h-44 grid-cols-3 gap-2 overflow-y-auto'>
-                {availableImages.map((img) => (
-                  <button
-                    key={img.id}
-                    type='button'
-                    disabled={disabled}
-                    onClick={() => onChange(img.src, 'generated')}
-                    className='hover:ring-primary overflow-hidden rounded-md border hover:ring-2'
-                  >
-                    <img
-                      src={img.src}
-                      alt=''
-                      className='aspect-square w-full object-cover'
-                    />
-                  </button>
-                ))}
-              </div>
-            ))}
-
-          {sourceType === 'url' && (
-            <Input
-              type='url'
-              value={urlText}
-              disabled={disabled}
-              placeholder='https://example.com/image.jpg'
-              onChange={(e) => setUrlText(e.target.value)}
-              onBlur={() => urlText.trim() && onChange(urlText.trim(), 'url')}
-            />
-          )}
-        </>
       )}
 
+      {/* Hidden file input */}
       <input
         ref={fileRef}
         type='file'
@@ -181,4 +158,17 @@ export function ImageSourceInput({
       />
     </div>
   )
+}
+
+/** Derive the text to display in the input field. */
+function displayText(value: string, sourceType: ImageSourceType): string {
+  if (!value) return ''
+  if (sourceType === 'url' || value.startsWith('http')) return value
+  // For uploaded / data-URI images, show a truncated indicator.
+  if (value.startsWith('data:')) {
+    const semi = value.indexOf(';')
+    const mime = semi > 5 ? value.slice(5, semi) : 'image'
+    return `[${mime}]`
+  }
+  return value
 }
