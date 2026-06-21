@@ -194,6 +194,11 @@ export const CHANNEL_OPTIONS = [
     color: 'green',
     label: 'VCLM 可灵',
   },
+  {
+    value: 9002,
+    color: 'blue',
+    label: 'AIART (Image-GI)',
+  },
 ];
 
 // Channel types that support upstream model list fetching in UI.
