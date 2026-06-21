@@ -26,6 +26,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useSidebarPortalTarget } from '@/context/sidebar-portal'
 import { getUserModels } from './api'
+import { detectImageModelFamily, isTaskBasedImageModel } from './constants'
 import { GeneratorPanel } from './components/generator-panel'
 import { ResultGallery } from './components/result-gallery'
 import { VideoPanel } from './components/video-panel'
@@ -77,8 +78,24 @@ export function ImageGenerator() {
   )
 
   const handleImageModelChange = useCallback(
-    (value: string) => imageGen.updateConfig('model', value),
-    [imageGen.updateConfig]
+    (value: string) => {
+      const oldFamily = detectImageModelFamily(imageGen.config.model)
+      const newFamily = detectImageModelFamily(value)
+      imageGen.updateConfig('model', value)
+      // Reset size when switching between families with different size formats
+      if (isTaskBasedImageModel(oldFamily) !== isTaskBasedImageModel(newFamily)) {
+        imageGen.updateConfig(
+          'size',
+          isTaskBasedImageModel(newFamily) ? '1:1' : '1024x1024'
+        )
+      }
+      // Clear metadata when switching families
+      if (oldFamily !== newFamily) {
+        imageGen.updateConfig('metadata', {})
+        imageGen.updateConfig('images', [])
+      }
+    },
+    [imageGen.updateConfig, imageGen.config.model]
   )
 
   const handleVideoModelChange = useCallback(

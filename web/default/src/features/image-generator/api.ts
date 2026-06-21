@@ -22,6 +22,7 @@ import type {
   GroupOption,
   ImageGenerationRequest,
   ImageGenerationResponse,
+  ImageTaskRequest,
   ModelOption,
   VideoGenerationRequest,
   VideoSubmitResponse,
@@ -80,6 +81,48 @@ export async function generateImages(
     signal,
   } as Record<string, unknown>)
   return res.data as ImageGenerationResponse
+}
+
+/**
+ * Submit a task-based image generation (for async models like image-gi).
+ * Uses the same task API as video generation.
+ */
+export async function submitImageTask(
+  payload: ImageTaskRequest,
+  signal?: AbortSignal
+): Promise<VideoSubmitResponse> {
+  const res = await api.post(API_ENDPOINTS.IMAGE_TASK_SUBMIT, payload, {
+    skipErrorHandler: true,
+    skipBusinessError: true,
+    signal,
+  } as Record<string, unknown>)
+  return res.data as VideoSubmitResponse
+}
+
+/**
+ * Poll a task-based image generation task's status by id.
+ */
+export async function fetchImageTask(
+  taskId: string,
+  signal?: AbortSignal
+): Promise<VideoTaskResponse> {
+  const res = await api.get(API_ENDPOINTS.IMAGE_TASK(taskId), {
+    skipErrorHandler: true,
+    skipBusinessError: true,
+    disableDuplicate: true,
+    signal,
+  } as Record<string, unknown>)
+
+  const raw = (res.data?.data ?? res.data) as Record<string, unknown>
+
+  return {
+    task_id: (raw.task_id as string) || taskId,
+    status: (raw.status as string) || '',
+    url: (raw.result_url as string) || (raw.url as string) || undefined,
+    error: raw.fail_reason
+      ? { message: raw.fail_reason as string }
+      : undefined,
+  } as VideoTaskResponse
 }
 
 /**

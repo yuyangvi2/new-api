@@ -30,6 +30,17 @@ export interface GroupOption {
   desc?: string
 }
 
+// Request payload for task-based image generation (image-gi etc.)
+export interface ImageTaskRequest {
+  model: string
+  group?: string
+  prompt: string
+  // Reference images: URLs or raw base64 strings
+  images?: string[]
+  size?: string
+  metadata?: Record<string, unknown>
+}
+
 // Request payload sent to /pg/images/generations
 export interface ImageGenerationRequest {
   model: string
@@ -88,6 +99,10 @@ export interface GeneratorConfig {
   size: string
   quality: string
   n: number
+  // Reference images (URLs or data: URIs) for image-gi models
+  images: string[]
+  // Model-family-specific parameters, keyed by PascalCase upstream names
+  metadata: Record<string, unknown>
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +174,9 @@ export interface VideoConfig {
 // ---------------------------------------------------------------------------
 // Model-family dynamic parameters
 // ---------------------------------------------------------------------------
+
+// Image model families
+export type ImageModelFamily = 'dall-e' | 'gpt-image' | 'image-gi' | 'image-gi2' | 'generic-image'
 
 export type ModelFamily = 'kling' | 'vidu' | 'unknown'
 

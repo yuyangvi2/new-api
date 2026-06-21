@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useMemo } from 'react'
 import { SparklesIcon, SquareIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
@@ -29,15 +30,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { Slider } from '@/components/ui/slider'
 import { Textarea } from '@/components/ui/textarea'
 import { ModelSelector } from '@/components/model-group-selector'
 import {
+  AIART_ASPECT_RATIOS,
   COUNT_OPTIONS,
+  detectImageModelFamily,
+  GPT_IMAGE_QUALITY_OPTIONS,
+  GPT_IMAGE_SIZE_PRESETS,
+  IMAGE_FAMILY_PARAMS,
   MAX_PROMPT_LENGTH,
   QUALITY_OPTIONS,
   SIZE_PRESETS,
+  supportsReferenceImages,
 } from '../constants'
 import type { GeneratorConfig, ModelOption } from '../types'
+import { ReferenceImagesInput } from './reference-images-input'
 
 interface GeneratorPanelProps {
   config: GeneratorConfig
@@ -65,8 +75,39 @@ export function GeneratorPanel({
 }: GeneratorPanelProps) {
   const { t } = useTranslation()
 
-  const isDallE3 = config.model.startsWith('dall-e-3')
+  const family = useMemo(() => detectImageModelFamily(config.model), [config.model])
+  const familyParams = useMemo(() => IMAGE_FAMILY_PARAMS[family], [family])
+  const isDallE3 = family === 'dall-e'
+  const isGptImage = family === 'gpt-image'
+  const isImageGI = family === 'image-gi' || family === 'image-gi2'
+  const hasRefImages = supportsReferenceImages(family)
   const canGenerate = !!config.prompt.trim() && !isGenerating
+
+  const updateMeta = (key: string, value: unknown) => {
+    updateConfig('metadata', { ...config.metadata, [key]: value })
+  }
+
+  const getMetaValue = (key: string, defaultValue: unknown) =>
+    config.metadata[key] ?? defaultValue
+
+  // Determine which size presets to show
+  const sizeOptions = isImageGI
+    ? AIART_ASPECT_RATIOS
+    : isGptImage
+      ? GPT_IMAGE_SIZE_PRESETS.map((p) => ({
+          label: p.ratioLabel ? `${p.ratioLabel} (${p.value})` : p.label,
+          value: p.value,
+        }))
+      : SIZE_PRESETS.map((p) => ({
+          label: `${p.ratioLabel} (${p.value})`,
+          value: p.value,
+        }))
+
+  // Quality options vary by family
+  const qualityOptions = isGptImage ? GPT_IMAGE_QUALITY_OPTIONS : QUALITY_OPTIONS
+
+  // Show count selector only for models that support n > 1
+  const showCount = !isDallE3 && !isImageGI
 
   return (
     <div className='flex h-full flex-col'>
@@ -102,13 +143,29 @@ export function GeneratorPanel({
           />
         </div>
 
+        {/* Reference images (image-gi / image-gi2 only) */}
+        {hasRefImages && (
+          <div className='space-y-2'>
+            <Label className='text-sm font-medium'>
+              {t('Reference images')}
+            </Label>
+            <ReferenceImagesInput
+              images={config.images}
+              onChange={(imgs) => updateConfig('images', imgs)}
+              disabled={isGenerating}
+            />
+          </div>
+        )}
+
         {/* Aspect ratio / size */}
         <div className='space-y-2'>
-          <Label className='text-sm font-medium'>{t('Aspect ratio')}</Label>
+          <Label className='text-sm font-medium'>
+            {isImageGI ? t('Aspect ratio') : t('Size')}
+          </Label>
           <Select
-            items={SIZE_PRESETS.map((p) => ({
+            items={sizeOptions.map((p) => ({
               value: p.value,
-              label: `${p.ratioLabel} (${p.value})`,
+              label: p.label,
             }))}
             onValueChange={(v) => updateConfig('size', v)}
             value={config.size}
@@ -119,9 +176,9 @@ export function GeneratorPanel({
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                {SIZE_PRESETS.map((p) => (
+                {sizeOptions.map((p) => (
                   <SelectItem key={p.value} value={p.value}>
-                    {p.ratioLabel} ({p.value})
+                    {p.label}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -129,12 +186,12 @@ export function GeneratorPanel({
           </Select>
         </div>
 
-        {/* Quality (dall-e-3 only) */}
-        {isDallE3 && (
+        {/* Quality (dall-e-3 and gpt-image) */}
+        {(isDallE3 || isGptImage) && (
           <div className='space-y-2'>
             <Label className='text-sm font-medium'>{t('Quality')}</Label>
             <div className='grid grid-cols-2 gap-2'>
-              {QUALITY_OPTIONS.map((opt) => {
+              {qualityOptions.map((opt) => {
                 const active = config.quality === opt.value
                 return (
                   <button
@@ -157,8 +214,8 @@ export function GeneratorPanel({
           </div>
         )}
 
-        {/* Number of images (hidden for dall-e-3 which only supports 1) */}
-        {!isDallE3 && (
+        {/* Number of images */}
+        {showCount && (
           <div className='space-y-2'>
             <Label className='text-sm font-medium'>
               {t('Number of images')}
@@ -185,6 +242,78 @@ export function GeneratorPanel({
               })}
             </div>
           </div>
+        )}
+
+        {/* Model-family specific parameters */}
+        {familyParams.length > 0 && (
+          <>
+            <div className='border-muted-foreground/20 border-t pt-4'>
+              <Label className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+                {t('Advanced')}
+              </Label>
+            </div>
+            {familyParams.map((param) => (
+              <div key={param.key} className='space-y-2'>
+                <Label className='text-sm font-medium'>{t(param.label)}</Label>
+                {param.type === 'select' && param.options && (
+                  <Select
+                    items={param.options.map((o) => ({
+                      value: o.value,
+                      label: t(o.label),
+                    }))}
+                    onValueChange={(v) => updateMeta(param.key, v)}
+                    value={String(getMetaValue(param.key, param.default))}
+                    disabled={isGenerating}
+                  >
+                    <SelectTrigger className='w-full'>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {param.options.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {t(o.label)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                )}
+                {param.type === 'slider' && (
+                  <div className='flex items-center gap-3'>
+                    <Slider
+                      min={param.min ?? 0}
+                      max={param.max ?? 1}
+                      step={param.step ?? 0.1}
+                      value={[Number(getMetaValue(param.key, param.default))]}
+                      onValueChange={([v]) => updateMeta(param.key, v)}
+                      disabled={isGenerating}
+                      className='flex-1'
+                    />
+                    <span className='text-muted-foreground w-8 text-right text-xs'>
+                      {Number(getMetaValue(param.key, param.default)).toFixed(1)}
+                    </span>
+                  </div>
+                )}
+                {param.type === 'text' && (
+                  <Textarea
+                    value={String(getMetaValue(param.key, param.default))}
+                    onChange={(e) => updateMeta(param.key, e.target.value)}
+                    placeholder={t(param.label)}
+                    className='min-h-[60px] resize-y'
+                    disabled={isGenerating}
+                  />
+                )}
+                {param.type === 'switch' && (
+                  <Switch
+                    checked={!!getMetaValue(param.key, param.default)}
+                    onCheckedChange={(v) => updateMeta(param.key, v)}
+                    disabled={isGenerating}
+                  />
+                )}
+              </div>
+            ))}
+          </>
         )}
       </div>
 

@@ -16,13 +16,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { FamilyParam, GeneratorConfig, ModelFamily, VideoConfig } from './types'
+import type { FamilyParam, GeneratorConfig, ImageModelFamily, ModelFamily, VideoConfig } from './types'
 
 // API endpoints
 export const API_ENDPOINTS = {
   // Playground proxy: authenticated by the login session (cookie), so no
   // API key is required — a temp token is created server-side, like chat.
   IMAGE_GENERATIONS: '/pg/images/generations',
+  // Task-based image generation (for async models like image-gi)
+  IMAGE_TASK_SUBMIT: '/pg/video/generations',
+  IMAGE_TASK: (taskId: string) => `/pg/video/generations/${taskId}`,
   VIDEO_SUBMIT: '/pg/video/generations',
   VIDEO_TASK: (taskId: string) => `/pg/video/generations/${taskId}`,
   USER_MODELS: '/api/user/models',
@@ -64,6 +67,8 @@ export const DEFAULT_CONFIG: GeneratorConfig = {
   size: '1024x1024',
   quality: 'standard',
   n: 1,
+  images: [],
+  metadata: {},
 }
 
 // Storage key for persisting non-sensitive config (prompt/model/size/etc.)
@@ -146,6 +151,118 @@ export function detectModelFamily(model: string): ModelFamily {
   if (VIDU_RE.test(model)) return 'vidu'
   return 'unknown'
 }
+
+// ---------------------------------------------------------------------------
+// Image model-family detection & per-family parameter schemas
+// ---------------------------------------------------------------------------
+
+const DALLE_RE = /dall-e/i
+const GPT_IMAGE_RE = /gpt-image/i
+const IMAGE_GI2_RE = /image-gi-?2/i
+const IMAGE_GI_RE = /image-gi/i
+
+export function detectImageModelFamily(model: string): ImageModelFamily {
+  if (GPT_IMAGE_RE.test(model)) return 'gpt-image'
+  if (DALLE_RE.test(model)) return 'dall-e'
+  if (IMAGE_GI2_RE.test(model)) return 'image-gi2'
+  if (IMAGE_GI_RE.test(model)) return 'image-gi'
+  return 'generic-image'
+}
+
+/** Whether the model uses async task-based generation (submit/poll) */
+export function isTaskBasedImageModel(family: ImageModelFamily): boolean {
+  return family === 'image-gi' || family === 'image-gi2'
+}
+
+/** Whether the model supports reference image input */
+export function supportsReferenceImages(family: ImageModelFamily): boolean {
+  return family === 'image-gi' || family === 'image-gi2'
+}
+
+/** AIART aspect ratio presets (different from dall-e WxH format) */
+export const AIART_ASPECT_RATIOS = [
+  { label: '1:1', value: '1:1' },
+  { label: '3:4', value: '3:4' },
+  { label: '4:3', value: '4:3' },
+  { label: '16:9', value: '16:9' },
+  { label: '9:16', value: '9:16' },
+  { label: '2:3', value: '2:3' },
+  { label: '3:2', value: '3:2' },
+] as const
+
+/** gpt-image size presets */
+export const GPT_IMAGE_SIZE_PRESETS = [
+  { label: 'Auto', value: 'auto' },
+  { label: '1024x1024', value: '1024x1024', ratioLabel: '1:1' },
+  { label: '1536x1024', value: '1536x1024', ratioLabel: '3:2' },
+  { label: '1024x1536', value: '1024x1536', ratioLabel: '2:3' },
+] as const
+
+export const GPT_IMAGE_QUALITY_OPTIONS = [
+  { label: 'Auto', value: 'auto' },
+  { label: 'Low', value: 'low' },
+  { label: 'Medium', value: 'medium' },
+  { label: 'High', value: 'high' },
+] as const
+
+export const GPT_IMAGE_BACKGROUND_OPTIONS = [
+  { label: 'Auto', value: 'auto' },
+  { label: 'Transparent', value: 'transparent' },
+  { label: 'Opaque', value: 'opaque' },
+] as const
+
+export const IMAGE_FAMILY_PARAMS: Record<ImageModelFamily, FamilyParam[]> = {
+  'dall-e': [],      // dall-e quality/n handled inline
+  'gpt-image': [
+    {
+      key: 'background',
+      label: 'Background',
+      type: 'select',
+      default: 'auto',
+      options: [
+        { label: 'Auto', value: 'auto' },
+        { label: 'Transparent', value: 'transparent' },
+        { label: 'Opaque', value: 'opaque' },
+      ],
+    },
+  ],
+  'image-gi': [
+    {
+      key: 'ImageSearch',
+      label: 'Image search',
+      type: 'switch',
+      default: false,
+    },
+  ],
+  'image-gi2': [
+    {
+      key: 'ThinkingLevel',
+      label: 'Thinking level',
+      type: 'select',
+      default: 'default',
+      options: [
+        { label: 'Default', value: 'default' },
+        { label: 'Think', value: 'think' },
+      ],
+    },
+    {
+      key: 'ImageSearch',
+      label: 'Image search',
+      type: 'switch',
+      default: false,
+    },
+  ],
+  'generic-image': [],
+}
+
+// Task-based image generation polling config
+export const IMAGE_TASK_POLL_INTERVAL_MS = 3000
+export const IMAGE_TASK_POLL_TIMEOUT_MS = 5 * 60 * 1000
+export const IMAGE_TASK_SUCCESS_STATUSES = ['succeeded', 'success', 'completed']
+export const IMAGE_TASK_FAILED_STATUSES = ['failed', 'error', 'cancelled', 'canceled']
+
+// Max reference images for AIART
+export const MAX_REFERENCE_IMAGES = 5
 
 export const FAMILY_PARAMS: Record<ModelFamily, FamilyParam[]> = {
   kling: [
