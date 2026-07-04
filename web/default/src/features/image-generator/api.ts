@@ -29,21 +29,44 @@ import type {
   VideoTaskResponse,
 } from './types'
 
+type RawUserModel =
+  | string
+  | {
+      label?: string
+      value?: string
+      groups?: string[]
+    }
+
 /**
  * Get user available models.
  */
 export async function getUserModels(): Promise<ModelOption[]> {
-  const res = await api.get(API_ENDPOINTS.USER_MODELS)
+  const res = await api.get(API_ENDPOINTS.USER_MODELS, {
+    params: { with_groups: true },
+  })
   const { data } = res
 
   if (!data.success || !Array.isArray(data.data)) {
     return []
   }
 
-  return data.data.map((model: string) => ({
-    label: model,
-    value: model,
-  }))
+  return (data.data as RawUserModel[])
+    .map((model): ModelOption | null => {
+      if (typeof model === 'string') {
+        return {
+          label: model,
+          value: model,
+        }
+      }
+      const value = model.value || model.label
+      if (!value) return null
+      return {
+        label: model.label || value,
+        value,
+        groups: Array.isArray(model.groups) ? model.groups : undefined,
+      }
+    })
+    .filter((model: ModelOption | null): model is ModelOption => model !== null)
 }
 
 /**

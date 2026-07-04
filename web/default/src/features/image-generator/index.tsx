@@ -26,17 +26,26 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useSidebarPortalTarget } from '@/context/sidebar-portal'
 import { getUserModels } from './api'
-import { detectImageModelFamily, isTaskBasedImageModel } from './constants'
+import { detectImageModelFamily } from './constants'
 import { GeneratorPanel } from './components/generator-panel'
 import { ResultGallery } from './components/result-gallery'
 import { VideoPanel } from './components/video-panel'
 import { VideoResults } from './components/video-results'
 import { useImageGenerator, useVideoGenerator } from './hooks'
-import type { GeneratorMode } from './types'
+import type { GeneratorMode, ModelOption } from './types'
 
 const IMAGE_MODEL_RE = /dall-e|image|flux|sd|stable|gpt-image|midjourney|ideogram/i
 const VIDEO_MODEL_RE =
   /kling|jimeng|sora|vidu|cogvideo|video|hailuo|minimax|wan|seedance|runway|luma|pika|veo|doubao/i
+
+function resolveModelGroup(
+  model: ModelOption | undefined,
+  currentGroup: string
+): string | undefined {
+  if (!model?.groups || model.groups.length === 0) return undefined
+  if (model.groups.includes(currentGroup)) return currentGroup
+  return model.groups[0]
+}
 
 export function ImageGenerator() {
   const { t } = useTranslation()
@@ -86,7 +95,14 @@ export function ImageGenerator() {
     (value: string) => {
       const oldFamily = detectImageModelFamily(imageGen.config.model)
       const newFamily = detectImageModelFamily(value)
+      const nextGroup = resolveModelGroup(
+        imageModels.find((m) => m.value === value),
+        imageGen.config.group
+      )
       imageGen.updateConfig('model', value)
+      if (nextGroup && nextGroup !== imageGen.config.group) {
+        imageGen.updateConfig('group', nextGroup)
+      }
       // Reset size when switching between families with different size formats
       if (oldFamily !== newFamily) {
         const defaultSize = newFamily === 'hunyuan-image'
@@ -102,26 +118,64 @@ export function ImageGenerator() {
         imageGen.updateConfig('images', [])
       }
     },
-    [imageGen.updateConfig, imageGen.config.model]
+    [
+      imageGen.updateConfig,
+      imageGen.config.model,
+      imageGen.config.group,
+      imageModels,
+    ]
   )
 
   const handleVideoModelChange = useCallback(
-    (value: string) => videoGen.updateConfig('model', value),
-    [videoGen.updateConfig]
+    (value: string) => {
+      const nextGroup = resolveModelGroup(
+        videoModels.find((m) => m.value === value),
+        videoGen.config.group
+      )
+      videoGen.updateConfig('model', value)
+      if (nextGroup && nextGroup !== videoGen.config.group) {
+        videoGen.updateConfig('group', nextGroup)
+      }
+    },
+    [videoGen.updateConfig, videoGen.config.group, videoModels]
   )
 
   // Auto-select initial model when models load
   useEffect(() => {
     if (imageModels.length === 0) return
-    if (imageModels.some((m) => m.value === imageGen.config.model)) return
-    imageGen.updateConfig('model', imageModels[0].value)
-  }, [imageModels, imageGen.config.model, imageGen.updateConfig])
+    const currentModel = imageModels.find((m) => m.value === imageGen.config.model)
+    const nextModel = currentModel ?? imageModels[0]
+    if (!currentModel) {
+      imageGen.updateConfig('model', nextModel.value)
+    }
+    const nextGroup = resolveModelGroup(nextModel, imageGen.config.group)
+    if (nextGroup && nextGroup !== imageGen.config.group) {
+      imageGen.updateConfig('group', nextGroup)
+    }
+  }, [
+    imageModels,
+    imageGen.config.model,
+    imageGen.config.group,
+    imageGen.updateConfig,
+  ])
 
   useEffect(() => {
     if (videoModels.length === 0) return
-    if (videoModels.some((m) => m.value === videoGen.config.model)) return
-    videoGen.updateConfig('model', videoModels[0].value)
-  }, [videoModels, videoGen.config.model, videoGen.updateConfig])
+    const currentModel = videoModels.find((m) => m.value === videoGen.config.model)
+    const nextModel = currentModel ?? videoModels[0]
+    if (!currentModel) {
+      videoGen.updateConfig('model', nextModel.value)
+    }
+    const nextGroup = resolveModelGroup(nextModel, videoGen.config.group)
+    if (nextGroup && nextGroup !== videoGen.config.group) {
+      videoGen.updateConfig('group', nextGroup)
+    }
+  }, [
+    videoModels,
+    videoGen.config.model,
+    videoGen.config.group,
+    videoGen.updateConfig,
+  ])
 
   // ---- Icon rail tabs (rendered into the 80px sidebar via portal) ----
   const railTabs: { mode: GeneratorMode; label: string; icon: typeof ImageIcon }[] = [

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -585,13 +586,40 @@ func GetUserModels(c *gin.Context) {
 		return
 	}
 	groups := service.GetUserUsableGroups(user.Group)
-	var models []string
+	groupNames := make([]string, 0, len(groups))
 	for group := range groups {
+		groupNames = append(groupNames, group)
+	}
+	sort.Strings(groupNames)
+
+	modelGroups := make(map[string][]string)
+	for _, group := range groupNames {
 		for _, g := range model.GetGroupEnabledModels(group) {
-			if !common.StringsContains(models, g) {
-				models = append(models, g)
+			if !common.StringsContains(modelGroups[g], group) {
+				modelGroups[g] = append(modelGroups[g], group)
 			}
 		}
+	}
+	models := make([]string, 0, len(modelGroups))
+	for modelName := range modelGroups {
+		models = append(models, modelName)
+	}
+	sort.Strings(models)
+	if c.Query("with_groups") == "true" {
+		data := make([]gin.H, 0, len(models))
+		for _, modelName := range models {
+			data = append(data, gin.H{
+				"label":  modelName,
+				"value":  modelName,
+				"groups": modelGroups[modelName],
+			})
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "",
+			"data":    data,
+		})
+		return
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

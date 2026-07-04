@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -47,9 +48,10 @@ const (
 
 // modelDef 定义一个对外模型名的 vipeak 参数映射。
 type modelDef struct {
-	provider string // 上游 provider 字段
-	endpoint string // 提交端点
-	kind     string // "video" | "image"
+	provider      string // 上游 provider 字段
+	endpoint      string // 提交端点
+	kind          string // "video" | "image"
+	upstreamModel string // 非空时把对外别名转换成上游模型名
 }
 
 var modelDefs = map[string]modelDef{
@@ -73,6 +75,26 @@ var modelDefs = map[string]modelDef{
 		endpoint: epAdvanced,
 		kind:     "video",
 	},
+	// 兼容模型广场/渠道配置中常见的短名；上游仍使用完整模型名。
+	"seedance": {
+		provider:      "seedance",
+		endpoint:      epAdvanced,
+		kind:          "video",
+		upstreamModel: "dreamina-seedance-2-0-260128",
+	},
+	"seedance-fast": {
+		provider:      "seedance",
+		endpoint:      epAdvanced,
+		kind:          "video",
+		upstreamModel: "dreamina-seedance-2-0-fast-260128",
+	},
+}
+
+func canonicalModelName(requestModel string, def modelDef) string {
+	if def.upstreamModel != "" {
+		return def.upstreamModel
+	}
+	return requestModel
 }
 
 // ============================ 响应结构 ============================
@@ -145,6 +167,7 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 		for k := range modelDefs {
 			supported = append(supported, k)
 		}
+		sort.Strings(supported)
 		return service.TaskErrorWrapperLocal(
 			fmt.Errorf("unsupported model: %s (supported: %s)", peek.Model, strings.Join(supported, ", ")),
 			"invalid_model", http.StatusBadRequest)
@@ -188,9 +211,10 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 // 其余 provider 特有参数由 metadata 透传补充/覆盖。
 func buildRequest(req *relaycommon.TaskSubmitReq, upstreamModel string) map[string]any {
 	def := modelDefs[strings.ToLower(upstreamModel)]
+	canonicalModel := canonicalModelName(upstreamModel, def)
 	m := map[string]any{
 		"provider": def.provider,
-		"model":    upstreamModel,
+		"model":    canonicalModel,
 	}
 
 	if req.Prompt != "" {
@@ -513,6 +537,7 @@ func (a *TaskAdaptor) GetModelList() []string {
 	for m := range modelDefs {
 		out = append(out, m)
 	}
+	sort.Strings(out)
 	return out
 }
 

@@ -93,13 +93,23 @@ func Distribute() func(c *gin.Context) {
 						abortWithOpenAiMessage(c, http.StatusBadRequest, i18n.T(c, i18n.MsgDistributorInvalidPlayground, map[string]any{"Error": err.Error()}))
 						return
 					}
+					userGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup)
+					if userGroup == "" {
+						userGroup = usingGroup
+					}
 					if playgroundRequest.Group != "" {
-						if !service.GroupInUserUsableGroups(usingGroup, playgroundRequest.Group) && playgroundRequest.Group != usingGroup {
+						if !service.GroupInUserUsableGroups(userGroup, playgroundRequest.Group) && playgroundRequest.Group != usingGroup {
 							abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorGroupAccessDenied))
 							return
 						}
 						usingGroup = playgroundRequest.Group
 						common.SetContextKey(c, constant.ContextKeyUsingGroup, usingGroup)
+					}
+					if shouldAutoResolvePlaygroundGroup(c.Request.URL.Path) {
+						if resolvedGroup, changed := resolvePlaygroundGroupByModel(userGroup, usingGroup, modelRequest.Model); changed {
+							usingGroup = resolvedGroup
+							common.SetContextKey(c, constant.ContextKeyUsingGroup, usingGroup)
+						}
 					}
 				}
 
@@ -167,6 +177,48 @@ func Distribute() func(c *gin.Context) {
 			service.RecordChannelAffinity(c, channel.Id)
 		}
 	}
+}
+
+func shouldAutoResolvePlaygroundGroup(path string) bool {
+	return strings.HasPrefix(path, "/pg/images/generations") ||
+		strings.HasPrefix(path, "/pg/video/generations")
+}
+
+func resolvePlaygroundGroupByModel(userGroup, currentGroup, modelName string) (string, bool) {
+	if modelName == "" {
+		return currentGroup, false
+	}
+	if groupSupportsModel(currentGroup, modelName) {
+		return currentGroup, false
+	}
+	usableGroups := service.GetUserUsableGroups(userGroup)
+	for _, group := range model.GetModelEnableGroups(modelName) {
+		if _, ok := usableGroups[group]; ok {
+			return group, group != currentGroup
+		}
+	}
+	return currentGroup, false
+}
+
+func groupSupportsModel(group, modelName string) bool {
+	if group == "" || modelName == "" {
+		return false
+	}
+	for _, enabledGroup := range model.GetModelEnableGroups(modelName) {
+		if enabledGroup == group {
+			return true
+		}
+	}
+	normalized := ratio_setting.FormatMatchingModelName(modelName)
+	if normalized == "" || normalized == modelName {
+		return false
+	}
+	for _, enabledGroup := range model.GetModelEnableGroups(normalized) {
+		if enabledGroup == group {
+			return true
+		}
+	}
+	return false
 }
 
 // getModelFromRequest 从请求中读取模型信息

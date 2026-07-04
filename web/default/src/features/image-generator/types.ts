@@ -21,6 +21,7 @@ For commercial licensing, please contact support@quantumnous.com
 export interface ModelOption {
   label: string
   value: string
+  groups?: string[]
 }
 
 export interface GroupOption {
