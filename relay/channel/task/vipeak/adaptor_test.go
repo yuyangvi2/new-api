@@ -43,3 +43,19 @@ func TestBuildRequestUsesCanonicalSeedanceFastModel(t *testing.T) {
 		t.Fatalf("model = %v, want dreamina-seedance-2-0-fast-260128", got)
 	}
 }
+
+func TestNormalizeBaseURLStripsKnownAPIPaths(t *testing.T) {
+	tests := map[string]string{
+		"https://www.123vips.com":                       "https://www.123vips.com",
+		"https://www.123vips.com/":                      "https://www.123vips.com",
+		"https://www.123vips.com/api":                   "https://www.123vips.com",
+		"https://www.123vips.com/api/advanced/generate": "https://www.123vips.com",
+		"https://www.123vips.com/api/wan27/image-edit":  "https://www.123vips.com",
+	}
+
+	for input, want := range tests {
+		if got := normalizeBaseURL(input); got != want {
+			t.Fatalf("normalizeBaseURL(%q) = %q, want %q", input, got, want)
+		}
+	}
+}

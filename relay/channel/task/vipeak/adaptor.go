@@ -152,9 +152,22 @@ func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo) {
 
 func (a *TaskAdaptor) base() string {
 	if a.baseURL != "" {
-		return strings.TrimRight(a.baseURL, "/")
+		return normalizeBaseURL(a.baseURL)
 	}
 	return vipeakBaseURL
+}
+
+func normalizeBaseURL(base string) string {
+	base = strings.TrimRight(strings.TrimSpace(base), "/")
+	for _, suffix := range []string{
+		epAdvanced,
+		epImageEdit,
+		"/api/generation-records",
+		"/api",
+	} {
+		base = strings.TrimSuffix(base, suffix)
+	}
+	return base
 }
 
 func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskError {
