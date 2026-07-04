@@ -167,6 +167,20 @@ export function Hero(props: HeroProps) {
             )}
           </div>
 
+          {/* Powered by 品牌标识（对齐 Stitch 结构） */}
+          <div
+            className='landing-animate-fade-up mt-6 flex items-center gap-4 opacity-0'
+            style={{ animationDelay: '210ms' }}
+          >
+            <span className='text-muted-foreground/50 text-[10px] font-bold tracking-[0.18em] uppercase'>
+              {t('Powered by')}
+            </span>
+            <div className='text-foreground/70 flex items-center gap-4 text-sm font-semibold'>
+              <span>new-api</span>
+              <span>QuantumNous</span>
+            </div>
+          </div>
+
           {/* Supported Apps (参考图二样式，进行卡片化和信息扩充设计，增加视觉高度) */}
           <div
             className='landing-animate-fade-up mt-10 w-full max-w-xl opacity-0'

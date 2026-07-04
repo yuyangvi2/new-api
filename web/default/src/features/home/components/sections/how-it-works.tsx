@@ -16,7 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Settings, Zap, BarChart3 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { AnimateInView } from '@/components/animate-in-view'
 
@@ -30,7 +29,6 @@ export function HowItWorks() {
       desc: t(
         'Add your API keys, set up channels and configure access permissions'
       ),
-      icon: <Settings className='size-6' strokeWidth={1.5} />,
     },
     {
       num: '2',
@@ -38,18 +36,16 @@ export function HowItWorks() {
       desc: t(
         'Connect through OpenAI, Claude, Gemini, and other compatible API routes'
       ),
-      icon: <Zap className='size-6' strokeWidth={1.5} />,
     },
     {
       num: '3',
       title: t('Monitor'),
       desc: t('Track usage, costs and performance with real-time analytics'),
-      icon: <BarChart3 className='size-6' strokeWidth={1.5} />,
     },
   ]
 
   return (
-    <section className='border-border/40 relative z-10 border-t px-6 py-24 md:py-32'>
+    <section className='bg-muted/20 border-border/40 relative z-10 border-y px-6 py-24 md:py-32'>
       <div className='mx-auto max-w-6xl'>
         <AnimateInView className='mb-16 text-center md:mb-20'>
           <p className='text-muted-foreground mb-3 text-xs font-medium tracking-widest uppercase'>
@@ -60,23 +56,23 @@ export function HowItWorks() {
           </h2>
         </AnimateInView>
 
-        <div className='grid gap-8 md:grid-cols-3 md:gap-12'>
+        <div className='relative grid gap-10 md:grid-cols-3 md:gap-12'>
+          {/* Desktop connector line behind the numbered circles */}
+          <div
+            aria-hidden
+            className='bg-border/60 absolute top-8 left-[16.6%] right-[16.6%] -z-10 hidden h-px md:block'
+          />
           {steps.map((step, i) => (
             <AnimateInView
               key={step.num}
               delay={i * 150}
               animation='fade-up'
-              className='relative flex flex-col items-center text-center'
+              className='flex flex-col items-center text-center'
             >
-              <div className='relative mb-6'>
-                <div className='text-muted-foreground border-border/50 bg-muted/30 flex size-16 items-center justify-center rounded-2xl border transition-colors'>
-                  {step.icon}
-                </div>
-                <div className='bg-foreground text-background absolute -top-2 -right-2 flex size-6 items-center justify-center rounded-full text-xs font-bold'>
-                  {step.num}
-                </div>
+              <div className='border-border/60 bg-background flex size-16 items-center justify-center rounded-full border text-2xl font-bold shadow-sm'>
+                {step.num}
               </div>
-              <h3 className='mb-2 text-base font-semibold'>{step.title}</h3>
+              <h3 className='mt-6 mb-2 text-base font-semibold'>{step.title}</h3>
               <p className='text-muted-foreground max-w-[240px] text-sm leading-relaxed'>
                 {step.desc}
               </p>
