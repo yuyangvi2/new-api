@@ -5,8 +5,22 @@ var ModelList = []string{
 	"doubao-seedance-1-0-lite-t2v",
 	"doubao-seedance-1-0-lite-i2v",
 	"doubao-seedance-1-5-pro-251215",
+	"doubao-seedance-2-0",
 	"doubao-seedance-2-0-260128",
+	"doubao-seedance-2-0-fast",
 	"doubao-seedance-2-0-fast-260128",
+}
+
+var modelAliases = map[string]string{
+	"doubao-seedance-2-0":      "doubao-seedance-2-0-260128",
+	"doubao-seedance-2-0-fast": "doubao-seedance-2-0-fast-260128",
+}
+
+func CanonicalModelName(modelName string) string {
+	if mapped, ok := modelAliases[modelName]; ok {
+		return mapped
+	}
+	return modelName
 }
 
 var ChannelName = "doubao-video"
@@ -20,6 +34,7 @@ var videoInputRatioMap = map[string]float64{
 }
 
 func GetVideoInputRatio(modelName string) (float64, bool) {
+	modelName = CanonicalModelName(modelName)
 	r, ok := videoInputRatioMap[modelName]
 	return r, ok
 }

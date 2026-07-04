@@ -269,7 +269,7 @@ func (a *TaskAdaptor) GetChannelName() string {
 
 func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*requestPayload, error) {
 	r := requestPayload{
-		Model:   req.Model,
+		Model:   CanonicalModelName(req.Model),
 		Content: []ContentItem{},
 	}
 

@@ -10,6 +10,7 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/config"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -59,4 +60,64 @@ func TestModelPriceHelperTieredUsesPreloadedRequestInput(t *testing.T) {
 	require.Equal(t, "stream", info.TieredBillingSnapshot.EstimatedTier)
 	require.Equal(t, billing_setting.BillingModeTieredExpr, info.TieredBillingSnapshot.BillingMode)
 	require.Equal(t, common.QuotaPerUnit, info.TieredBillingSnapshot.QuotaPerUnit)
+}
+
+func TestModelPriceHelperPerCallUsesSeedanceBillingAlias(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	saved := ratio_setting.ModelPrice2JSONString()
+	t.Cleanup(func() {
+		require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(saved))
+	})
+
+	require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(`{"dreamina-seedance-2-0-260128":0.42}`))
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Set("group", "default")
+
+	info := &relaycommon.RelayInfo{
+		OriginModelName: "seedance",
+		UserGroup:       "default",
+		UsingGroup:      "default",
+		ChannelMeta: &relaycommon.ChannelMeta{
+			UpstreamModelName: "seedance",
+		},
+	}
+
+	priceData, err := ModelPriceHelperPerCall(ctx, info)
+	require.NoError(t, err)
+	require.True(t, priceData.UsePrice)
+	require.Equal(t, 0.42, priceData.ModelPrice)
+	require.Equal(t, int(0.42*common.QuotaPerUnit), priceData.Quota)
+}
+
+func TestModelPriceHelperPerCallUsesDoubaoSeedanceBillingAlias(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	saved := ratio_setting.ModelPrice2JSONString()
+	t.Cleanup(func() {
+		require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(saved))
+	})
+
+	require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(`{"doubao-seedance-2-0-fast-260128":0.37}`))
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Set("group", "default")
+
+	info := &relaycommon.RelayInfo{
+		OriginModelName: "doubao-seedance-2-0-fast",
+		UserGroup:       "default",
+		UsingGroup:      "default",
+		ChannelMeta: &relaycommon.ChannelMeta{
+			UpstreamModelName: "doubao-seedance-2-0-fast",
+		},
+	}
+
+	priceData, err := ModelPriceHelperPerCall(ctx, info)
+	require.NoError(t, err)
+	require.True(t, priceData.UsePrice)
+	require.Equal(t, 0.37, priceData.ModelPrice)
+	require.Equal(t, int(0.37*common.QuotaPerUnit), priceData.Quota)
 }

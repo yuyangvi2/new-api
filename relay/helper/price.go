@@ -167,19 +167,20 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types.PriceData, error) {
 	groupRatioInfo := HandleGroupRatio(c, info)
 
-	modelPrice, success := ratio_setting.GetModelPrice(info.OriginModelName, true)
+	billingModelNames := perCallBillingModelNames(info)
+	modelPrice, success := getModelPriceForCandidates(billingModelNames)
 	usePrice := success
 	var modelRatio float64
 
 	if !success {
-		defaultPrice, ok := ratio_setting.GetDefaultModelPriceMap()[info.OriginModelName]
+		defaultPrice, ok := getDefaultModelPriceForCandidates(billingModelNames)
 		if ok {
 			modelPrice = defaultPrice
 			usePrice = true
 		} else {
 			var ratioSuccess bool
 			var matchName string
-			modelRatio, ratioSuccess, matchName = ratio_setting.GetModelRatio(info.OriginModelName)
+			modelRatio, ratioSuccess, matchName = getModelRatioForCandidates(billingModelNames)
 			acceptUnsetRatio := false
 			if info.UserSetting.AcceptUnsetRatioModel {
 				acceptUnsetRatio = true
@@ -222,6 +223,79 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types
 		GroupRatioInfo: groupRatioInfo,
 	}
 	return priceData, nil
+}
+
+var perCallBillingAliases = map[string][]string{
+	"doubao-seedance-2-0":      {"doubao-seedance-2-0-260128"},
+	"doubao-seedance-2-0-fast": {"doubao-seedance-2-0-fast-260128"},
+	"seedance":                 {"dreamina-seedance-2-0-260128"},
+	"seedance-fast":            {"dreamina-seedance-2-0-fast-260128"},
+}
+
+func perCallBillingModelNames(info *relaycommon.RelayInfo) []string {
+	if info == nil {
+		return nil
+	}
+	return uniqueBillingModelNames(info.OriginModelName, info.UpstreamModelName)
+}
+
+func uniqueBillingModelNames(names ...string) []string {
+	out := make([]string, 0, len(names))
+	seen := make(map[string]struct{}, len(names))
+	add := func(name string) {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return
+		}
+		if _, ok := seen[name]; ok {
+			return
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	for _, name := range names {
+		add(name)
+		for _, alias := range perCallBillingAliases[name] {
+			add(alias)
+		}
+	}
+	return out
+}
+
+func getModelPriceForCandidates(modelNames []string) (float64, bool) {
+	for _, modelName := range modelNames {
+		if price, ok := ratio_setting.GetModelPrice(modelName, false); ok {
+			return price, true
+		}
+	}
+	return -1, false
+}
+
+func getDefaultModelPriceForCandidates(modelNames []string) (float64, bool) {
+	defaults := ratio_setting.GetDefaultModelPriceMap()
+	for _, modelName := range modelNames {
+		if price, ok := defaults[modelName]; ok {
+			return price, true
+		}
+	}
+	return -1, false
+}
+
+func getModelRatioForCandidates(modelNames []string) (float64, bool, string) {
+	var fallbackName string
+	for _, modelName := range modelNames {
+		ratio, ok, matchName := ratio_setting.GetModelRatio(modelName)
+		if fallbackName == "" {
+			fallbackName = matchName
+		}
+		if ok {
+			return ratio, true, matchName
+		}
+	}
+	if fallbackName == "" && len(modelNames) > 0 {
+		fallbackName = modelNames[0]
+	}
+	return 37.5, false, fallbackName
 }
 
 func HasModelBillingConfig(modelName string) bool {
