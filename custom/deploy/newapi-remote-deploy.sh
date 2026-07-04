@@ -199,15 +199,28 @@ if [ -z "$HOST_CADDY" ] || [ ! -f "$HOST_CADDY" ]; then
   echo "::error::cannot locate host Caddyfile for $CADDY_CTR"
   exit 1
 fi
+CADDY_IMAGE="$(docker inspect "$CADDY_CTR" --format '{{.Config.Image}}')"
+CADDY_SERVICE="$(docker inspect "$CADDY_CTR" --format '{{ index .Config.Labels "com.docker.compose.service" }}')"
+CADDY_WORKDIR="$(docker inspect "$CADDY_CTR" --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}')"
 cp "$HOST_CADDY" "${HOST_CADDY}.bak.newapi.${TS}"
 
 BEGIN="# >>> new-api ${DOMAIN} (managed by new-api deploy workflow) >>>"
 END="# <<< new-api ${DOMAIN} (managed by new-api deploy workflow) <<<"
-esc() { printf '%s' "$1" | sed -e 's/[\/&]/\\&/g'; }
-sed -i "/$(esc "$BEGIN")/,/$(esc "$END")/d" "$HOST_CADDY"
+TMP_CADDY="$(mktemp)"
+NEXT_CADDY="$(mktemp)"
+ROLLBACK_CADDY="$(mktemp)"
+trap 'rm -f "$TMP_CADDY" "$NEXT_CADDY" "$ROLLBACK_CADDY"' EXIT
 
-printf '\n%s\n' "$BEGIN" >> "$HOST_CADDY"
-cat >> "$HOST_CADDY" <<CADDYBLOCK
+docker exec "$CADDY_CTR" sh -c 'cat /etc/caddy/Caddyfile' > "$TMP_CADDY"
+cp "$TMP_CADDY" "$ROLLBACK_CADDY"
+awk -v begin="$BEGIN" -v end="$END" '
+  $0 == begin { skip = 1; next }
+  $0 == end { skip = 0; next }
+  !skip { print }
+' "$TMP_CADDY" > "$NEXT_CADDY"
+
+printf '\n%s\n' "$BEGIN" >> "$NEXT_CADDY"
+cat >> "$NEXT_CADDY" <<CADDYBLOCK
 ${DOMAIN} {
 	encode zstd gzip
 	reverse_proxy ${APP_CTR}:3000 {
@@ -230,17 +243,33 @@ ${DOMAIN} {
 	}
 }
 CADDYBLOCK
-printf '%s\n' "$END" >> "$HOST_CADDY"
+printf '%s\n' "$END" >> "$NEXT_CADDY"
 
 echo ">>> Validate Caddyfile"
-if ! docker exec "$CADDY_CTR" caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile; then
+if ! docker run --rm --entrypoint caddy -v "$NEXT_CADDY:/etc/caddy/Caddyfile:ro" "$CADDY_IMAGE" validate --adapter caddyfile --config /etc/caddy/Caddyfile; then
   echo "::error::Caddyfile invalid, rolling back"
-  cp "${HOST_CADDY}.bak.newapi.${TS}" "$HOST_CADDY"
+  cp "$ROLLBACK_CADDY" "$HOST_CADDY"
   exit 1
 fi
+cp "$NEXT_CADDY" "$HOST_CADDY"
 
-echo ">>> Reload Caddy"
-docker exec "$CADDY_CTR" caddy reload --adapter caddyfile --config /etc/caddy/Caddyfile
+echo ">>> Apply Caddyfile"
+if docker exec -i "$CADDY_CTR" sh -c 'cat > /etc/caddy/Caddyfile' < "$NEXT_CADDY"; then
+  echo ">>> Reload Caddy"
+  docker exec "$CADDY_CTR" caddy reload --adapter caddyfile --config /etc/caddy/Caddyfile
+else
+  echo ">>> Caddyfile mount is not writable in-place; recreating Caddy service"
+  if [ -z "$CADDY_SERVICE" ] || [ -z "$CADDY_WORKDIR" ] || [ ! -d "$CADDY_WORKDIR" ]; then
+    echo "::error::cannot locate Caddy compose service/workdir for recreate"
+    cp "$ROLLBACK_CADDY" "$HOST_CADDY"
+    exit 1
+  fi
+  (
+    cd "$CADDY_WORKDIR"
+    docker compose up -d --no-deps --force-recreate "$CADDY_SERVICE"
+  )
+fi
+docker exec "$CADDY_CTR" caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile
 
 echo ">>> Probe Caddy network to new-api"
 docker exec "$CADDY_CTR" sh -c "wget -q -O - -T 5 http://${APP_CTR}:3000/api/status | grep -q '\"success\":true' && echo 'caddy->new-api OK'"
