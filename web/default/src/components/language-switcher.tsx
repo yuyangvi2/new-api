@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback } from 'react'
+import { loadLanguage } from '@/i18n/config'
 import {
   INTERFACE_LANGUAGE_OPTIONS,
   normalizeInterfaceLanguage,
@@ -41,7 +42,7 @@ export function LanguageSwitcher() {
 
   const handleChangeLanguage = useCallback(
     async (code: string) => {
-      await i18n.changeLanguage(code)
+      await loadLanguage(code)
       if (user) {
         try {
           await api.put('/api/user/self', { language: code })
@@ -50,7 +51,7 @@ export function LanguageSwitcher() {
         }
       }
     },
-    [i18n, user]
+    [user]
   )
 
   return (

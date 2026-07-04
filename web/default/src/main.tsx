@@ -37,7 +37,7 @@ import { handleServerError } from '@/lib/handle-server-error'
 import { DirectionProvider } from './context/direction-provider'
 import { FontProvider } from './context/font-provider'
 import { ThemeProvider } from './context/theme-provider'
-import './i18n/config'
+import { initI18n } from './i18n/config'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
 // Styles
@@ -155,7 +155,9 @@ const rootElement = document.getElementById('root')!
     /* empty */
   }
 })()
-if (!rootElement.innerHTML) {
+function renderApp() {
+  if (rootElement.innerHTML) return
+
   const root = ReactDOM.createRoot(rootElement)
   root.render(
     <StrictMode>
@@ -171,3 +173,12 @@ if (!rootElement.innerHTML) {
     </StrictMode>
   )
 }
+
+initI18n()
+  .catch((error: unknown) => {
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.warn('[i18n] Failed to initialize language resources', error)
+    }
+  })
+  .finally(renderApp)

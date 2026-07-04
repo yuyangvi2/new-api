@@ -16,42 +16,110 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import i18n from 'i18next'
+import i18n, {
+  type BackendModule,
+  type ReadCallback,
+  type ResourceKey,
+} from 'i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
 import { initReactI18next } from 'react-i18next'
-import en from './locales/en.json'
-import fr from './locales/fr.json'
-import ja from './locales/ja.json'
-import ru from './locales/ru.json'
-import vi from './locales/vi.json'
-import zh from './locales/zh.json'
 
-export const resources = {
-  en,
-  zh,
-  fr,
-  ru,
-  ja,
-  vi,
+const localeLoaders = {
+  en: () => import('./locales/en.json'),
+  zh: () => import('./locales/zh.json'),
+  fr: () => import('./locales/fr.json'),
+  ru: () => import('./locales/ru.json'),
+  ja: () => import('./locales/ja.json'),
+  vi: () => import('./locales/vi.json'),
 } as const
 
-i18n
-  .use(LanguageDetector)
-  .use(initReactI18next)
-  .init({
-    resources,
-    fallbackLng: 'en',
-    supportedLngs: ['en', 'zh', 'fr', 'ru', 'ja', 'vi'],
-    load: 'languageOnly', // Convert zh-CN -> zh
-    nsSeparator: false, // Allow literal colons in keys (e.g., URLs, labels)
-    debug: import.meta.env.DEV,
-    interpolation: {
-      escapeValue: false, // not needed for react as it escapes by default
-    },
-    detection: {
-      order: ['localStorage', 'navigator'],
-      caches: ['localStorage'],
-    },
-  })
+type SupportedLanguage = keyof typeof localeLoaders
+
+function normalizeLanguage(language?: string): SupportedLanguage {
+  const normalized = language?.trim().replace(/_/g, '-').toLowerCase()
+  if (normalized?.startsWith('zh')) return 'zh'
+
+  if (
+    normalized &&
+    Object.prototype.hasOwnProperty.call(localeLoaders, normalized)
+  ) {
+    return normalized as SupportedLanguage
+  }
+
+  return 'en'
+}
+
+const dynamicResourceBackend: BackendModule = {
+  type: 'backend',
+  init() {
+    /* no backend options */
+  },
+  read(language: string, namespace: string, callback: ReadCallback) {
+    if (namespace !== 'translation') {
+      callback(null, {})
+      return
+    }
+
+    const normalized = normalizeLanguage(language)
+    localeLoaders[normalized]()
+      .then((module) => callback(null, module.default.translation))
+      .catch((error: unknown) =>
+        callback(
+          error instanceof Error ? error : new Error(String(error)),
+          null
+        )
+      )
+  },
+}
+
+let initPromise: Promise<typeof i18n> | null = null
+
+export function initI18n() {
+  if (i18n.isInitialized) return Promise.resolve(i18n)
+  if (initPromise) return initPromise
+
+  initPromise = i18n
+    .use(dynamicResourceBackend)
+    .use(LanguageDetector)
+    .use(initReactI18next)
+    .init({
+      fallbackLng: 'en',
+      supportedLngs: ['en', 'zh', 'fr', 'ru', 'ja', 'vi'],
+      load: 'languageOnly', // Convert zh-CN -> zh
+      nsSeparator: false, // Allow literal colons in keys (e.g., URLs, labels)
+      defaultNS: 'translation',
+      ns: ['translation'],
+      debug: import.meta.env.DEV,
+      interpolation: {
+        escapeValue: false, // not needed for react as it escapes by default
+      },
+      detection: {
+        order: ['localStorage', 'navigator'],
+        caches: ['localStorage'],
+      },
+      react: {
+        useSuspense: false,
+      },
+    })
+    .then(() => i18n)
+
+  return initPromise
+}
+
+export async function loadLanguage(language: string) {
+  await initI18n()
+  const normalized = normalizeLanguage(language)
+  if (!i18n.hasResourceBundle(normalized, 'translation')) {
+    const module = await localeLoaders[normalized]()
+    i18n.addResourceBundle(
+      normalized,
+      'translation',
+      module.default.translation as ResourceKey,
+      true,
+      true
+    )
+  }
+  await i18n.changeLanguage(normalized)
+}
 
 export default i18n
