@@ -152,7 +152,7 @@ export function VideoPanel({
         </div>
 
         {variantState && (
-          <div className='flex flex-nowrap items-center gap-1.5'>
+          <div className='grid grid-cols-2 items-center gap-1'>
             {variantState.axes.map((axis) => (
               <SegmentedTabs
                 key={axis.id}
@@ -342,15 +342,15 @@ function SegmentedTabs({
     <Tabs
       value={axis.value}
       onValueChange={onValueChange}
-      className='!flex-row gap-0'
+      className='min-w-0 !flex-row gap-0'
     >
-      <TabsList className='bg-background h-8 overflow-hidden rounded-none border p-0'>
+      <TabsList className='bg-background h-7 w-full overflow-hidden rounded-none border p-0'>
         {axis.options.map((option, index) => (
           <TabsTrigger
             key={option.value}
             value={option.value}
             disabled={disabled}
-            className='h-8 min-w-14 rounded-none border-r px-2.5 text-xs shadow-none last:border-r-0 data-active:bg-muted data-active:shadow-none'
+            className='h-7 min-w-0 flex-1 rounded-none border-r px-1.5 text-[11px] leading-none shadow-none last:border-r-0 data-active:bg-muted data-active:shadow-none'
             data-index={index}
           >
             {axis.translateLabels === false ? option.label : t(option.label)}
