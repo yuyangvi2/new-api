@@ -1,0 +1,174 @@
+name: Auto Deploy new-api to Tencent Cloud
+
+on:
+  push:
+    branches:
+      - "main"
+    paths-ignore:
+      - "**/*.md"
+      - "custom/docs/**"
+      - "LICENSE"
+  workflow_dispatch:
+
+concurrency:
+  group: "new-api-deploy-${{ github.ref }}"
+  cancel-in-progress: false
+
+env:
+  ACR_REGISTRY: "crpi-msjfhehj888m1yl4.ap-northeast-1.personal.cr.aliyuncs.com"
+  ACR_NAMESPACE: "x2api"
+  ACR_REPO: "new-api"
+  TENCENT_REGION: "ap-tokyo"
+  TENCENT_INSTANCE_ID: "lhins-rfrpv8cv"
+  CADDY_CONTAINER: "sub2api-caddy"
+  CADDY_NETWORK: "sub2api-deploy_sub2api-network"
+  APP_CONTAINER: "newapi"
+  PUBLIC_DOMAIN: "cn.tokone.ai"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: vars
+        run: |
+          SHORT_SHA="$(git rev-parse --short HEAD)"
+          echo "tag=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "main-${SHORT_SHA}" > VERSION
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Aliyun ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/${{ env.ACR_REPO }}:${{ steps.vars.outputs.tag }}
+            ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/${{ env.ACR_REPO }}:main
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: .github/requirements-deploy.txt
+
+      - name: Install tccli
+        run: pip install -r .github/requirements-deploy.txt
+
+      - name: Configure tccli
+        env:
+          TENCENT_SECRET_ID: ${{ secrets.TENCENT_SECRET_ID }}
+          TENCENT_SECRET_KEY: ${{ secrets.TENCENT_SECRET_KEY }}
+        run: |
+          tccli configure set secretId "$TENCENT_SECRET_ID"
+          tccli configure set secretKey "$TENCENT_SECRET_KEY"
+          tccli configure set region "$TENCENT_REGION"
+          tccli configure set output json
+
+      - name: Deploy via Tencent TAT
+        env:
+          IMAGE_FULL: ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/${{ env.ACR_REPO }}:${{ steps.vars.outputs.tag }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          ACR_USER_B64="$(printf '%s' "$ACR_USERNAME" | base64 -w0)"
+          ACR_PASS_B64="$(printf '%s' "$ACR_PASSWORD" | base64 -w0)"
+          echo "::add-mask::$ACR_USER_B64"
+          echo "::add-mask::$ACR_PASS_B64"
+
+          {
+            echo "IMAGE='${IMAGE_FULL}'"
+            echo "ACR_REGISTRY='${ACR_REGISTRY}'"
+            echo "ACR_USER_B64='${ACR_USER_B64}'"
+            echo "ACR_PASS_B64='${ACR_PASS_B64}'"
+            echo "CADDY_CTR='${CADDY_CONTAINER}'"
+            echo "CADDY_NETWORK='${CADDY_NETWORK}'"
+            echo "APP_CTR='${APP_CONTAINER}'"
+            echo "DOMAIN='${PUBLIC_DOMAIN}'"
+            cat custom/deploy/newapi-remote-deploy.sh
+          } > /tmp/remote_deploy.sh
+
+          B64="$(base64 -w0 /tmp/remote_deploy.sh)"
+
+          tat_call() {
+            local tries=5 delay=8
+            local stdout rc=0
+            local errf
+            errf="$(mktemp)"
+            for i in $(seq 1 "$tries"); do
+              if stdout="$(tccli "$@" 2>"$errf")"; then
+                printf '%s' "$stdout"
+                rm -f "$errf"
+                return 0
+              fi
+              rc=$?
+              echo "::warning::tccli $1 attempt $i/$tries failed (rc=$rc), retrying in ${delay}s" >&2
+              tail -3 "$errf" >&2 || true
+              sleep "$delay"
+              delay=$((delay * 2))
+            done
+            echo "::error::tccli $1 failed after $tries attempts" >&2
+            cat "$errf" >&2 || true
+            rm -f "$errf"
+            return "$rc"
+          }
+
+          echo ">>> Submitting TAT command"
+          RUN_RES="$(tat_call tat RunCommand \
+            --InstanceIds "[\"$TENCENT_INSTANCE_ID\"]" \
+            --CommandType SHELL \
+            --Username root \
+            --Timeout 420 \
+            --Content "$B64")"
+          echo "$RUN_RES"
+          INVOCATION_ID="$(echo "$RUN_RES" | python3 -c 'import sys,json; print(json.load(sys.stdin)["InvocationId"])')"
+          echo "InvocationId=$INVOCATION_ID"
+
+          sleep 2
+          INVT_ID="$(tat_call tat DescribeInvocations --InvocationIds "[\"$INVOCATION_ID\"]" \
+            | python3 -c 'import sys,json; print(json.load(sys.stdin)["InvocationSet"][0]["InvocationTaskBasicInfoSet"][0]["InvocationTaskId"])')"
+          echo "InvocationTaskId=$INVT_ID"
+
+          for i in $(seq 1 84); do
+            STATUS="$(tat_call tat DescribeInvocations --InvocationIds "[\"$INVOCATION_ID\"]" \
+              | python3 -c 'import sys,json; print(json.load(sys.stdin)["InvocationSet"][0]["InvocationStatus"])')"
+            echo "[$i] status=$STATUS"
+            case "$STATUS" in
+              SUCCESS)
+                break
+                ;;
+              FAILED|TIMEOUT|CANCELLED|TERMINATED)
+                echo "::error::Deploy failed with status=$STATUS"
+                tat_call tat DescribeInvocationTasks --InvocationTaskIds "[\"$INVT_ID\"]" --HideOutput False \
+                  | python3 -c 'import sys,json,base64; d=json.load(sys.stdin); t=d["InvocationTaskSet"][0]["TaskResult"]; print(base64.b64decode(t["Output"]).decode("utf-8","replace"))'
+                exit 1
+                ;;
+            esac
+            sleep 5
+          done
+
+          echo "===== Remote deploy log ====="
+          tat_call tat DescribeInvocationTasks --InvocationTaskIds "[\"$INVT_ID\"]" --HideOutput False \
+            | python3 -c 'import sys,json,base64; d=json.load(sys.stdin); t=d["InvocationTaskSet"][0]["TaskResult"]; print(base64.b64decode(t["Output"]).decode("utf-8","replace"))'

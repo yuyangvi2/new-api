@@ -47,3 +47,16 @@ docker compose -f docker-compose.server.yml logs -f newapi | grep -iE 'root|pass
 - **拉镜像慢/失败**：x2api 能跑说明服务器能拉 Docker Hub；若慢，给 Docker daemon 配镜像加速器，或等 N7 把镜像同步到阿里云 ACR 后改 `NEWAPI_IMAGE`。
 - **3000 被占**：改 `.env` 的 `NEWAPI_PORT`。
 - **数据持久化**：数据在 `pg_data` 卷 + `./data`、`./logs` 目录，别误删。
+
+## 自动部署（GitHub Actions）
+
+`.github/workflows/deploy.yml` 会在 `main` 分支更新后构建 new-api 镜像，推送到阿里云 ACR，并通过腾讯云 TAT 部署到东京机器。
+
+需要在 GitHub 仓库配置这些 secrets：
+
+- `ACR_USERNAME`
+- `ACR_PASSWORD`
+- `TENCENT_SECRET_ID`
+- `TENCENT_SECRET_KEY`
+
+远程脚本 `custom/deploy/newapi-remote-deploy.sh` 默认使用 `/opt/new-api-deploy`。如果服务器上已有测试用 `newapi` compose，脚本会先备份旧 `docker-compose.yml`，再写入托管 compose 并覆盖该测试部署。托管部署使用 `newapi`、`newapi-postgres`、`newapi-redis`、`newapi-network` 等独立资源。脚本不修改 x2api 的 compose，只会在现有 `sub2api-caddy` 的 Caddyfile 中维护 `cn.tokone.ai` 的受管标记块，校验失败会回滚 Caddyfile。
