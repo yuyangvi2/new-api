@@ -54,6 +54,9 @@ For commercial licensing, please contact support@quantumnous.com
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  /* DESIGN.md 素白强调蓝（点睛色，非主色面）：accent-500 #2D4BFF */
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
@@ -114,6 +117,8 @@ For commercial licensing, please contact support@quantumnous.com
   --muted-foreground: oklch(0.49 0 0);
   --accent: oklch(0.95 0 0);
   --accent-foreground: oklch(0.145 0 0);
+  --brand: #2d4bff;
+  --brand-hover: #1e37d6;
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
   --success: oklch(0.596 0.145 163.225);
@@ -160,6 +165,8 @@ For commercial licensing, please contact support@quantumnous.com
   --muted-foreground: oklch(0.76 0 0);
   --accent: oklch(0.325 0 0);
   --accent-foreground: oklch(0.985 0 0);
+  --brand: #5e6cff;
+  --brand-hover: #97a1ff;
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
   --success: oklch(0.696 0.17 162.48);

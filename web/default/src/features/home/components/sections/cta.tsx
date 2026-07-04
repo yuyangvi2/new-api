@@ -43,12 +43,10 @@ export function CTA(props: CTAProps) {
         {/* Subtle radial glow inside the dark card */}
         <div
           aria-hidden
-          className='pointer-events-none absolute inset-0 -z-0 opacity-[0.14]'
+          className='pointer-events-none absolute inset-0 -z-0 opacity-20'
           style={{
-            background: [
-              'radial-gradient(ellipse 50% 60% at 30% 40%, oklch(0.72 0.16 250) 0%, transparent 70%)',
-              'radial-gradient(ellipse 40% 50% at 75% 60%, oklch(0.66 0.13 200) 0%, transparent 70%)',
-            ].join(', '),
+            background:
+              'radial-gradient(ellipse 55% 60% at 30% 40%, #2d4bff 0%, transparent 70%)',
           }}
         />
         <div className='relative z-10'>
