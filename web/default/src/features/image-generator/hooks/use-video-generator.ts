@@ -169,12 +169,14 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
 
       // Poll until the task reaches a terminal state or times out.
       const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS
-      // eslint-disable-next-line no-constant-condition
       while (true) {
         await sleep(VIDEO_POLL_INTERVAL_MS, controller.signal)
 
         const task = await fetchVideoTask(submit.task_id, controller.signal)
         const status = (task.status || '').toLowerCase()
+        if (task.progress) {
+          patchBatch(batchId, { progress: task.progress })
+        }
 
         if (VIDEO_SUCCESS_STATUSES.includes(status)) {
           if (task.url) {

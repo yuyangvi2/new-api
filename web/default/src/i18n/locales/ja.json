@@ -1888,6 +1888,7 @@
     "Generate video": "Generate video",
     "Generated image": "生成された画像",
     "Generating new codes will invalidate all existing backup codes.": "新しいコードを生成すると、既存のすべてのバックアップコードが無効になります。",
+    "Generating video ({{progress}})...": "動画を生成中（{{progress}}）...",
     "Generating video...": "Generating video...",
     "Generating...": "生成中...",
     "Generation quality preset": "生成品質プリセット",

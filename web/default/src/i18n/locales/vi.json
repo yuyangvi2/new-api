@@ -1888,6 +1888,7 @@
     "Generate video": "Generate video",
     "Generated image": "Ảnh được tạo",
     "Generating new codes will invalidate all existing backup codes.": "Tạo mã mới sẽ vô hiệu hóa tất cả các mã dự phòng hiện có.",
+    "Generating video ({{progress}})...": "Đang tạo video ({{progress}})...",
     "Generating video...": "Generating video...",
     "Generating...": "Đang tạo...",
     "Generation quality preset": "Mức chất lượng sinh",

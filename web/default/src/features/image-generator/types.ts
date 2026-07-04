@@ -139,6 +139,7 @@ export interface VideoSubmitResponse {
 export interface VideoTaskResponse {
   task_id: string
   status: string
+  progress?: string
   url?: string
   format?: string
   error?: { code?: number; message?: string }
@@ -154,6 +155,7 @@ export interface VideoBatch {
   // Displayable source of the input image (data URI or URL).
   imagePreview: string
   taskId?: string
+  progress?: string
   videoUrl?: string
   errorMessage?: string
   createdAt: number

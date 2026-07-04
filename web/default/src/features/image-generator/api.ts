@@ -37,6 +37,12 @@ type RawUserModel =
       groups?: string[]
     }
 
+function normalizeTaskProgress(progress: unknown): string | undefined {
+  if (progress === undefined || progress === null) return undefined
+  const normalized = String(progress).trim()
+  return normalized || undefined
+}
+
 /**
  * Get user available models.
  */
@@ -141,6 +147,7 @@ export async function fetchImageTask(
   return {
     task_id: (raw.task_id as string) || taskId,
     status: (raw.status as string) || '',
+    progress: normalizeTaskProgress(raw.progress),
     url: (raw.result_url as string) || (raw.url as string) || undefined,
     error: raw.fail_reason
       ? { message: raw.fail_reason as string }
@@ -188,6 +195,7 @@ export async function fetchVideoTask(
   return {
     task_id: (raw.task_id as string) || taskId,
     status: (raw.status as string) || '',
+    progress: normalizeTaskProgress(raw.progress),
     url: (raw.result_url as string) || (raw.url as string) || undefined,
     error: raw.fail_reason
       ? { message: raw.fail_reason as string }

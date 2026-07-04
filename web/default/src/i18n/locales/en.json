@@ -1888,6 +1888,7 @@
     "Generate video": "Generate video",
     "Generated image": "Generated image",
     "Generating new codes will invalidate all existing backup codes.": "Generating new codes will invalidate all existing backup codes.",
+    "Generating video ({{progress}})...": "Generating video ({{progress}})...",
     "Generating video...": "Generating video...",
     "Generating...": "Generating...",
     "Generation quality preset": "Generation quality preset",

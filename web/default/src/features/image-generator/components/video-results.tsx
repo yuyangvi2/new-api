@@ -93,7 +93,15 @@ export function VideoResults({ batches, onClearHistory }: VideoResultsProps) {
             )}
 
             {batch.status === 'polling' && (
-              <StatusOverlay label={t('Generating video...')} />
+              <StatusOverlay
+                label={
+                  batch.progress
+                    ? t('Generating video ({{progress}})...', {
+                        progress: batch.progress,
+                      })
+                    : t('Generating video...')
+                }
+              />
             )}
 
             {batch.status === 'error' && (
