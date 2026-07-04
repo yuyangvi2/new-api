@@ -26,7 +26,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useSidebarPortalTarget } from '@/context/sidebar-portal'
 import { getUserModels } from './api'
-import { detectImageModelFamily } from './constants'
+import { detectImageModelFamily, isHiddenVideoVariantModel } from './constants'
 import { GeneratorPanel } from './components/generator-panel'
 import { ResultGallery } from './components/result-gallery'
 import { VideoPanel } from './components/video-panel'
@@ -56,7 +56,7 @@ export function ImageGenerator() {
   const videoGen = useVideoGenerator()
 
   const { data: models = [], isLoading: isModelLoading } = useQuery({
-    queryKey: ['image-generator-models'],
+    queryKey: ['image-generator-models', t],
     queryFn: async () => {
       try {
         return await getUserModels()
@@ -72,7 +72,7 @@ export function ImageGenerator() {
     () => models.filter((m) => IMAGE_MODEL_RE.test(m.value)),
     [models]
   )
-  const videoModels = useMemo(
+  const allVideoModels = useMemo(
     // Exclude image models that also match a video keyword (e.g. wan2.7-image-pro
     // contains "wan") so the video tab only lists real video models.
     () =>
@@ -81,6 +81,12 @@ export function ImageGenerator() {
       ),
     [models]
   )
+  const videoModels = useMemo(() => {
+    const availableModelNames = allVideoModels.map((m) => m.value)
+    return allVideoModels.filter(
+      (m) => !isHiddenVideoVariantModel(m.value, availableModelNames)
+    )
+  }, [allVideoModels])
 
   // Completed images from Image mode, offered as video input sources.
   const availableImages = useMemo(
@@ -129,7 +135,7 @@ export function ImageGenerator() {
   const handleVideoModelChange = useCallback(
     (value: string) => {
       const nextGroup = resolveModelGroup(
-        videoModels.find((m) => m.value === value),
+        allVideoModels.find((m) => m.value === value),
         videoGen.config.group
       )
       videoGen.updateConfig('model', value)
@@ -137,7 +143,7 @@ export function ImageGenerator() {
         videoGen.updateConfig('group', nextGroup)
       }
     },
-    [videoGen.updateConfig, videoGen.config.group, videoModels]
+    [videoGen.updateConfig, videoGen.config.group, allVideoModels]
   )
 
   // Auto-select initial model when models load
@@ -161,7 +167,9 @@ export function ImageGenerator() {
 
   useEffect(() => {
     if (videoModels.length === 0) return
-    const currentModel = videoModels.find((m) => m.value === videoGen.config.model)
+    const currentModel = allVideoModels.find(
+      (m) => m.value === videoGen.config.model
+    )
     const nextModel = currentModel ?? videoModels[0]
     if (!currentModel) {
       videoGen.updateConfig('model', nextModel.value)
@@ -172,6 +180,7 @@ export function ImageGenerator() {
     }
   }, [
     videoModels,
+    allVideoModels,
     videoGen.config.model,
     videoGen.config.group,
     videoGen.updateConfig,
@@ -187,7 +196,8 @@ export function ImageGenerator() {
     <nav className='flex h-full flex-col items-center'>
       {/* Back */}
       <Link
-        to='/dashboard/overview'
+        to='/dashboard/$section'
+        params={{ section: 'overview' }}
         className='text-muted-foreground hover:text-foreground hover:bg-accent flex w-full flex-col items-center gap-1 border-b px-2 py-3 text-xs transition-colors'
       >
         <ArrowLeft size={20} />
@@ -245,8 +255,9 @@ export function ImageGenerator() {
               config={videoGen.config}
               updateConfig={videoGen.updateConfig}
               onModelChange={handleVideoModelChange}
-              models={videoModels}
-              isModelLoading={isModelLoading}
+          models={videoModels}
+          variantModels={allVideoModels}
+          isModelLoading={isModelLoading}
               isGenerating={videoGen.isGenerating}
               availableImages={availableImages}
               onGenerate={videoGen.generate}

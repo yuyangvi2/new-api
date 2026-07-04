@@ -99,7 +99,7 @@ export function GeneratorPanel({
       ? AIART_ASPECT_RATIOS
       : isGptImage
         ? GPT_IMAGE_SIZE_PRESETS.map((p) => ({
-            label: p.ratioLabel ? `${p.ratioLabel} (${p.value})` : p.label,
+            label: 'ratioLabel' in p ? `${p.ratioLabel} (${p.value})` : p.label,
             value: p.value,
           }))
         : SIZE_PRESETS.map((p) => ({
@@ -171,7 +171,9 @@ export function GeneratorPanel({
               value: p.value,
               label: p.label,
             }))}
-            onValueChange={(v) => updateConfig('size', v)}
+            onValueChange={(v) => {
+              if (v) updateConfig('size', v)
+            }}
             value={config.size}
             disabled={isGenerating}
           >
@@ -290,7 +292,10 @@ export function GeneratorPanel({
                       max={param.max ?? 1}
                       step={param.step ?? 0.1}
                       value={[Number(getMetaValue(param.key, param.default))]}
-                      onValueChange={([v]) => updateMeta(param.key, v)}
+                      onValueChange={(next) => {
+                        const v = Array.isArray(next) ? next[0] : next
+                        updateMeta(param.key, v)
+                      }}
                       disabled={isGenerating}
                       className='flex-1'
                     />

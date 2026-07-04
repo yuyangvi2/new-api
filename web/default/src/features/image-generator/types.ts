@@ -172,6 +172,32 @@ export interface VideoConfig {
   metadata: Record<string, unknown>
 }
 
+export interface VideoModelVariantOption {
+  label: string
+  value: string
+}
+
+export interface VideoModelVariantAxis {
+  id: string
+  options: VideoModelVariantOption[]
+}
+
+export interface VideoModelVariantSet {
+  defaultModel: string
+  axes: VideoModelVariantAxis[]
+  variants: Record<string, string>
+}
+
+export interface VideoModelVariantAxisState extends VideoModelVariantAxis {
+  value: string
+}
+
+export interface VideoModelVariantState {
+  set: VideoModelVariantSet
+  selection: Record<string, string>
+  axes: VideoModelVariantAxisState[]
+}
+
 // ---------------------------------------------------------------------------
 // Model-family dynamic parameters
 // ---------------------------------------------------------------------------

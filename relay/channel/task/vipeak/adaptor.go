@@ -75,6 +75,26 @@ var modelDefs = map[string]modelDef{
 		endpoint: epAdvanced,
 		kind:     "video",
 	},
+	"seedance2.0_direct": {
+		provider: "seedance",
+		endpoint: epAdvanced,
+		kind:     "video",
+	},
+	"seedance2.0_fast_direct": {
+		provider: "seedance",
+		endpoint: epAdvanced,
+		kind:     "video",
+	},
+	"seedance2.0_vision": {
+		provider: "seedance",
+		endpoint: epAdvanced,
+		kind:     "video",
+	},
+	"seedance2.0_fast_vision": {
+		provider: "seedance",
+		endpoint: epAdvanced,
+		kind:     "video",
+	},
 	// 兼容模型广场/渠道配置中常见的短名；上游仍使用完整模型名。
 	"seedance": {
 		provider:      "seedance",
@@ -89,6 +109,8 @@ var modelDefs = map[string]modelDef{
 		upstreamModel: "dreamina-seedance-2-0-fast-260128",
 	},
 }
+
+var cosEnvPrefixes = []string{"VIPEAK_COS", "TASK_COS", "VCLM_COS"}
 
 func canonicalModelName(requestModel string, def modelDef) string {
 	if def.upstreamModel != "" {
@@ -185,8 +207,20 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 			fmt.Errorf("unsupported model: %s (supported: %s)", peek.Model, strings.Join(supported, ", ")),
 			"invalid_model", http.StatusBadRequest)
 	}
+
+	if taskErr := relaycommon.ValidateBasicTaskRequest(c, info, def.provider); taskErr != nil {
+		return taskErr
+	}
+
+	req, err := relaycommon.GetTaskRequest(c)
+	if err == nil && requiresPublicImageURL(def) && hasNonURLImage(&req) && !taskcommon.HasCOSConfig(cosEnvPrefixes...) {
+		return service.TaskErrorWrapperLocal(
+			fmt.Errorf("123vips model %s requires uploaded/base64 images to be converted to a public URL; configure VIPEAK_COS_BUCKET, VIPEAK_COS_SECRET_ID and VIPEAK_COS_SECRET_KEY, or use a public image URL", peek.Model),
+			"image_upload_requires_cos", http.StatusBadRequest)
+	}
+
 	// action 用 provider 名占位（存进 task.Action，轮询时不需要它，但保持统一约定）。
-	return relaycommon.ValidateBasicTaskRequest(c, info, def.provider)
+	return nil
 }
 
 func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, error) {
@@ -204,7 +238,12 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	}
 	req := v.(relaycommon.TaskSubmitReq)
 
-	body := buildRequest(&req, info.UpstreamModelName)
+	body, err := buildRequestWithImageResolver(&req, info.UpstreamModelName, func(img string) (string, error) {
+		return taskcommon.EnsurePublicImageURL(img, "vipeak", cosEnvPrefixes...)
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	// metadata 透传/覆盖（供 provider 特有参数：ratio, resolution, duration,
 	// generateAudio, watermark, prompt_extend, n, mediaMode, seedanceMode,
@@ -223,6 +262,13 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 // buildRequest 按 provider 构造 vipeak 请求体。标准字段做基础映射，
 // 其余 provider 特有参数由 metadata 透传补充/覆盖。
 func buildRequest(req *relaycommon.TaskSubmitReq, upstreamModel string) map[string]any {
+	body, _ := buildRequestWithImageResolver(req, upstreamModel, func(img string) (string, error) {
+		return img, nil
+	})
+	return body
+}
+
+func buildRequestWithImageResolver(req *relaycommon.TaskSubmitReq, upstreamModel string, resolveImageURL func(string) (string, error)) (map[string]any, error) {
 	def := modelDefs[strings.ToLower(upstreamModel)]
 	canonicalModel := canonicalModelName(upstreamModel, def)
 	m := map[string]any{
@@ -252,7 +298,11 @@ func buildRequest(req *relaycommon.TaskSubmitReq, upstreamModel string) map[stri
 	switch def.provider {
 	case "wan27": // 图生视频：firstFrameUrl + mediaMode
 		if firstImage != "" {
-			m["firstFrameUrl"] = firstImage
+			resolved, err := resolveImageURL(firstImage)
+			if err != nil {
+				return nil, fmt.Errorf("resolve firstFrameUrl failed: %w", err)
+			}
+			m["firstFrameUrl"] = resolved
 			m["mediaMode"] = "first_frame"
 		}
 		if req.Duration > 0 {
@@ -268,8 +318,12 @@ func buildRequest(req *relaycommon.TaskSubmitReq, upstreamModel string) map[stri
 		if len(imgs) > 0 {
 			refs := make([]map[string]any, 0, len(imgs))
 			for i, u := range imgs {
+				resolved, err := resolveImageURL(u)
+				if err != nil {
+					return nil, fmt.Errorf("resolve reference image %d failed: %w", i+1, err)
+				}
 				refs = append(refs, map[string]any{
-					"url":      u,
+					"url":      resolved,
 					"fileName": fmt.Sprintf("image%d.png", i+1),
 				})
 			}
@@ -290,21 +344,44 @@ func buildRequest(req *relaycommon.TaskSubmitReq, upstreamModel string) map[stri
 		}
 	}
 
-	return m
+	return m, nil
 }
 
 // collectImages 汇总单图 + 多图（去空）。
 func collectImages(req *relaycommon.TaskSubmitReq) []string {
 	var out []string
+	seen := map[string]struct{}{}
+	add := func(img string) {
+		img = strings.TrimSpace(img)
+		if img == "" {
+			return
+		}
+		if _, ok := seen[img]; ok {
+			return
+		}
+		seen[img] = struct{}{}
+		out = append(out, img)
+	}
 	if req.Image != "" {
-		out = append(out, req.Image)
+		add(req.Image)
 	}
 	for _, u := range req.Images {
-		if u != "" {
-			out = append(out, u)
-		}
+		add(u)
 	}
 	return out
+}
+
+func requiresPublicImageURL(def modelDef) bool {
+	return def.provider == "wan27" || def.provider == "seedance"
+}
+
+func hasNonURLImage(req *relaycommon.TaskSubmitReq) bool {
+	for _, img := range collectImages(req) {
+		if !taskcommon.IsHTTPURL(strings.TrimSpace(img)) {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *TaskAdaptor) BuildRequestHeader(c *gin.Context, req *http.Request, info *relaycommon.RelayInfo) error {
@@ -362,7 +439,7 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 	if !ok || taskID == "" {
 		return nil, fmt.Errorf("invalid task_id")
 	}
-	base := strings.TrimRight(baseUrl, "/")
+	base := normalizeBaseURL(baseUrl)
 	if base == "" {
 		base = vipeakBaseURL
 	}

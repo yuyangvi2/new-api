@@ -17,10 +17,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useRef, useState } from 'react'
-import { PlusIcon, UploadIcon, XIcon } from 'lucide-react'
+import { UploadIcon, XIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MAX_IMAGE_UPLOAD_BYTES, MAX_REFERENCE_IMAGES } from '../constants'
 

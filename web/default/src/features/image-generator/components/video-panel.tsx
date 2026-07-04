@@ -30,16 +30,25 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { ModelSelector } from '@/components/model-group-selector'
 import {
   detectModelFamily,
   FAMILY_PARAMS,
+  getVideoModelVariantState,
   MAX_PROMPT_LENGTH,
+  resolveVideoVariantModel,
   VIDEO_DURATIONS,
   VIDEO_SIZE_PRESETS,
 } from '../constants'
-import type { ImageSourceType, ModelOption, VideoConfig } from '../types'
+import type {
+  FamilyParam,
+  ImageSourceType,
+  ModelOption,
+  VideoConfig,
+  VideoModelVariantAxisState,
+} from '../types'
 import { ImageSourceInput } from './image-source-input'
 
 interface VideoPanelProps {
@@ -50,6 +59,7 @@ interface VideoPanelProps {
   ) => void
   onModelChange: (value: string) => void
   models: ModelOption[]
+  variantModels: ModelOption[]
   isModelLoading: boolean
   isGenerating: boolean
   availableImages: { id: string; src: string }[]
@@ -62,6 +72,7 @@ export function VideoPanel({
   updateConfig,
   onModelChange,
   models,
+  variantModels,
   isModelLoading,
   isGenerating,
   availableImages,
@@ -72,6 +83,15 @@ export function VideoPanel({
 
   const family = useMemo(() => detectModelFamily(config.model), [config.model])
   const familyParams = useMemo(() => FAMILY_PARAMS[family], [family])
+  const availableVariantModels = useMemo(
+    () => variantModels.map((m) => m.value),
+    [variantModels]
+  )
+  const variantState = useMemo(
+    () => getVideoModelVariantState(config.model, availableVariantModels),
+    [config.model, availableVariantModels]
+  )
+  const displayModel = variantState?.set.defaultModel ?? config.model
 
   const canGenerate = !!config.image && !isGenerating
 
@@ -85,6 +105,18 @@ export function VideoPanel({
   const handleImageChange = (src: string, sourceType: ImageSourceType) => {
     updateConfig('image', src)
     updateConfig('imageSourceType', sourceType)
+  }
+
+  const handleVariantChange = (axisId: string, value: string) => {
+    const nextModel = resolveVideoVariantModel(
+      config.model,
+      axisId,
+      value,
+      availableVariantModels
+    )
+    if (nextModel && nextModel !== config.model) {
+      onModelChange(nextModel)
+    }
   }
 
   return (
@@ -112,12 +144,25 @@ export function VideoPanel({
           <Label className='text-sm font-medium'>{t('Model')}</Label>
           <ModelSelector
             className='w-full'
-            selectedModel={config.model}
+            selectedModel={displayModel}
             models={models}
             onModelChange={onModelChange}
             disabled={isModelLoading}
           />
         </div>
+
+        {variantState && (
+          <div className='flex flex-wrap items-center gap-2'>
+            {variantState.axes.map((axis) => (
+              <SegmentedTabs
+                key={axis.id}
+                axis={axis}
+                disabled={isGenerating}
+                onValueChange={(value) => handleVariantChange(axis.id, value)}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Motion prompt (optional) */}
         <div className='space-y-2'>
@@ -170,7 +215,9 @@ export function VideoPanel({
               value: `${p.width}x${p.height}`,
               label: `${p.ratioLabel} (${p.width}x${p.height})`,
             }))}
-            onValueChange={(v) => updateConfig('size', v)}
+            onValueChange={(v) => {
+              if (v) updateConfig('size', v)
+            }}
             value={config.size}
             disabled={isGenerating}
           >
@@ -200,60 +247,54 @@ export function VideoPanel({
                 {t('Advanced')}
               </Label>
             </div>
-            {familyParams.map((param) => (
-              <div key={param.key} className='space-y-2'>
-                <Label className='text-sm font-medium'>{t(param.label)}</Label>
-                {param.type === 'select' && param.options && (
-                  <Select
-                    items={param.options.map((o) => ({
-                      value: o.value,
-                      label: t(o.label),
-                    }))}
-                    onValueChange={(v) => updateMeta(param.key, v)}
+            <div className='flex flex-wrap items-center gap-2'>
+              {familyParams
+                .filter((param) => param.type === 'select' && param.options)
+                .map((param) => (
+                  <SegmentedParam
+                    key={param.key}
+                    param={param}
                     value={String(getMetaValue(param.key, param.default))}
                     disabled={isGenerating}
-                  >
-                    <SelectTrigger className='w-full'>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {param.options.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            {t(o.label)}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-                {param.type === 'slider' && (
-                  <div className='flex items-center gap-3'>
-                    <Slider
-                      min={param.min ?? 0}
-                      max={param.max ?? 1}
-                      step={param.step ?? 0.1}
-                      value={[Number(getMetaValue(param.key, param.default))]}
-                      onValueChange={([v]) => updateMeta(param.key, v)}
-                      disabled={isGenerating}
-                      className='flex-1'
-                    />
-                    <span className='text-muted-foreground w-8 text-right text-xs'>
-                      {Number(getMetaValue(param.key, param.default)).toFixed(1)}
-                    </span>
-                  </div>
-                )}
-                {param.type === 'text' && (
-                  <Textarea
-                    value={String(getMetaValue(param.key, param.default))}
-                    onChange={(e) => updateMeta(param.key, e.target.value)}
-                    placeholder={t(param.label)}
-                    className='min-h-[60px] resize-y'
-                    disabled={isGenerating}
+                    onValueChange={(value) => updateMeta(param.key, value)}
                   />
-                )}
-              </div>
-            ))}
+                ))}
+            </div>
+            {familyParams
+              .filter((param) => param.type !== 'select')
+              .map((param) => (
+                <div key={param.key} className='space-y-2'>
+                  <Label className='text-sm font-medium'>{t(param.label)}</Label>
+                  {param.type === 'slider' && (
+                    <div className='flex items-center gap-3'>
+                      <Slider
+                        min={param.min ?? 0}
+                        max={param.max ?? 1}
+                        step={param.step ?? 0.1}
+                        value={[Number(getMetaValue(param.key, param.default))]}
+                        onValueChange={(next) => {
+                          const v = Array.isArray(next) ? next[0] : next
+                          updateMeta(param.key, v)
+                        }}
+                        disabled={isGenerating}
+                        className='flex-1'
+                      />
+                      <span className='text-muted-foreground w-8 text-right text-xs'>
+                        {Number(getMetaValue(param.key, param.default)).toFixed(1)}
+                      </span>
+                    </div>
+                  )}
+                  {param.type === 'text' && (
+                    <Textarea
+                      value={String(getMetaValue(param.key, param.default))}
+                      onChange={(e) => updateMeta(param.key, e.target.value)}
+                      placeholder={t(param.label)}
+                      className='min-h-[60px] resize-y'
+                      disabled={isGenerating}
+                    />
+                  )}
+                </div>
+              ))}
           </>
         )}
       </div>
@@ -283,5 +324,71 @@ export function VideoPanel({
         )}
       </div>
     </div>
+  )
+}
+
+function SegmentedTabs({
+  axis,
+  disabled,
+  onValueChange,
+}: {
+  axis: VideoModelVariantAxisState
+  disabled: boolean
+  onValueChange: (value: string) => void
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <Tabs
+      value={axis.value}
+      onValueChange={onValueChange}
+      className='!flex-row gap-0'
+    >
+      <TabsList className='bg-background h-9 overflow-hidden rounded-lg border p-0'>
+        {axis.options.map((option, index) => (
+          <TabsTrigger
+            key={option.value}
+            value={option.value}
+            disabled={disabled}
+            className='h-9 min-w-20 rounded-none border-r px-4 text-sm shadow-none last:border-r-0 data-active:bg-muted data-active:shadow-none'
+            data-index={index}
+          >
+            {t(option.label)}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
+  )
+}
+
+function SegmentedParam({
+  param,
+  value,
+  disabled,
+  onValueChange,
+}: {
+  param: FamilyParam
+  value: string
+  disabled: boolean
+  onValueChange: (value: string) => void
+}) {
+  const { t } = useTranslation()
+  if (!param.options || param.options.length === 0) return null
+
+  return (
+    <Tabs value={value} onValueChange={onValueChange} className='!flex-row gap-0'>
+      <TabsList className='bg-background h-9 overflow-hidden rounded-lg border p-0'>
+        {param.options.map((option) => (
+          <TabsTrigger
+            key={option.value}
+            value={option.value}
+            disabled={disabled}
+            className='h-9 min-w-20 rounded-none border-r px-4 text-sm shadow-none last:border-r-0 data-active:bg-muted data-active:shadow-none'
+          >
+            {t(option.label)}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
   )
 }

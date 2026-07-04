@@ -16,7 +16,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { FamilyParam, GeneratorConfig, ImageModelFamily, ModelFamily, VideoConfig } from './types'
+import type {
+  FamilyParam,
+  GeneratorConfig,
+  ImageModelFamily,
+  ModelFamily,
+  VideoConfig,
+  VideoModelVariantAxisState,
+  VideoModelVariantSet,
+  VideoModelVariantState,
+} from './types'
 
 // API endpoints
 export const API_ENDPOINTS = {
@@ -133,6 +142,116 @@ export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
   duration: 5,
   size: '1280x720',
   metadata: {},
+}
+
+export const VIDEO_MODEL_VARIANT_SETS: VideoModelVariantSet[] = [
+  {
+    defaultModel: 'seedance2.0_direct',
+    axes: [
+      {
+        id: 'quality',
+        options: [
+          { label: 'Direct', value: 'direct' },
+          { label: 'Vision', value: 'vision' },
+        ],
+      },
+      {
+        id: 'speed',
+        options: [
+          { label: 'Standard', value: 'standard' },
+          { label: 'Fast', value: 'fast' },
+        ],
+      },
+    ],
+    variants: {
+      'direct:standard': 'seedance2.0_direct',
+      'direct:fast': 'seedance2.0_fast_direct',
+      'vision:standard': 'seedance2.0_vision',
+      'vision:fast': 'seedance2.0_fast_vision',
+    },
+  },
+]
+
+function getVariantKey(
+  set: VideoModelVariantSet,
+  selection: Record<string, string>
+): string {
+  return set.axes.map((axis) => selection[axis.id]).join(':')
+}
+
+function getDefaultSelection(
+  set: VideoModelVariantSet
+): Record<string, string> {
+  return Object.fromEntries(
+    set.axes.map((axis) => [axis.id, axis.options[0]?.value || ''])
+  )
+}
+
+export function getVideoVariantSet(
+  model: string
+): VideoModelVariantSet | undefined {
+  return VIDEO_MODEL_VARIANT_SETS.find((set) =>
+    Object.values(set.variants).includes(model)
+  )
+}
+
+export function getSelectionForVideoModel(
+  set: VideoModelVariantSet,
+  model: string
+): Record<string, string> {
+  const match = Object.entries(set.variants).find(([, m]) => m === model)
+  if (!match) return getDefaultSelection(set)
+  const values = match[0].split(':')
+  return Object.fromEntries(set.axes.map((axis, i) => [axis.id, values[i]]))
+}
+
+export function isHiddenVideoVariantModel(
+  model: string,
+  availableModels: string[]
+): boolean {
+  const set = getVideoVariantSet(model)
+  if (!set || model === set.defaultModel) return false
+  return availableModels.includes(set.defaultModel)
+}
+
+export function getVideoModelVariantState(
+  model: string,
+  availableModels: string[]
+): VideoModelVariantState | undefined {
+  const set = getVideoVariantSet(model)
+  if (!set) return undefined
+
+  const availableSet = new Set(availableModels)
+  const selection = getSelectionForVideoModel(set, model)
+  const axes: VideoModelVariantAxisState[] = set.axes
+    .map((axis) => {
+      const options = axis.options.filter((option) => {
+        const nextSelection = { ...selection, [axis.id]: option.value }
+        const nextModel = set.variants[getVariantKey(set, nextSelection)]
+        return !!nextModel && availableSet.has(nextModel)
+      })
+      return { id: axis.id, value: selection[axis.id], options }
+    })
+    .filter((axis) => axis.options.length > 1)
+
+  if (axes.length === 0) return undefined
+
+  return { set, selection, axes }
+}
+
+export function resolveVideoVariantModel(
+  model: string,
+  axisId: string,
+  value: string,
+  availableModels: string[]
+): string | undefined {
+  const set = getVideoVariantSet(model)
+  if (!set) return undefined
+  const selection = getSelectionForVideoModel(set, model)
+  const nextSelection = { ...selection, [axisId]: value }
+  const nextModel = set.variants[getVariantKey(set, nextSelection)]
+  if (!nextModel || !availableModels.includes(nextModel)) return undefined
+  return nextModel
 }
 
 // Terminal task statuses reported by the backend (case-insensitive).

@@ -260,7 +260,7 @@ export function useImageGenerator(): UseImageGeneratorResult {
         }
 
         const response = await generateImages(
-          payload as Parameters<typeof generateImages>[0],
+          payload as unknown as Parameters<typeof generateImages>[0],
           controller.signal
         )
 

@@ -44,6 +44,44 @@ func TestBuildRequestUsesCanonicalSeedanceFastModel(t *testing.T) {
 	}
 }
 
+func TestBuildRequestWithImageResolverConvertsAndDeduplicatesSeedanceImages(t *testing.T) {
+	req := &relaycommon.TaskSubmitReq{
+		Model:  "seedance",
+		Image:  "raw-base64",
+		Images: []string{"raw-base64", "https://example.com/other.png"},
+	}
+
+	body, err := buildRequestWithImageResolver(req, "seedance", func(img string) (string, error) {
+		if img == "raw-base64" {
+			return "https://cos.example.com/input.png", nil
+		}
+		return img, nil
+	})
+	if err != nil {
+		t.Fatalf("buildRequestWithImageResolver returned error: %v", err)
+	}
+
+	refs, ok := body["referenceImages"].([]map[string]any)
+	if !ok || len(refs) != 2 {
+		t.Fatalf("referenceImages = %#v, want two deduplicated reference images", body["referenceImages"])
+	}
+	if got := refs[0]["url"]; got != "https://cos.example.com/input.png" {
+		t.Fatalf("first reference image url = %v, want converted COS URL", got)
+	}
+	if got := refs[1]["url"]; got != "https://example.com/other.png" {
+		t.Fatalf("second reference image url = %v, want original URL", got)
+	}
+}
+
+func TestHasNonURLImage(t *testing.T) {
+	if hasNonURLImage(&relaycommon.TaskSubmitReq{Images: []string{"https://example.com/input.png"}}) {
+		t.Fatal("hasNonURLImage returned true for http URL")
+	}
+	if !hasNonURLImage(&relaycommon.TaskSubmitReq{Images: []string{"raw-base64"}}) {
+		t.Fatal("hasNonURLImage returned false for base64 image")
+	}
+}
+
 func TestNormalizeBaseURLStripsKnownAPIPaths(t *testing.T) {
 	tests := map[string]string{
 		"https://www.123vips.com":                       "https://www.123vips.com",

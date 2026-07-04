@@ -232,6 +232,10 @@ var perCallBillingAliases = map[string][]string{
 	"seedance-fast":            {"dreamina-seedance-2-0-fast-260128"},
 }
 
+var perCallBillingPrefixAliases = map[string]string{
+	"seedance2.0_": "seedance2.0_",
+}
+
 func perCallBillingModelNames(info *relaycommon.RelayInfo) []string {
 	if info == nil {
 		return nil
@@ -257,6 +261,11 @@ func uniqueBillingModelNames(names ...string) []string {
 		add(name)
 		for _, alias := range perCallBillingAliases[name] {
 			add(alias)
+		}
+		for prefix, alias := range perCallBillingPrefixAliases {
+			if strings.HasPrefix(name, prefix) {
+				add(alias)
+			}
 		}
 	}
 	return out

@@ -121,3 +121,33 @@ func TestModelPriceHelperPerCallUsesDoubaoSeedanceBillingAlias(t *testing.T) {
 	require.Equal(t, 0.37, priceData.ModelPrice)
 	require.Equal(t, int(0.37*common.QuotaPerUnit), priceData.Quota)
 }
+
+func TestModelPriceHelperPerCallUsesSeedance20PrefixPrice(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	saved := ratio_setting.ModelPrice2JSONString()
+	t.Cleanup(func() {
+		require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(saved))
+	})
+
+	require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(`{"seedance2.0_":0.93}`))
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Set("group", "default")
+
+	info := &relaycommon.RelayInfo{
+		OriginModelName: "seedance2.0_direct",
+		UserGroup:       "default",
+		UsingGroup:      "default",
+		ChannelMeta: &relaycommon.ChannelMeta{
+			UpstreamModelName: "seedance2.0_direct",
+		},
+	}
+
+	priceData, err := ModelPriceHelperPerCall(ctx, info)
+	require.NoError(t, err)
+	require.True(t, priceData.UsePrice)
+	require.Equal(t, 0.93, priceData.ModelPrice)
+	require.Equal(t, int(0.93*common.QuotaPerUnit), priceData.Quota)
+}
