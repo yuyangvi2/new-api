@@ -56,15 +56,6 @@ function genId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-// Strip a data: URI down to raw base64; leave plain URLs untouched.
-function toBackendImage(src: string): string {
-  if (src.startsWith('data:')) {
-    const comma = src.indexOf(',')
-    return comma >= 0 ? src.slice(comma + 1) : src
-  }
-  return src
-}
-
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(resolve, ms)
@@ -152,7 +143,7 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
           model: config.model,
           group: config.group,
           prompt: prompt || undefined,
-          image: toBackendImage(config.image),
+          image: config.image,
           duration: config.duration,
           width: preset?.width,
           height: preset?.height,

@@ -121,7 +121,7 @@ export interface VideoGenerationRequest {
   model: string
   group?: string
   prompt?: string
-  // Input image: a remote URL or raw base64 (data: prefix stripped).
+  // Input image: a remote URL, data URI, or raw base64.
   image: string
   duration?: number
   width?: number
@@ -181,11 +181,13 @@ export interface VideoModelVariantOption {
 
 export interface VideoModelVariantAxis {
   id: string
+  translateLabels?: boolean
   options: VideoModelVariantOption[]
 }
 
 export interface VideoModelVariantSet {
   defaultModel: string
+  displayName: string
   axes: VideoModelVariantAxis[]
   variants: Record<string, string>
 }

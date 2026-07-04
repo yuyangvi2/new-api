@@ -26,7 +26,11 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useSidebarPortalTarget } from '@/context/sidebar-portal'
 import { getUserModels } from './api'
-import { detectImageModelFamily, isHiddenVideoVariantModel } from './constants'
+import {
+  detectImageModelFamily,
+  getVideoVariantDisplayName,
+  isHiddenVideoVariantModel,
+} from './constants'
 import { GeneratorPanel } from './components/generator-panel'
 import { ResultGallery } from './components/result-gallery'
 import { VideoPanel } from './components/video-panel'
@@ -83,10 +87,18 @@ export function ImageGenerator() {
   )
   const videoModels = useMemo(() => {
     const availableModelNames = allVideoModels.map((m) => m.value)
-    return allVideoModels.filter(
-      (m) => !isHiddenVideoVariantModel(m.value, availableModelNames)
-    )
+    return allVideoModels
+      .filter((m) => !isHiddenVideoVariantModel(m.value, availableModelNames))
+      .map((m) => ({
+        ...m,
+        label: getVideoVariantDisplayName(m.value) ?? m.label,
+      }))
   }, [allVideoModels])
+
+  const imageConfig = imageGen.config
+  const videoConfig = videoGen.config
+  const updateImageConfig = imageGen.updateConfig
+  const updateVideoConfig = videoGen.updateConfig
 
   // Completed images from Image mode, offered as video input sources.
   const availableImages = useMemo(
@@ -99,15 +111,15 @@ export function ImageGenerator() {
 
   const handleImageModelChange = useCallback(
     (value: string) => {
-      const oldFamily = detectImageModelFamily(imageGen.config.model)
+      const oldFamily = detectImageModelFamily(imageConfig.model)
       const newFamily = detectImageModelFamily(value)
       const nextGroup = resolveModelGroup(
         imageModels.find((m) => m.value === value),
-        imageGen.config.group
+        imageConfig.group
       )
-      imageGen.updateConfig('model', value)
-      if (nextGroup && nextGroup !== imageGen.config.group) {
-        imageGen.updateConfig('group', nextGroup)
+      updateImageConfig('model', value)
+      if (nextGroup && nextGroup !== imageConfig.group) {
+        updateImageConfig('group', nextGroup)
       }
       // Reset size when switching between families with different size formats
       if (oldFamily !== newFamily) {
@@ -116,74 +128,64 @@ export function ImageGenerator() {
           : newFamily === 'image-gi' || newFamily === 'image-gi2'
             ? '1:1'
             : '1024x1024'
-        imageGen.updateConfig('size', defaultSize)
+        updateImageConfig('size', defaultSize)
       }
       // Clear metadata when switching families
       if (oldFamily !== newFamily) {
-        imageGen.updateConfig('metadata', {})
-        imageGen.updateConfig('images', [])
+        updateImageConfig('metadata', {})
+        updateImageConfig('images', [])
       }
     },
-    [
-      imageGen.updateConfig,
-      imageGen.config.model,
-      imageGen.config.group,
-      imageModels,
-    ]
+    [imageConfig.model, imageConfig.group, imageModels, updateImageConfig]
   )
 
   const handleVideoModelChange = useCallback(
     (value: string) => {
       const nextGroup = resolveModelGroup(
         allVideoModels.find((m) => m.value === value),
-        videoGen.config.group
+        videoConfig.group
       )
-      videoGen.updateConfig('model', value)
-      if (nextGroup && nextGroup !== videoGen.config.group) {
-        videoGen.updateConfig('group', nextGroup)
+      updateVideoConfig('model', value)
+      if (nextGroup && nextGroup !== videoConfig.group) {
+        updateVideoConfig('group', nextGroup)
       }
     },
-    [videoGen.updateConfig, videoGen.config.group, allVideoModels]
+    [videoConfig.group, allVideoModels, updateVideoConfig]
   )
 
   // Auto-select initial model when models load
   useEffect(() => {
     if (imageModels.length === 0) return
-    const currentModel = imageModels.find((m) => m.value === imageGen.config.model)
+    const currentModel = imageModels.find((m) => m.value === imageConfig.model)
     const nextModel = currentModel ?? imageModels[0]
     if (!currentModel) {
-      imageGen.updateConfig('model', nextModel.value)
+      updateImageConfig('model', nextModel.value)
     }
-    const nextGroup = resolveModelGroup(nextModel, imageGen.config.group)
-    if (nextGroup && nextGroup !== imageGen.config.group) {
-      imageGen.updateConfig('group', nextGroup)
+    const nextGroup = resolveModelGroup(nextModel, imageConfig.group)
+    if (nextGroup && nextGroup !== imageConfig.group) {
+      updateImageConfig('group', nextGroup)
     }
-  }, [
-    imageModels,
-    imageGen.config.model,
-    imageGen.config.group,
-    imageGen.updateConfig,
-  ])
+  }, [imageModels, imageConfig.model, imageConfig.group, updateImageConfig])
 
   useEffect(() => {
     if (videoModels.length === 0) return
     const currentModel = allVideoModels.find(
-      (m) => m.value === videoGen.config.model
+      (m) => m.value === videoConfig.model
     )
     const nextModel = currentModel ?? videoModels[0]
     if (!currentModel) {
-      videoGen.updateConfig('model', nextModel.value)
+      updateVideoConfig('model', nextModel.value)
     }
-    const nextGroup = resolveModelGroup(nextModel, videoGen.config.group)
-    if (nextGroup && nextGroup !== videoGen.config.group) {
-      videoGen.updateConfig('group', nextGroup)
+    const nextGroup = resolveModelGroup(nextModel, videoConfig.group)
+    if (nextGroup && nextGroup !== videoConfig.group) {
+      updateVideoConfig('group', nextGroup)
     }
   }, [
     videoModels,
     allVideoModels,
-    videoGen.config.model,
-    videoGen.config.group,
-    videoGen.updateConfig,
+    videoConfig.model,
+    videoConfig.group,
+    updateVideoConfig,
   ])
 
   // ---- Icon rail tabs (rendered into the 80px sidebar via portal) ----
@@ -255,9 +257,9 @@ export function ImageGenerator() {
               config={videoGen.config}
               updateConfig={videoGen.updateConfig}
               onModelChange={handleVideoModelChange}
-          models={videoModels}
-          variantModels={allVideoModels}
-          isModelLoading={isModelLoading}
+              models={videoModels}
+              variantModels={allVideoModels}
+              isModelLoading={isModelLoading}
               isGenerating={videoGen.isGenerating}
               availableImages={availableImages}
               onGenerate={videoGen.generate}

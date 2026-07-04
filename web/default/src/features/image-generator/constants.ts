@@ -147,9 +147,11 @@ export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
 export const VIDEO_MODEL_VARIANT_SETS: VideoModelVariantSet[] = [
   {
     defaultModel: 'seedance2.0_direct',
+    displayName: 'seedance2.0',
     axes: [
       {
         id: 'quality',
+        translateLabels: false,
         options: [
           { label: 'Direct', value: 'direct' },
           { label: 'Vision', value: 'vision' },
@@ -157,6 +159,7 @@ export const VIDEO_MODEL_VARIANT_SETS: VideoModelVariantSet[] = [
       },
       {
         id: 'speed',
+        translateLabels: false,
         options: [
           { label: 'Standard', value: 'standard' },
           { label: 'Fast', value: 'fast' },
@@ -193,6 +196,11 @@ export function getVideoVariantSet(
   return VIDEO_MODEL_VARIANT_SETS.find((set) =>
     Object.values(set.variants).includes(model)
   )
+}
+
+export function getVideoVariantDisplayName(model: string): string | undefined {
+  const set = getVideoVariantSet(model)
+  return set?.displayName
 }
 
 export function getSelectionForVideoModel(
