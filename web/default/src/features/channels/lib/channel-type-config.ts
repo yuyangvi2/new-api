@@ -144,6 +144,17 @@ export const CHANNEL_TYPE_CONFIGS: Record<number, ChannelTypeConfig> = {
       models: 'Models exposed by this channel',
     },
   },
+  9004: {
+    id: 9004,
+    name: CHANNEL_TYPES[9004],
+    icon: 'doubao',
+    defaultBaseUrl: 'https://api.apiz.ai',
+    hints: {
+      baseUrl: 'Default: https://api.apiz.ai',
+      key: 'Bearer API key',
+      models: 'ark/seedance-2.0, seedance2.0_direct, seedance2.0_vision',
+    },
+  },
 }
 
 /**
