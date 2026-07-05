@@ -33,7 +33,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
 import { Textarea } from '@/components/ui/textarea'
-import { GroupSelector, ModelSelector } from '@/components/model-group-selector'
+import { ModelSelector } from '@/components/model-group-selector'
 import {
   AIART_ASPECT_RATIOS,
   COUNT_OPTIONS,
@@ -47,7 +47,7 @@ import {
   SIZE_PRESETS,
   supportsReferenceImages,
 } from '../constants'
-import type { GeneratorConfig, GroupOption, ModelOption } from '../types'
+import type { GeneratorConfig, ModelOption } from '../types'
 import { ReferenceImagesInput } from './reference-images-input'
 
 interface GeneratorPanelProps {
@@ -57,11 +57,8 @@ interface GeneratorPanelProps {
     value: GeneratorConfig[K]
   ) => void
   onModelChange: (value: string) => void
-  onGroupChange: (value: string) => void
   models: ModelOption[]
-  groups: GroupOption[]
   isModelLoading: boolean
-  isGroupLoading: boolean
   isGenerating: boolean
   onGenerate: () => void
   onCancel: () => void
@@ -71,11 +68,8 @@ export function GeneratorPanel({
   config,
   updateConfig,
   onModelChange,
-  onGroupChange,
   models,
-  groups,
   isModelLoading,
-  isGroupLoading,
   isGenerating,
   onGenerate,
   onCancel,
@@ -98,26 +92,35 @@ export function GeneratorPanel({
   const getMetaValue = (key: string, defaultValue: unknown) =>
     config.metadata[key] ?? defaultValue
 
-  // Determine which size presets to show
-  const sizeOptions = isHunyuanImage
-    ? HUNYUAN_IMAGE_RESOLUTIONS.map((p) => ({ label: p.label, value: p.value }))
-    : isImageGI
-      ? AIART_ASPECT_RATIOS
-      : isGptImage
-        ? GPT_IMAGE_SIZE_PRESETS.map((p) => ({
-            label: 'ratioLabel' in p ? `${p.ratioLabel} (${p.value})` : p.label,
-            value: p.value,
-          }))
-        : SIZE_PRESETS.map((p) => ({
-            label: `${p.ratioLabel} (${p.value})`,
-            value: p.value,
-          }))
+  let sizeOptions: { label: string; value: string }[] = SIZE_PRESETS.map((p) => ({
+    label: `${p.ratioLabel} (${p.value})`,
+    value: p.value,
+  }))
+  if (isHunyuanImage) {
+    sizeOptions = HUNYUAN_IMAGE_RESOLUTIONS.map((p) => ({
+      label: p.label,
+      value: p.value,
+    }))
+  } else if (isImageGI) {
+    sizeOptions = [...AIART_ASPECT_RATIOS]
+  } else if (isGptImage) {
+    sizeOptions = GPT_IMAGE_SIZE_PRESETS.map((p) => ({
+      label: 'ratioLabel' in p ? `${p.ratioLabel} (${p.value})` : p.label,
+      value: p.value,
+    }))
+  }
 
   // Quality options vary by family
   const qualityOptions = isGptImage ? GPT_IMAGE_QUALITY_OPTIONS : QUALITY_OPTIONS
 
   // Show count selector only for models that support n > 1
   const showCount = !isDallE3 && !isImageGI && !isHunyuanImage
+  let sizeLabel = t('Size')
+  if (isImageGI) {
+    sizeLabel = t('Aspect ratio')
+  } else if (isHunyuanImage) {
+    sizeLabel = t('Resolution')
+  }
 
   return (
     <div className='flex h-full flex-col'>
@@ -127,21 +130,8 @@ export function GeneratorPanel({
       </div>
 
       <div className='flex-1 space-y-5 overflow-y-auto p-4'>
-        {/* Group */}
-        <div className='space-y-2'>
-          <Label className='text-sm font-medium'>{t('Group')}</Label>
-          <GroupSelector
-            className='w-full'
-            selectedGroup={config.group}
-            groups={groups}
-            onGroupChange={onGroupChange}
-            disabled={isGroupLoading || isGenerating}
-          />
-        </div>
-
         {/* Model */}
-        <div className='space-y-2'>
-          <Label className='text-sm font-medium'>{t('Model')}</Label>
+        <div>
           <ModelSelector
             className='w-full'
             selectedModel={config.model}
@@ -181,9 +171,7 @@ export function GeneratorPanel({
 
         {/* Aspect ratio / size */}
         <div className='space-y-2'>
-          <Label className='text-sm font-medium'>
-            {isImageGI ? t('Aspect ratio') : isHunyuanImage ? t('Resolution') : t('Size')}
-          </Label>
+          <Label className='text-sm font-medium'>{sizeLabel}</Label>
           <Select
             items={sizeOptions.map((p) => ({
               value: p.value,

@@ -111,7 +111,8 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
   const generate = useCallback(async () => {
     const prompt = config.prompt.trim()
     const requiresImage = videoModelRequiresImage(config.model)
-    if ((requiresImage && !config.image) || isGenerating) return
+    const inputImage = requiresImage ? config.image : ''
+    if ((requiresImage && !inputImage) || isGenerating) return
 
     const batchId = genId()
     const batch: VideoBatch = {
@@ -119,7 +120,7 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
       status: 'submitting',
       prompt,
       model: config.model,
-      imagePreview: config.image,
+      imagePreview: inputImage,
       createdAt: Date.now(),
     }
     setBatches((prev) => [batch, ...prev])
@@ -148,7 +149,7 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
           model: config.model,
           group: config.group,
           prompt: prompt || undefined,
-          image: config.image || undefined,
+          image: inputImage || undefined,
           duration: config.duration,
           width: preset?.width,
           height: preset?.height,
