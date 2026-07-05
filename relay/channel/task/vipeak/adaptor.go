@@ -278,6 +278,7 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	if err := taskcommon.UnmarshalMetadata(req.Metadata, &body); err != nil {
 		return nil, errors.Wrap(err, "unmarshal metadata failed")
 	}
+	enforceCoreRequestFields(body, &req, info.UpstreamModelName)
 
 	data, err := common.Marshal(body)
 	if err != nil {
@@ -325,6 +326,15 @@ func hasVideoInput(req relaycommon.TaskSubmitReq) bool {
 		}
 	}
 	return false
+}
+
+func enforceCoreRequestFields(body map[string]any, req *relaycommon.TaskSubmitReq, upstreamModel string) {
+	def, ok := modelDefs[strings.ToLower(upstreamModel)]
+	if !ok {
+		return
+	}
+	body["provider"] = def.provider
+	body["model"] = canonicalModelName(upstreamModel, def, req)
 }
 
 // buildRequest 按 provider 构造 vipeak 请求体。标准字段做基础映射，

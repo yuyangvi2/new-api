@@ -121,6 +121,23 @@ func TestEstimateBillingUsesOfficialSeedanceResolutionRatio(t *testing.T) {
 	}
 }
 
+func TestEnforceCoreRequestFieldsKeepsOfficialSeedanceCanonicalModel(t *testing.T) {
+	req := &relaycommon.TaskSubmitReq{
+		Model: "seedance2.0_vision",
+		Image: "https://example.com/input.png",
+	}
+	body := map[string]any{
+		"provider": "seedance",
+		"model":    "doubao-seedance-2-0-260128",
+	}
+
+	enforceCoreRequestFields(body, req, "doubao-seedance-2-0-260128")
+
+	if got := body["model"]; got != "seedance2.0_vision" {
+		t.Fatalf("model = %v, want seedance2.0_vision", got)
+	}
+}
+
 func TestBuildRequestWithImageResolverConvertsAndDeduplicatesSeedanceImages(t *testing.T) {
 	req := &relaycommon.TaskSubmitReq{
 		Model:  "seedance",
