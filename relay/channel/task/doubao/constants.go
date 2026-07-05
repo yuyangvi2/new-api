@@ -9,6 +9,10 @@ var ModelList = []string{
 	"doubao-seedance-1-5-pro-251215",
 	"doubao-seedance-2-0-260128",
 	"doubao-seedance-2-0-fast-260128",
+	"seedance2.0_direct",
+	"seedance2.0_vision",
+	"seedance2.0_fast_direct",
+	"seedance2.0_fast_vision",
 }
 
 var ChannelName = "doubao-video"
@@ -33,6 +37,30 @@ var videoPriceTable = map[string]map[videoPriceKey]float64{
 		{is4k: true, hasVideo: true}:     16.0,
 	},
 	"doubao-seedance-2-0-fast-260128": {
+		{hasVideo: false}: 37.0,
+		{hasVideo: true}:  22.0,
+	},
+	"seedance2.0_direct": {
+		{hasVideo: false}:                46.0,
+		{hasVideo: true}:                 28.0,
+		{is1080p: true, hasVideo: false}: 51.0,
+		{is1080p: true, hasVideo: true}:  31.0,
+		{is4k: true, hasVideo: false}:    26.0,
+		{is4k: true, hasVideo: true}:     16.0,
+	},
+	"seedance2.0_vision": {
+		{hasVideo: false}:                46.0,
+		{hasVideo: true}:                 28.0,
+		{is1080p: true, hasVideo: false}: 51.0,
+		{is1080p: true, hasVideo: true}:  31.0,
+		{is4k: true, hasVideo: false}:    26.0,
+		{is4k: true, hasVideo: true}:     16.0,
+	},
+	"seedance2.0_fast_direct": {
+		{hasVideo: false}: 37.0,
+		{hasVideo: true}:  22.0,
+	},
+	"seedance2.0_fast_vision": {
 		{hasVideo: false}: 37.0,
 		{hasVideo: true}:  22.0,
 	},
