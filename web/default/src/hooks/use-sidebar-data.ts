@@ -16,29 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import {
-  Activity,
-  Box,
-  CreditCard,
-  FileText,
-  FlaskConical,
-  ImagePlus,
-  Key,
-  LayoutDashboard,
-  ListTodo,
-  MessageSquare,
-  Radio,
-  ServerCog,
-  Settings,
-  Ticket,
-  User,
-  Users,
-  Wallet,
-} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { type SidebarData } from '@/components/layout/types'
+import type { SidebarData } from '@/components/layout/types'
 import { ROLE } from '@/lib/roles'
+import { SidebarIcons } from '@/components/layout/config/sidebar-icons'
 
 /**
  * Root navigation groups for the application sidebar.
@@ -58,17 +40,17 @@ export function useSidebarData(): SidebarData {
           {
             title: t('Playground'),
             url: '/playground',
-            icon: FlaskConical,
+            icon: SidebarIcons.playground,
           },
           {
             title: t('Experience Center'),
             url: '/image-generator',
-            icon: ImagePlus,
+            icon: SidebarIcons.experienceCenter,
             activeUrls: ['/image-generator'],
           },
           {
             title: t('Chat'),
-            icon: MessageSquare,
+            icon: SidebarIcons.chat,
             type: 'chat-presets',
           },
         ],
@@ -80,29 +62,29 @@ export function useSidebarData(): SidebarData {
           {
             title: t('Overview'),
             url: '/dashboard/overview',
-            icon: Activity,
+            icon: SidebarIcons.overview,
           },
           {
             title: t('Dashboard'),
             url: '/dashboard/models',
-            icon: LayoutDashboard,
+            icon: SidebarIcons.dashboard,
           },
           {
             title: t('API Keys'),
             url: '/keys',
-            icon: Key,
+            icon: SidebarIcons.apiKeys,
           },
           {
             title: t('Usage Logs'),
             url: '/usage-logs/common',
-            icon: FileText,
+            icon: SidebarIcons.usageLogs,
           },
           {
             title: t('Task Logs'),
             url: '/usage-logs/task',
             activeUrls: ['/usage-logs/drawing'],
             configUrls: ['/usage-logs/drawing', '/usage-logs/task'],
-            icon: ListTodo,
+            icon: SidebarIcons.taskLogs,
           },
         ],
       },
@@ -113,12 +95,12 @@ export function useSidebarData(): SidebarData {
           {
             title: t('Wallet'),
             url: '/wallet',
-            icon: Wallet,
+            icon: SidebarIcons.wallet,
           },
           {
             title: t('Profile'),
             url: '/profile',
-            icon: User,
+            icon: SidebarIcons.profile,
           },
         ],
       },
@@ -129,39 +111,39 @@ export function useSidebarData(): SidebarData {
           {
             title: t('Channels'),
             url: '/channels',
-            icon: Radio,
+            icon: SidebarIcons.channels,
           },
           {
             title: t('Models'),
             url: '/models/metadata',
-            icon: Box,
+            icon: SidebarIcons.models,
           },
           {
             title: t('Users'),
             url: '/users',
-            icon: Users,
+            icon: SidebarIcons.users,
           },
           {
             title: t('Redemption Codes'),
             url: '/redemption-codes',
-            icon: Ticket,
+            icon: SidebarIcons.redemptionCodes,
           },
           {
             title: t('Subscriptions'),
             url: '/subscriptions',
-            icon: CreditCard,
+            icon: SidebarIcons.subscription,
           },
           {
             title: t('System Info'),
             url: '/system-info',
-            icon: ServerCog,
+            icon: SidebarIcons.systemInfo,
             requiredRole: ROLE.SUPER_ADMIN,
           },
           {
             title: t('System Settings'),
             url: '/system-settings/site',
             activeUrls: ['/system-settings'],
-            icon: Settings,
+            icon: SidebarIcons.systemSettings,
           },
         ],
       },
