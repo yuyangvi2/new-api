@@ -23,9 +23,11 @@ import {
   Trash2Icon,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Button } from '@/components/ui/button'
+
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+
 import type { VideoBatch } from '../types'
 
 interface VideoResultsProps {
@@ -38,6 +40,25 @@ function StatusOverlay({ label }: { label: string }) {
     <div className='bg-muted/40 text-muted-foreground flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-xl border'>
       <Spinner className='size-6' />
       <span className='text-sm'>{label}</span>
+    </div>
+  )
+}
+
+function DebugResult({ value }: { value?: string }) {
+  const { t } = useTranslation()
+
+  if (!value) {
+    return null
+  }
+
+  return (
+    <div className='border-border bg-muted/30 rounded-md border p-2'>
+      <div className='text-muted-foreground mb-1 text-xs font-medium'>
+        {t('Latest polling result')}
+      </div>
+      <pre className='text-muted-foreground max-h-40 overflow-auto text-xs leading-relaxed break-words whitespace-pre-wrap'>
+        {value}
+      </pre>
     </div>
   )
 }
@@ -93,22 +114,28 @@ export function VideoResults({ batches, onClearHistory }: VideoResultsProps) {
             )}
 
             {batch.status === 'polling' && (
-              <StatusOverlay
-                label={
-                  batch.progress
-                    ? t('Generating video ({{progress}})...', {
-                        progress: batch.progress,
-                      })
-                    : t('Generating video...')
-                }
-              />
+              <>
+                <StatusOverlay
+                  label={
+                    batch.progress
+                      ? t('Generating video ({{progress}})...', {
+                          progress: batch.progress,
+                        })
+                      : t('Generating video...')
+                  }
+                />
+                <DebugResult value={batch.debugResult} />
+              </>
             )}
 
             {batch.status === 'error' && (
-              <div className='border-destructive/30 bg-destructive/5 text-destructive flex items-center gap-2 rounded-lg border p-3 text-sm'>
-                <AlertCircleIcon size={16} />
-                {batch.errorMessage || t('Video generation failed')}
-              </div>
+              <>
+                <div className='border-destructive/30 bg-destructive/5 text-destructive flex items-center gap-2 rounded-lg border p-3 text-sm'>
+                  <AlertCircleIcon size={16} />
+                  {batch.errorMessage || t('Video generation failed')}
+                </div>
+                <DebugResult value={batch.debugResult} />
+              </>
             )}
 
             {batch.status === 'complete' && batch.videoUrl && (

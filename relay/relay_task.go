@@ -597,10 +597,11 @@ func TaskModel2UserDto(task *model.Task) *dto.TaskDto {
 // TaskModel2PollDto 将 Task 转为轮询精简 DTO，只包含前端渲染所需的最少字段。
 func TaskModel2PollDto(task *model.Task) *dto.TaskPollDto {
 	return &dto.TaskPollDto{
-		TaskID:     task.TaskID,
-		Status:     string(task.Status),
-		FailReason: task.FailReason,
-		ResultURL:  task.GetResultURL(),
-		Progress:   task.Progress,
+		TaskID:      task.TaskID,
+		Status:      string(task.Status),
+		FailReason:  task.FailReason,
+		ResultURL:   task.GetResultURL(),
+		Progress:    task.Progress,
+		DebugResult: task.Data,
 	}
 }

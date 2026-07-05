@@ -142,6 +142,7 @@ export interface VideoTaskResponse {
   progress?: string
   url?: string
   format?: string
+  debugResult?: string
   error?: { code?: number; message?: string }
 }
 
@@ -156,6 +157,7 @@ export interface VideoBatch {
   imagePreview: string
   taskId?: string
   progress?: string
+  debugResult?: string
   videoUrl?: string
   errorMessage?: string
   createdAt: number
@@ -207,19 +209,25 @@ export interface VideoModelVariantState {
 // ---------------------------------------------------------------------------
 
 // Image model families
-export type ImageModelFamily = 'dall-e' | 'gpt-image' | 'image-gi' | 'image-gi2' | 'hunyuan-image' | 'generic-image'
+export type ImageModelFamily =
+  | 'dall-e'
+  | 'gpt-image'
+  | 'image-gi'
+  | 'image-gi2'
+  | 'hunyuan-image'
+  | 'generic-image'
 
 export type ModelFamily = 'kling' | 'vidu' | 'unknown'
 
 export type ParamType = 'select' | 'slider' | 'text' | 'switch'
 
 export interface FamilyParam {
-  key: string          // PascalCase key sent in metadata (e.g. "Mode")
-  label: string        // i18n display label
+  key: string // PascalCase key sent in metadata (e.g. "Mode")
+  label: string // i18n display label
   type: ParamType
   default: unknown
-  options?: { label: string; value: string }[]  // for select
-  min?: number         // for slider
+  options?: { label: string; value: string }[] // for select
+  min?: number // for slider
   max?: number
   step?: number
 }

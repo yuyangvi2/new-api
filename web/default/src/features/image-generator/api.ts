@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
+
 import { API_ENDPOINTS } from './constants'
 import type {
   GroupOption,
@@ -41,6 +42,18 @@ function normalizeTaskProgress(progress: unknown): string | undefined {
   if (progress === undefined || progress === null) return undefined
   const normalized = String(progress).trim()
   return normalized || undefined
+}
+
+function normalizeDebugResult(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined
+  const normalized =
+    typeof value === 'string' ? value : JSON.stringify(value, null, 2)
+  const trimmed = normalized.trim()
+  if (!trimmed) return undefined
+  const maxLength = 6000
+  return trimmed.length > maxLength
+    ? `${trimmed.slice(0, maxLength)}...`
+    : trimmed
 }
 
 /**
@@ -149,9 +162,8 @@ export async function fetchImageTask(
     status: (raw.status as string) || '',
     progress: normalizeTaskProgress(raw.progress),
     url: (raw.result_url as string) || (raw.url as string) || undefined,
-    error: raw.fail_reason
-      ? { message: raw.fail_reason as string }
-      : undefined,
+    debugResult: normalizeDebugResult(raw.debug_result),
+    error: raw.fail_reason ? { message: raw.fail_reason as string } : undefined,
   } as VideoTaskResponse
 }
 
@@ -197,8 +209,7 @@ export async function fetchVideoTask(
     status: (raw.status as string) || '',
     progress: normalizeTaskProgress(raw.progress),
     url: (raw.result_url as string) || (raw.url as string) || undefined,
-    error: raw.fail_reason
-      ? { message: raw.fail_reason as string }
-      : undefined,
+    debugResult: normalizeDebugResult(raw.debug_result),
+    error: raw.fail_reason ? { message: raw.fail_reason as string } : undefined,
   } as VideoTaskResponse
 }

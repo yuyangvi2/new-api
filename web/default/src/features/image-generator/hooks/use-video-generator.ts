@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useRef, useState } from 'react'
+
 import { fetchVideoTask, submitVideoTask } from '../api'
 import {
   DEFAULT_VIDEO_CONFIG,
@@ -102,7 +103,9 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
   )
 
   const patchBatch = useCallback((id: string, patch: Partial<VideoBatch>) => {
-    setBatches((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)))
+    setBatches((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, ...patch } : b))
+    )
   }, [])
 
   const generate = useCallback(async () => {
@@ -167,8 +170,11 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
 
         const task = await fetchVideoTask(submit.task_id, controller.signal)
         const status = (task.status || '').toLowerCase()
-        if (task.progress) {
-          patchBatch(batchId, { progress: task.progress })
+        if (task.progress || task.debugResult) {
+          patchBatch(batchId, {
+            ...(task.progress ? { progress: task.progress } : {}),
+            ...(task.debugResult ? { debugResult: task.debugResult } : {}),
+          })
         }
 
         if (VIDEO_SUCCESS_STATUSES.includes(status)) {
