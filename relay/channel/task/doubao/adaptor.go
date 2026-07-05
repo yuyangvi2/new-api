@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -110,8 +109,6 @@ type TaskAdaptor struct {
 	baseURL     string
 }
 
-var cosEnvPrefixes = []string{"DOUBAO_COS", "TASK_COS", "VIPEAK_COS", "VCLM_COS"}
-
 func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo) {
 	a.ChannelType = info.ChannelType
 	a.baseURL = info.ChannelBaseUrl
@@ -121,16 +118,7 @@ func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo) {
 // ValidateRequestAndSetAction parses body, validates fields and sets default action.
 func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycommon.RelayInfo) (taskErr *dto.TaskError) {
 	// Accept only POST /v1/video/generations as "generate" action.
-	if taskErr := relaycommon.ValidateBasicTaskRequest(c, info, constant.TaskActionGenerate); taskErr != nil {
-		return taskErr
-	}
-	req, err := relaycommon.GetTaskRequest(c)
-	if err == nil && hasNonURLImage(&req) && !taskcommon.HasCOSConfig(cosEnvPrefixes...) {
-		return service.TaskErrorWrapperLocal(
-			fmt.Errorf("doubao video models require uploaded/base64 images to be converted to a public URL; configure DOUBAO_COS_BUCKET, DOUBAO_COS_SECRET_ID and DOUBAO_COS_SECRET_KEY, or use a public image URL"),
-			"image_upload_requires_cos", http.StatusBadRequest)
-	}
-	return nil
+	return relaycommon.ValidateBasicTaskRequest(c, info, constant.TaskActionGenerate)
 }
 
 // BuildRequestURL constructs the upstream URL.
@@ -197,9 +185,7 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 		return nil, err
 	}
 
-	body, err := a.convertToRequestPayloadWithImageResolver(&req, func(img string) (string, error) {
-		return taskcommon.EnsurePublicImageURL(img, "doubao", cosEnvPrefixes...)
-	})
+	body, err := a.convertToRequestPayload(&req)
 	if err != nil {
 		return nil, errors.Wrap(err, "convert request payload failed")
 	}
@@ -285,28 +271,18 @@ func (a *TaskAdaptor) GetChannelName() string {
 }
 
 func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*requestPayload, error) {
-	return a.convertToRequestPayloadWithImageResolver(req, func(img string) (string, error) {
-		return img, nil
-	})
-}
-
-func (a *TaskAdaptor) convertToRequestPayloadWithImageResolver(req *relaycommon.TaskSubmitReq, resolveImageURL func(string) (string, error)) (*requestPayload, error) {
 	r := requestPayload{
-		Model:   CanonicalModelName(req.Model),
+		Model:   req.Model,
 		Content: []ContentItem{},
 	}
 
 	// Add images if present
 	if req.HasImage() {
 		for _, imgURL := range req.Images {
-			resolvedURL, err := resolveImageURL(imgURL)
-			if err != nil {
-				return nil, fmt.Errorf("resolve image url failed: %w", err)
-			}
 			r.Content = append(r.Content, ContentItem{
 				Type: "image_url",
 				ImageURL: &MediaURL{
-					URL: resolvedURL,
+					URL: imgURL,
 				},
 			})
 		}
@@ -328,18 +304,6 @@ func (a *TaskAdaptor) convertToRequestPayloadWithImageResolver(req *relaycommon.
 	})
 
 	return &r, nil
-}
-
-func hasNonURLImage(req *relaycommon.TaskSubmitReq) bool {
-	if req == nil {
-		return false
-	}
-	for _, img := range req.Images {
-		if img = strings.TrimSpace(img); img != "" && !taskcommon.IsHTTPURL(img) {
-			return true
-		}
-	}
-	return false
 }
 
 func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, error) {

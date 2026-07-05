@@ -7,22 +7,8 @@ var ModelList = []string{
 	"doubao-seedance-1-0-lite-t2v",
 	"doubao-seedance-1-0-lite-i2v",
 	"doubao-seedance-1-5-pro-251215",
-	"doubao-seedance-2-0",
 	"doubao-seedance-2-0-260128",
-	"doubao-seedance-2-0-fast",
 	"doubao-seedance-2-0-fast-260128",
-}
-
-var modelAliases = map[string]string{
-	"doubao-seedance-2-0":      "doubao-seedance-2-0-260128",
-	"doubao-seedance-2-0-fast": "doubao-seedance-2-0-fast-260128",
-}
-
-func CanonicalModelName(modelName string) string {
-	if mapped, ok := modelAliases[modelName]; ok {
-		return mapped
-	}
-	return modelName
 }
 
 var ChannelName = "doubao-video"
@@ -55,7 +41,6 @@ var videoPriceTable = map[string]map[videoPriceKey]float64{
 // GetVideoInputRatio 返回指定模型在给定输出分辨率/是否含视频输入下，相对基准价的计费倍率。
 // 第二个返回值表示该模型是否配置了价格表；倍率为 1.0 时调用方可忽略该 OtherRatio。
 func GetVideoInputRatio(modelName, resolution string, hasVideo bool) (float64, bool) {
-	modelName = CanonicalModelName(modelName)
 	prices, ok := videoPriceTable[modelName]
 	base := prices[videoPriceKey{}] // 零值键 = {480p/720p, 不含视频} 基准价
 	if !ok || base <= 0 {
