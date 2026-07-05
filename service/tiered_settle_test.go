@@ -559,6 +559,42 @@ func TestBuildTieredTokenParams_GPT_AudioOutputNoVar(t *testing.T) {
 	}
 }
 
+func TestBuildTieredTokenParams_GPT_ReasoningOutput(t *testing.T) {
+	usage := &dto.Usage{
+		PromptTokens:     1000,
+		CompletionTokens: 600,
+		CompletionTokenDetails: dto.OutputTokenDetails{
+			ReasoningTokens: 100,
+			TextTokens:      500,
+		},
+	}
+	expr := `tier("base", p * 2 + c * 10 + rt * 100)`
+	got := tieredQuota(expr, usage, false, 1.0)
+	// C=600-100=500, RT=100 → (1000*2 + 500*10 + 100*100) * 0.5 = 8500
+	want := 8500.0
+	if math.Abs(got-want) > 0.01 {
+		t.Fatalf("quota = %f, want %f", got, want)
+	}
+}
+
+func TestBuildTieredTokenParams_GPT_ReasoningOutputNoVar(t *testing.T) {
+	usage := &dto.Usage{
+		PromptTokens:     1000,
+		CompletionTokens: 600,
+		CompletionTokenDetails: dto.OutputTokenDetails{
+			ReasoningTokens: 100,
+			TextTokens:      500,
+		},
+	}
+	expr := `tier("base", p * 2 + c * 10)`
+	got := tieredQuota(expr, usage, false, 1.0)
+	// No rt → C=600 (reasoning stays in C) → (1000*2 + 600*10) * 0.5 = 4000
+	want := 4000.0
+	if math.Abs(got-want) > 0.01 {
+		t.Fatalf("quota = %f, want %f", got, want)
+	}
+}
+
 func TestBuildTieredTokenParams_ParityWithRatio(t *testing.T) {
 	// GPT-5.4 prices: input=$2.5, output=$15, cacheRead=$0.25
 	// Ratio equivalents: modelRatio=1.25, completionRatio=6, cacheRatio=0.1

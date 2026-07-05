@@ -71,7 +71,7 @@ export const CHANNEL_OPTIONS = [
   {
     value: 17,
     color: 'orange',
-    label: '阿里通义千问',
+    label: '万界方舟',
   },
   {
     value: 18,

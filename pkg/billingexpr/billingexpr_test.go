@@ -890,6 +890,18 @@ func TestAudioTokenVariables(t *testing.T) {
 	}
 }
 
+func TestReasoningTokenVariable(t *testing.T) {
+	exprStr := `tier("base", p * 2 + c * 10 + rt * 100)`
+	cost, _, err := billingexpr.RunExpr(exprStr, billingexpr.TokenParams{P: 1000, C: 400, RT: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 1000*2 + 400*10 + 100*100 = 2000 + 4000 + 10000 = 16000
+	if math.Abs(cost-16000) > 1e-6 {
+		t.Errorf("cost = %f, want 16000", cost)
+	}
+}
+
 func TestImageAudioVariables(t *testing.T) {
 	exprStr := `tier("base", p * 1 + img * 3 + ai * 5 + ao * 10)`
 	cost, _, err := billingexpr.RunExpr(exprStr, billingexpr.TokenParams{P: 100, Img: 50, AI: 20, AO: 10})

@@ -140,7 +140,7 @@ var ChannelTypeNames = map[int]string{
 	ChannelTypeAnthropic:      "Anthropic",
 	ChannelTypeBaidu:          "Baidu",
 	ChannelTypeZhipu:          "Zhipu",
-	ChannelTypeAli:            "Ali",
+	ChannelTypeAli:            "万界方舟",
 	ChannelTypeXunfei:         "Xunfei",
 	ChannelType360:            "360",
 	ChannelTypeOpenRouter:     "OpenRouter",

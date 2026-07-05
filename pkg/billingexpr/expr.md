@@ -45,6 +45,7 @@ Powered by [expr-lang/expr](https://github.com/expr-lang/expr). Expressions are 
 | `c` | 输出 token 数。**自动排除**表达式中单独计价的子类别（见下方说明） |
 | `img_o` | 图片输出 token 数 |
 | `ao` | 音频输出 token 数 |
+| `rt` | 推理/思考输出 token 数 |
 
 #### `p` 和 `c` 的自动排除机制
 
@@ -62,12 +63,13 @@ Powered by [expr-lang/expr](https://github.com/expr-lang/expr). Expressions are 
 | `p * 3 + c * 15 + cr * 0.3` | 800 | 用了 `cr`，缓存 200 从 `p` 中扣除，按 $0.3 单独计费；图片仍在 `p` 里按 $3 计费 |
 | `p * 3 + c * 15 + cr * 0.3 + img * 2` | 700 | 用了 `cr` 和 `img`，都从 `p` 中扣除，各自按自己的价格计费 |
 
-输出侧同理（假设 completion_tokens=500，其中包含 100 audio output）：
+输出侧同理（假设 completion_tokens=500，其中包含 100 audio output、50 reasoning output）：
 
 | 表达式 | `c` 的值 | 说明 |
 |--------|---------|------|
 | `p * 3 + c * 15` | 500 | 没用 `ao`，音频输出包含在 `c` 里按 $15 计费 |
 | `p * 3 + c * 15 + ao * 50` | 400 | 用了 `ao`，音频 100 从 `c` 中扣除按 $50 计费 |
+| `p * 3 + c * 15 + rt * 80` | 450 | 用了 `rt`，思考 50 从 `c` 中扣除按 $80 计费 |
 
 > **注意：** 这个自动排除仅针对 GPT/OpenAI 格式的 API（prompt_tokens 包含所有子类别）。Claude 格式的 API（input_tokens 本身就只包含纯文本）不做任何减法。系统根据上游返回格式自动判断，表达式作者无需关心。
 

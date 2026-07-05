@@ -138,6 +138,7 @@ import {
   FIELD_DESCRIPTIONS,
   FIELD_PLACEHOLDERS,
   MODEL_FETCHABLE_TYPES,
+  WANJIE_FANGZHOU_MODELS,
 } from '../../constants'
 import { useChannelMutateForm } from '../../hooks/use-channel-mutate-form'
 import {
@@ -802,6 +803,9 @@ export function ChannelMutateDrawer({
       return allModelsList.filter(
         (model) => model.startsWith('gpt-') || model.startsWith('text-')
       )
+    }
+    if (currentType === 17) {
+      return [...WANJIE_FANGZHOU_MODELS]
     }
     return allModelsList
   }, [allModelsList, currentType])

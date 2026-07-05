@@ -15,7 +15,7 @@ type TieredResultWrapper = billingexpr.TieredResult
 // when the expression references them via their own variable.
 //
 // GPT-format APIs report prompt_tokens / completion_tokens as totals that
-// include all sub-categories (cache, image, audio). Claude-format APIs
+// include all sub-categories (cache, image, audio, reasoning). Claude-format APIs
 // report them as text-only. This function normalizes to text-only when
 // sub-categories are separately priced.
 func BuildTieredTokenParams(usage *dto.Usage, isClaudeUsageSemantic bool, usedVars map[string]bool) billingexpr.TokenParams {
@@ -34,6 +34,7 @@ func BuildTieredTokenParams(usage *dto.Usage, isClaudeUsageSemantic bool, usedVa
 	ai := float64(usage.PromptTokensDetails.AudioTokens)
 	imgO := float64(usage.CompletionTokenDetails.ImageTokens)
 	ao := float64(usage.CompletionTokenDetails.AudioTokens)
+	rt := float64(usage.CompletionTokenDetails.ReasoningTokens)
 
 	// len = total input context length for tier condition evaluation.
 	// Non-Claude: prompt_tokens already includes everything.
@@ -65,6 +66,9 @@ func BuildTieredTokenParams(usage *dto.Usage, isClaudeUsageSemantic bool, usedVa
 		if usedVars["ao"] {
 			c -= ao
 		}
+		if usedVars["rt"] {
+			c -= rt
+		}
 	}
 
 	if p < 0 {
@@ -85,6 +89,7 @@ func BuildTieredTokenParams(usage *dto.Usage, isClaudeUsageSemantic bool, usedVa
 		ImgO: imgO,
 		AI:   ai,
 		AO:   ao,
+		RT:   rt,
 	}
 }
 
