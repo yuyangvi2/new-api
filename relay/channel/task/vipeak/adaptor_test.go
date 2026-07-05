@@ -1,9 +1,12 @@
 package vipeak
 
 import (
+	"math"
+	"net/http/httptest"
 	"testing"
 
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/gin-gonic/gin"
 )
 
 func TestBuildRequestUsesCanonicalSeedanceModel(t *testing.T) {
@@ -95,6 +98,26 @@ func TestBuildRequestRoutesOfficialSeedanceFastModelByImageInput(t *testing.T) {
 
 	if got := imageBody["model"]; got != "seedance2.0_fast_vision" {
 		t.Fatalf("image fast model = %v, want seedance2.0_fast_vision", got)
+	}
+}
+
+func TestEstimateBillingUsesOfficialSeedanceResolutionRatio(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Set("task_request", relaycommon.TaskSubmitReq{
+		Model: "doubao-seedance-2-0-260128",
+		Size:  "1080p",
+	})
+
+	adaptor := &TaskAdaptor{}
+	ratios := adaptor.EstimateBilling(ctx, &relaycommon.RelayInfo{
+		OriginModelName: "doubao-seedance-2-0-260128",
+	})
+
+	got := ratios["video_input"]
+	want := 51.0 / 46.0
+	if math.Abs(got-want) > 0.000001 {
+		t.Fatalf("video_input ratio = %v, want %v", got, want)
 	}
 }
 

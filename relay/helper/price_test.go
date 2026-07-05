@@ -10,6 +10,7 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/config"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -59,4 +60,30 @@ func TestModelPriceHelperTieredUsesPreloadedRequestInput(t *testing.T) {
 	require.Equal(t, "stream", info.TieredBillingSnapshot.EstimatedTier)
 	require.Equal(t, billing_setting.BillingModeTieredExpr, info.TieredBillingSnapshot.BillingMode)
 	require.Equal(t, common.QuotaPerUnit, info.TieredBillingSnapshot.QuotaPerUnit)
+}
+
+func TestModelPriceHelperPerCallFallsBackToDefaultModelRatio(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	originalModelRatio := ratio_setting.ModelRatio2JSONString()
+	t.Cleanup(func() {
+		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(originalModelRatio))
+	})
+	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{}`))
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Set("group", "default")
+
+	info := &relaycommon.RelayInfo{
+		OriginModelName: "doubao-seedance-2-0-260128",
+		UserGroup:       "default",
+		UsingGroup:      "default",
+	}
+
+	priceData, err := ModelPriceHelperPerCall(ctx, info)
+	require.NoError(t, err)
+	require.False(t, priceData.UsePrice)
+	require.InDelta(t, 46.0/14.0, priceData.ModelRatio, 0.000001)
+	require.True(t, HasModelBillingConfig("doubao-seedance-2-0-260128"))
 }

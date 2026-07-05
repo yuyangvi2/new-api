@@ -180,6 +180,12 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types
 			var ratioSuccess bool
 			var matchName string
 			modelRatio, ratioSuccess, matchName = ratio_setting.GetModelRatio(info.OriginModelName)
+			if !ratioSuccess {
+				if defaultRatio, ok := ratio_setting.GetDefaultModelRatioMap()[matchName]; ok {
+					modelRatio = defaultRatio
+					ratioSuccess = true
+				}
+			}
 			acceptUnsetRatio := false
 			if info.UserSetting.AcceptUnsetRatioModel {
 				acceptUnsetRatio = true
@@ -225,10 +231,14 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types
 }
 
 func HasModelBillingConfig(modelName string) bool {
+	modelName = ratio_setting.FormatMatchingModelName(modelName)
 	if _, ok := ratio_setting.GetModelPrice(modelName, false); ok {
 		return true
 	}
 	if _, ok, _ := ratio_setting.GetModelRatio(modelName); ok {
+		return true
+	}
+	if _, ok := ratio_setting.GetDefaultModelRatioMap()[modelName]; ok {
 		return true
 	}
 	if billing_setting.GetBillingMode(modelName) != billing_setting.BillingModeTieredExpr {

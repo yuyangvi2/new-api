@@ -33,6 +33,7 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relay/channel"
+	doubaotask "github.com/QuantumNous/new-api/relay/channel/task/doubao"
 	taskcommon "github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
@@ -283,6 +284,47 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 		return nil, err
 	}
 	return bytes.NewReader(data), nil
+}
+
+func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInfo) map[string]float64 {
+	req, err := relaycommon.GetTaskRequest(c)
+	if err != nil {
+		return nil
+	}
+
+	resolution := strings.TrimSpace(asString(req.Metadata["resolution"]))
+	if resolution == "" {
+		resolution = strings.TrimSpace(req.Size)
+	}
+	ratio, ok := doubaotask.GetVideoInputRatio(info.OriginModelName, resolution, hasVideoInput(req))
+	if !ok || ratio == 1.0 {
+		return nil
+	}
+	return map[string]float64{"video_input": ratio}
+}
+
+func hasVideoInput(req relaycommon.TaskSubmitReq) bool {
+	if strings.TrimSpace(req.InputReference) != "" {
+		return true
+	}
+	contentRaw, ok := req.Metadata["content"]
+	if !ok {
+		return false
+	}
+	content, ok := contentRaw.([]interface{})
+	if !ok {
+		return false
+	}
+	for _, item := range content {
+		itemMap, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if _, ok := itemMap["video_url"]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 // buildRequest 按 provider 构造 vipeak 请求体。标准字段做基础映射，
