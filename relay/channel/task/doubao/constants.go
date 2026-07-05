@@ -36,6 +36,10 @@ var videoPriceTable = map[string]map[videoPriceKey]float64{
 		{is4k: true, hasVideo: false}:    26.0,
 		{is4k: true, hasVideo: true}:     16.0,
 	},
+	"ark/seedance-2.0": {
+		{hasVideo: false}: 37.0,
+		{hasVideo: true}:  22.0,
+	},
 	"doubao-seedance-2-0-fast-260128": {
 		{hasVideo: false}: 37.0,
 		{hasVideo: true}:  22.0,

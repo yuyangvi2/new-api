@@ -31,7 +31,9 @@ import (
 	"github.com/QuantumNous/new-api/relay/channel/replicate"
 	"github.com/QuantumNous/new-api/relay/channel/siliconflow"
 	"github.com/QuantumNous/new-api/relay/channel/submodel"
+	taskaiart "github.com/QuantumNous/new-api/relay/channel/task/aiart"
 	taskali "github.com/QuantumNous/new-api/relay/channel/task/ali"
+	taskapiz "github.com/QuantumNous/new-api/relay/channel/task/apiz"
 	taskdoubao "github.com/QuantumNous/new-api/relay/channel/task/doubao"
 	taskGemini "github.com/QuantumNous/new-api/relay/channel/task/gemini"
 	"github.com/QuantumNous/new-api/relay/channel/task/hailuo"
@@ -39,11 +41,10 @@ import (
 	"github.com/QuantumNous/new-api/relay/channel/task/kling"
 	tasksora "github.com/QuantumNous/new-api/relay/channel/task/sora"
 	"github.com/QuantumNous/new-api/relay/channel/task/suno"
-	taskaiart "github.com/QuantumNous/new-api/relay/channel/task/aiart"
-	taskvipeak "github.com/QuantumNous/new-api/relay/channel/task/vipeak"
 	taskvclm "github.com/QuantumNous/new-api/relay/channel/task/vclm"
 	taskvertex "github.com/QuantumNous/new-api/relay/channel/task/vertex"
 	taskVidu "github.com/QuantumNous/new-api/relay/channel/task/vidu"
+	taskvipeak "github.com/QuantumNous/new-api/relay/channel/task/vipeak"
 	"github.com/QuantumNous/new-api/relay/channel/tencent"
 	"github.com/QuantumNous/new-api/relay/channel/vertex"
 	"github.com/QuantumNous/new-api/relay/channel/volcengine"
@@ -171,6 +172,8 @@ func GetTaskAdaptor(platform constant.TaskPlatform) channel.TaskAdaptor {
 			return &taskaiart.TaskAdaptor{}
 		case constant.ChannelTypeVipeak:
 			return &taskvipeak.TaskAdaptor{}
+		case constant.ChannelTypeApiz:
+			return &taskapiz.TaskAdaptor{}
 		}
 	}
 	return nil

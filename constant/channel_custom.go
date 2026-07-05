@@ -15,12 +15,14 @@ const (
 	ChannelTypeVCLM   = 9001 // 腾讯云 VCLM 可灵图生视频（TC3 签名，任务型）
 	ChannelTypeAIArt  = 9002 // 腾讯云 AIART 大模型图像创作（Image-GI / Nano Banana，TC3 签名，任务型）
 	ChannelTypeVipeak = 9003 // vipeak（www.123vips.com）Wan2.7 / Seedance 视频与图像（Bearer，任务型）
+	ChannelTypeApiz   = 9004 // apiz.ai / xskill.ai 生成模型（Bearer，任务型）
 )
 
 func init() {
 	registerCustomChannel(ChannelTypeVCLM, "VCLM (Kling)", "https://vclm.tencentcloudapi.com")
 	registerCustomChannel(ChannelTypeAIArt, "AIART (Image-GI)", "https://aiart.tencentcloudapi.com")
 	registerCustomChannel(ChannelTypeVipeak, "vipeak (Wan2.7/Seedance)", "https://www.123vips.com")
+	registerCustomChannel(ChannelTypeApiz, "apiz.ai / xskill.ai", "https://api.apiz.ai")
 }
 
 // registerCustomChannel 把高位自定义渠道安全地登记进上游的查表结构：

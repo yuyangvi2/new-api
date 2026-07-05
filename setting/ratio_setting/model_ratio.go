@@ -210,6 +210,7 @@ var defaultModelRatio = map[string]float64{
 	"doubao-seedance-2-0-260128":      46.0 / 14.0,
 	"seedance2.0_direct":              46.0 / 14.0,
 	"seedance2.0_vision":              46.0 / 14.0,
+	"ark/seedance-2.0":                37.0 / 14.0,
 	"doubao-seedance-2-0-fast-260128": 37.0 / 14.0,
 	"seedance2.0_fast_direct":         37.0 / 14.0,
 	"seedance2.0_fast_vision":         37.0 / 14.0,
