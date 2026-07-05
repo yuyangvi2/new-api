@@ -28,6 +28,7 @@ import {
   VIDEO_STORAGE_KEY,
   VIDEO_SUCCESS_STATUSES,
   videoModelRequiresImage,
+  videoModelSupportsImageInput,
 } from '../constants'
 import type { VideoBatch, VideoConfig } from '../types'
 
@@ -111,7 +112,9 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
   const generate = useCallback(async () => {
     const prompt = config.prompt.trim()
     const requiresImage = videoModelRequiresImage(config.model)
-    const inputImage = requiresImage ? config.image : ''
+    const inputImage = videoModelSupportsImageInput(config.model)
+      ? config.image
+      : ''
     if ((requiresImage && !inputImage) || isGenerating) return
 
     const batchId = genId()

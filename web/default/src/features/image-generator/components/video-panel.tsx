@@ -41,6 +41,7 @@ import {
   resolveVideoVariantModel,
   VIDEO_DURATIONS,
   videoModelRequiresImage,
+  videoModelSupportsImageInput,
   VIDEO_SIZE_PRESETS,
 } from '../constants'
 import type {
@@ -95,7 +96,7 @@ export function VideoPanel({
   const displayModel = variantState?.set.defaultModel ?? config.model
 
   const requiresImage = videoModelRequiresImage(config.model)
-  const showImageInput = requiresImage
+  const showImageInput = videoModelSupportsImageInput(config.model)
   const canGenerate = (!requiresImage || !!config.image) && !isGenerating
   const resolutionParam = familyParams.find(
     (param) => param.key === 'resolution' && param.type === 'select'
