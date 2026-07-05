@@ -16,48 +16,71 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { lazy, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useAuthStore } from '@/stores/auth-store'
+
+import { PublicLayout } from '@/components/layout'
 import { Footer } from '@/components/layout/components/footer'
-import { PublicLayout } from '@/components/layout/components/public-layout'
+import { RichContent } from '@/components/rich-content'
+import { isLikelyHtml } from '@/lib/content-format'
+import { useAuthStore } from '@/stores/auth-store'
+
 import { CTA, Features, Hero, HowItWorks, Stats } from './components'
 import { useHomePageContent } from './hooks'
-
-const Markdown = lazy(() =>
-  import('@/components/ui/markdown').then((module) => ({
-    default: module.Markdown,
-  }))
-)
 
 export function Home() {
   const { t } = useTranslation()
   const { auth } = useAuthStore()
   const isAuthenticated = !!auth.user
-  const { content, isUrl } = useHomePageContent()
+  const { content, isLoaded, isUrl } = useHomePageContent()
 
-  if (content) {
+  if (!isLoaded) {
     return (
       <PublicLayout showMainContainer={false}>
-        <main className='overflow-x-hidden'>
-          {isUrl ? (
-            <iframe
-              src={content}
-              className='h-screen w-full border-none'
-              title={t('Custom Home Page')}
-            />
-          ) : (
-            <div className='container mx-auto py-8'>
-              <Suspense
-                fallback={
-                  <div className='text-muted-foreground'>{t('Loading...')}</div>
-                }
-              >
-                <Markdown className='custom-home-content'>{content}</Markdown>
-              </Suspense>
-            </div>
-          )}
+        <main className='flex min-h-screen items-center justify-center'>
+          <div className='text-muted-foreground'>{t('Loading...')}</div>
         </main>
+      </PublicLayout>
+    )
+  }
+
+  if (content) {
+    if (isUrl) {
+      return (
+        <PublicLayout showMainContainer={false}>
+          <iframe
+            src={content}
+            className='h-screen w-full border-none'
+            title={t('Custom Home Page')}
+            sandbox='allow-forms allow-popups allow-popups-to-escape-sandbox allow-scripts'
+          />
+        </PublicLayout>
+      )
+    }
+
+    const contentIsHtml = isLikelyHtml(content)
+
+    if (contentIsHtml) {
+      return (
+        <PublicLayout showMainContainer={false}>
+          <RichContent
+            mode='html'
+            htmlVariant='isolated'
+            content={content}
+            className='custom-home-content'
+          />
+        </PublicLayout>
+      )
+    }
+
+    return (
+      <PublicLayout>
+        <div className='mx-auto max-w-6xl px-4 py-8'>
+          <RichContent
+            mode='markdown'
+            content={content}
+            className='custom-home-content'
+          />
+        </div>
       </PublicLayout>
     )
   }

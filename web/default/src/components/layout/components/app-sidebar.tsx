@@ -18,11 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { MOTION_TRANSITION, MOTION_VARIANTS } from '@/lib/motion'
+
+import { Sidebar, SidebarContent, SidebarRail } from '@/components/ui/sidebar'
 import { useLayout } from '@/context/layout-provider'
 import { useSetSidebarPortalTarget } from '@/context/sidebar-portal'
 import { useSidebarView } from '@/hooks/use-sidebar-view'
-import { Sidebar, SidebarContent, SidebarRail } from '@/components/ui/sidebar'
+import { MOTION_TRANSITION, MOTION_VARIANTS } from '@/lib/motion'
+
 import { NavGroup } from './nav-group'
 import { SidebarViewHeader } from './sidebar-view-header'
 

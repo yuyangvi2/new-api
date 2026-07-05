@@ -17,9 +17,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useMemo } from 'react'
-import { getServerAddress } from '@/lib/server-address'
-import { useStatus } from '@/hooks/use-status'
 import type { SystemStatus } from '@/features/auth/types'
+import { useStatus } from '@/hooks/use-status'
+import { getServerAddress } from '@/lib/server-address'
+
 import {
   type ChatPreset,
   parseChatConfig,
