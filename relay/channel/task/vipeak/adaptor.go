@@ -6,6 +6,8 @@
 //   - wan2.7-image-pro                 : POST /api/wan27/image-edit    provider=wan27-image  (文生图/图像编辑, 1K/2K/4K, 4K 仅文生图)
 //   - dreamina-seedance-2-0-260128     : POST /api/advanced/generate   provider=seedance     (视频, 480p/720p/1080p/4k)
 //   - dreamina-seedance-2-0-fast-260128: POST /api/advanced/generate   provider=seedance     (视频, 480p/720p)
+//   - doubao-seedance-2-0-260128       : POST /api/advanced/generate   provider=seedance     (按是否带图转为 seedance2.0_direct/vision)
+//   - doubao-seedance-2-0-fast-260128  : POST /api/advanced/generate   provider=seedance     (按是否带图转为 seedance2.0_fast_direct/vision)
 //
 // 轮询：GET /api/generation-records/<taskId>，返回本地生成记录（record，含 progress / result URL / billing / prompt）。
 //
@@ -51,7 +53,9 @@ type modelDef struct {
 	provider      string // 上游 provider 字段
 	endpoint      string // 提交端点
 	kind          string // "video" | "image"
-	upstreamModel string // 非空时把对外别名转换成上游模型名
+	upstreamModel string // 非空时把对外别名转换成固定上游模型名
+	directModel   string // 非空时，无图输入映射到该 vipeak Seedance 模型
+	visionModel   string // 非空时，有图输入映射到该 vipeak Seedance 模型
 }
 
 var modelDefs = map[string]modelDef{
@@ -74,6 +78,20 @@ var modelDefs = map[string]modelDef{
 		provider: "seedance",
 		endpoint: epAdvanced,
 		kind:     "video",
+	},
+	"doubao-seedance-2-0-260128": {
+		provider:    "seedance",
+		endpoint:    epAdvanced,
+		kind:        "video",
+		directModel: "seedance2.0_direct",
+		visionModel: "seedance2.0_vision",
+	},
+	"doubao-seedance-2-0-fast-260128": {
+		provider:    "seedance",
+		endpoint:    epAdvanced,
+		kind:        "video",
+		directModel: "seedance2.0_fast_direct",
+		visionModel: "seedance2.0_fast_vision",
 	},
 	"seedance2.0_direct": {
 		provider: "seedance",
@@ -112,9 +130,17 @@ var modelDefs = map[string]modelDef{
 
 var cosEnvPrefixes = []string{"VIPEAK_COS", "TASK_COS", "VCLM_COS"}
 
-func canonicalModelName(requestModel string, def modelDef) string {
+func canonicalModelName(requestModel string, def modelDef, req *relaycommon.TaskSubmitReq) string {
 	if def.upstreamModel != "" {
 		return def.upstreamModel
+	}
+	if def.directModel != "" || def.visionModel != "" {
+		if req != nil && len(collectImages(req)) > 0 && def.visionModel != "" {
+			return def.visionModel
+		}
+		if def.directModel != "" {
+			return def.directModel
+		}
 	}
 	return requestModel
 }
@@ -270,7 +296,7 @@ func buildRequest(req *relaycommon.TaskSubmitReq, upstreamModel string) map[stri
 
 func buildRequestWithImageResolver(req *relaycommon.TaskSubmitReq, upstreamModel string, resolveImageURL func(string) (string, error)) (map[string]any, error) {
 	def := modelDefs[strings.ToLower(upstreamModel)]
-	canonicalModel := canonicalModelName(upstreamModel, def)
+	canonicalModel := canonicalModelName(upstreamModel, def, req)
 	m := map[string]any{
 		"provider": def.provider,
 		"model":    canonicalModel,

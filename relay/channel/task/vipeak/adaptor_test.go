@@ -44,6 +44,60 @@ func TestBuildRequestUsesCanonicalSeedanceFastModel(t *testing.T) {
 	}
 }
 
+func TestBuildRequestRoutesOfficialSeedanceModelByImageInput(t *testing.T) {
+	textReq := &relaycommon.TaskSubmitReq{
+		Model:  "doubao-seedance-2-0-260128",
+		Prompt: "make it move",
+	}
+
+	textBody := buildRequest(textReq, "doubao-seedance-2-0-260128")
+
+	if got := textBody["model"]; got != "seedance2.0_direct" {
+		t.Fatalf("text-only model = %v, want seedance2.0_direct", got)
+	}
+	if _, ok := textBody["seedanceMode"]; ok {
+		t.Fatalf("text-only request unexpectedly set seedanceMode: %#v", textBody["seedanceMode"])
+	}
+
+	imageReq := &relaycommon.TaskSubmitReq{
+		Model:  "doubao-seedance-2-0-260128",
+		Prompt: "make it move",
+		Image:  "https://example.com/input.png",
+	}
+
+	imageBody := buildRequest(imageReq, "doubao-seedance-2-0-260128")
+
+	if got := imageBody["model"]; got != "seedance2.0_vision" {
+		t.Fatalf("image model = %v, want seedance2.0_vision", got)
+	}
+	if got := imageBody["seedanceMode"]; got != "reference_images" {
+		t.Fatalf("seedanceMode = %v, want reference_images", got)
+	}
+}
+
+func TestBuildRequestRoutesOfficialSeedanceFastModelByImageInput(t *testing.T) {
+	textBody := buildRequest(
+		&relaycommon.TaskSubmitReq{Model: "doubao-seedance-2-0-fast-260128"},
+		"doubao-seedance-2-0-fast-260128",
+	)
+
+	if got := textBody["model"]; got != "seedance2.0_fast_direct" {
+		t.Fatalf("text-only fast model = %v, want seedance2.0_fast_direct", got)
+	}
+
+	imageBody := buildRequest(
+		&relaycommon.TaskSubmitReq{
+			Model: "doubao-seedance-2-0-fast-260128",
+			Image: "https://example.com/input.png",
+		},
+		"doubao-seedance-2-0-fast-260128",
+	)
+
+	if got := imageBody["model"]; got != "seedance2.0_fast_vision" {
+		t.Fatalf("image fast model = %v, want seedance2.0_fast_vision", got)
+	}
+}
+
 func TestBuildRequestWithImageResolverConvertsAndDeduplicatesSeedanceImages(t *testing.T) {
 	req := &relaycommon.TaskSubmitReq{
 		Model:  "seedance",
