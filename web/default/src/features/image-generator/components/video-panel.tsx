@@ -32,7 +32,7 @@ import {
 import { Slider } from '@/components/ui/slider'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { ModelSelector } from '@/components/model-group-selector'
+import { GroupSelector, ModelSelector } from '@/components/model-group-selector'
 import {
   detectModelFamily,
   FAMILY_PARAMS,
@@ -44,6 +44,7 @@ import {
 } from '../constants'
 import type {
   FamilyParam,
+  GroupOption,
   ImageSourceType,
   ModelOption,
   VideoConfig,
@@ -58,9 +59,12 @@ interface VideoPanelProps {
     value: VideoConfig[K]
   ) => void
   onModelChange: (value: string) => void
+  onGroupChange: (value: string) => void
   models: ModelOption[]
   variantModels: ModelOption[]
+  groups: GroupOption[]
   isModelLoading: boolean
+  isGroupLoading: boolean
   isGenerating: boolean
   availableImages: { id: string; src: string }[]
   onGenerate: () => void
@@ -71,9 +75,12 @@ export function VideoPanel({
   config,
   updateConfig,
   onModelChange,
+  onGroupChange,
   models,
   variantModels,
+  groups,
   isModelLoading,
+  isGroupLoading,
   isGenerating,
   availableImages,
   onGenerate,
@@ -139,6 +146,18 @@ export function VideoPanel({
           />
         </div>
 
+        {/* Group */}
+        <div className='space-y-2'>
+          <Label className='text-sm font-medium'>{t('Group')}</Label>
+          <GroupSelector
+            className='w-full'
+            selectedGroup={config.group}
+            groups={groups}
+            onGroupChange={onGroupChange}
+            disabled={isGroupLoading || isGenerating}
+          />
+        </div>
+
         {/* Model */}
         <div className='space-y-2'>
           <Label className='text-sm font-medium'>{t('Model')}</Label>
@@ -147,7 +166,7 @@ export function VideoPanel({
             selectedModel={displayModel}
             models={models}
             onModelChange={onModelChange}
-            disabled={isModelLoading}
+            disabled={isModelLoading || isGenerating}
           />
         </div>
 

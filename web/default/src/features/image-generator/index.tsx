@@ -25,7 +25,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useSidebarPortalTarget } from '@/context/sidebar-portal'
-import { getUserModels } from './api'
+import { getUserGroups, getUserModels } from './api'
 import {
   detectImageModelFamily,
   getVideoVariantDisplayName,
@@ -36,19 +36,54 @@ import { ResultGallery } from './components/result-gallery'
 import { VideoPanel } from './components/video-panel'
 import { VideoResults } from './components/video-results'
 import { useImageGenerator, useVideoGenerator } from './hooks'
-import type { GeneratorMode, ModelOption } from './types'
+import type { GeneratorMode, GroupOption, ModelOption } from './types'
 
 const IMAGE_MODEL_RE = /dall-e|image|flux|sd|stable|gpt-image|midjourney|ideogram/i
 const VIDEO_MODEL_RE =
   /kling|jimeng|sora|vidu|cogvideo|video|hailuo|minimax|wan|seedance|runway|luma|pika|veo|doubao/i
 
-function resolveModelGroup(
-  model: ModelOption | undefined,
-  currentGroup: string
-): string | undefined {
-  if (!model?.groups || model.groups.length === 0) return undefined
-  if (model.groups.includes(currentGroup)) return currentGroup
-  return model.groups[0]
+function modelSupportsGroup(model: ModelOption, group: string): boolean {
+  return !model.groups || model.groups.length === 0 || model.groups.includes(group)
+}
+
+function getDisplayVideoModels(models: ModelOption[]): ModelOption[] {
+  const availableModelNames = models.map((m) => m.value)
+  return models
+    .filter((m) => !isHiddenVideoVariantModel(m.value, availableModelNames))
+    .map((m) => ({
+      ...m,
+      label: getVideoVariantDisplayName(m.value) ?? m.label,
+    }))
+}
+
+function mergeGroupOptions(
+  groups: GroupOption[],
+  models: ModelOption[],
+  currentGroups: string[]
+): GroupOption[] {
+  const merged = new Map<string, GroupOption>()
+
+  for (const group of groups) {
+    merged.set(group.value, group)
+  }
+
+  for (const model of models) {
+    for (const group of model.groups ?? []) {
+      if (!merged.has(group)) {
+        merged.set(group, { label: group, value: group })
+      }
+    }
+  }
+
+  if (merged.size === 0) {
+    for (const group of currentGroups) {
+      if (group && !merged.has(group)) {
+        merged.set(group, { label: group, value: group })
+      }
+    }
+  }
+
+  return [...merged.values()]
 }
 
 export function ImageGenerator() {
@@ -58,6 +93,10 @@ export function ImageGenerator() {
 
   const imageGen = useImageGenerator()
   const videoGen = useVideoGenerator()
+  const imageConfig = imageGen.config
+  const videoConfig = videoGen.config
+  const updateImageConfig = imageGen.updateConfig
+  const updateVideoConfig = videoGen.updateConfig
 
   const { data: models = [], isLoading: isModelLoading } = useQuery({
     queryKey: ['image-generator-models', t],
@@ -70,6 +109,27 @@ export function ImageGenerator() {
       }
     },
   })
+
+  const { data: fetchedGroups = [], isLoading: isGroupLoading } = useQuery({
+    queryKey: ['image-generator-groups', t],
+    queryFn: async () => {
+      try {
+        return await getUserGroups()
+      } catch {
+        toast.error(t('Failed to load groups'))
+        return []
+      }
+    },
+  })
+
+  const groups = useMemo(
+    () =>
+      mergeGroupOptions(fetchedGroups, models, [
+        imageConfig.group,
+        videoConfig.group,
+      ]),
+    [fetchedGroups, models, imageConfig.group, videoConfig.group]
+  )
 
   // Filter models by tab type so image tab only shows image models, etc.
   const imageModels = useMemo(
@@ -85,20 +145,19 @@ export function ImageGenerator() {
       ),
     [models]
   )
-  const videoModels = useMemo(() => {
-    const availableModelNames = allVideoModels.map((m) => m.value)
-    return allVideoModels
-      .filter((m) => !isHiddenVideoVariantModel(m.value, availableModelNames))
-      .map((m) => ({
-        ...m,
-        label: getVideoVariantDisplayName(m.value) ?? m.label,
-      }))
-  }, [allVideoModels])
-
-  const imageConfig = imageGen.config
-  const videoConfig = videoGen.config
-  const updateImageConfig = imageGen.updateConfig
-  const updateVideoConfig = videoGen.updateConfig
+  const imageModelsForGroup = useMemo(
+    () => imageModels.filter((m) => modelSupportsGroup(m, imageConfig.group)),
+    [imageModels, imageConfig.group]
+  )
+  const allVideoModelsForGroup = useMemo(
+    () =>
+      allVideoModels.filter((m) => modelSupportsGroup(m, videoConfig.group)),
+    [allVideoModels, videoConfig.group]
+  )
+  const videoModels = useMemo(
+    () => getDisplayVideoModels(allVideoModelsForGroup),
+    [allVideoModelsForGroup]
+  )
 
   // Completed images from Image mode, offered as video input sources.
   const availableImages = useMemo(
@@ -109,18 +168,11 @@ export function ImageGenerator() {
     [imageGen.batches]
   )
 
-  const handleImageModelChange = useCallback(
+  const applyImageModelChange = useCallback(
     (value: string) => {
       const oldFamily = detectImageModelFamily(imageConfig.model)
       const newFamily = detectImageModelFamily(value)
-      const nextGroup = resolveModelGroup(
-        imageModels.find((m) => m.value === value),
-        imageConfig.group
-      )
       updateImageConfig('model', value)
-      if (nextGroup && nextGroup !== imageConfig.group) {
-        updateImageConfig('group', nextGroup)
-      }
       // Reset size when switching between families with different size formats
       if (oldFamily !== newFamily) {
         const defaultSize = newFamily === 'hunyuan-image'
@@ -136,55 +188,98 @@ export function ImageGenerator() {
         updateImageConfig('images', [])
       }
     },
-    [imageConfig.model, imageConfig.group, imageModels, updateImageConfig]
+    [imageConfig.model, updateImageConfig]
+  )
+
+  const handleImageModelChange = useCallback(
+    (value: string) => {
+      applyImageModelChange(value)
+    },
+    [applyImageModelChange]
+  )
+
+  const handleImageGroupChange = useCallback(
+    (value: string) => {
+      updateImageConfig('group', value)
+
+      const currentModel = imageModels.find(
+        (m) => m.value === imageConfig.model
+      )
+      if (currentModel && modelSupportsGroup(currentModel, value)) return
+
+      const nextModel = imageModels.find((m) => modelSupportsGroup(m, value))
+      if (nextModel) {
+        applyImageModelChange(nextModel.value)
+      }
+    },
+    [applyImageModelChange, imageConfig.model, imageModels, updateImageConfig]
   )
 
   const handleVideoModelChange = useCallback(
     (value: string) => {
-      const nextGroup = resolveModelGroup(
-        allVideoModels.find((m) => m.value === value),
-        videoConfig.group
-      )
       updateVideoConfig('model', value)
-      if (nextGroup && nextGroup !== videoConfig.group) {
-        updateVideoConfig('group', nextGroup)
+    },
+    [updateVideoConfig]
+  )
+
+  const handleVideoGroupChange = useCallback(
+    (value: string) => {
+      updateVideoConfig('group', value)
+
+      const currentModel = allVideoModels.find(
+        (m) => m.value === videoConfig.model
+      )
+      if (currentModel && modelSupportsGroup(currentModel, value)) return
+
+      const nextModel = getDisplayVideoModels(
+        allVideoModels.filter((m) => modelSupportsGroup(m, value))
+      )[0]
+      if (nextModel) {
+        updateVideoConfig('model', nextModel.value)
       }
     },
-    [videoConfig.group, allVideoModels, updateVideoConfig]
+    [allVideoModels, updateVideoConfig, videoConfig.model]
   )
+
+  useEffect(() => {
+    if (groups.length === 0) return
+    if (!groups.some((g) => g.value === imageConfig.group)) {
+      updateImageConfig('group', groups[0].value)
+    }
+  }, [groups, imageConfig.group, updateImageConfig])
+
+  useEffect(() => {
+    if (groups.length === 0) return
+    if (!groups.some((g) => g.value === videoConfig.group)) {
+      updateVideoConfig('group', groups[0].value)
+    }
+  }, [groups, videoConfig.group, updateVideoConfig])
 
   // Auto-select initial model when models load
   useEffect(() => {
-    if (imageModels.length === 0) return
-    const currentModel = imageModels.find((m) => m.value === imageConfig.model)
-    const nextModel = currentModel ?? imageModels[0]
+    if (imageModelsForGroup.length === 0) return
+    const currentModel = imageModelsForGroup.find(
+      (m) => m.value === imageConfig.model
+    )
+    const nextModel = currentModel ?? imageModelsForGroup[0]
     if (!currentModel) {
-      updateImageConfig('model', nextModel.value)
+      applyImageModelChange(nextModel.value)
     }
-    const nextGroup = resolveModelGroup(nextModel, imageConfig.group)
-    if (nextGroup && nextGroup !== imageConfig.group) {
-      updateImageConfig('group', nextGroup)
-    }
-  }, [imageModels, imageConfig.model, imageConfig.group, updateImageConfig])
+  }, [applyImageModelChange, imageModelsForGroup, imageConfig.model])
 
   useEffect(() => {
     if (videoModels.length === 0) return
-    const currentModel = allVideoModels.find(
+    const currentModel = allVideoModelsForGroup.find(
       (m) => m.value === videoConfig.model
     )
     const nextModel = currentModel ?? videoModels[0]
     if (!currentModel) {
       updateVideoConfig('model', nextModel.value)
     }
-    const nextGroup = resolveModelGroup(nextModel, videoConfig.group)
-    if (nextGroup && nextGroup !== videoConfig.group) {
-      updateVideoConfig('group', nextGroup)
-    }
   }, [
     videoModels,
-    allVideoModels,
+    allVideoModelsForGroup,
     videoConfig.model,
-    videoConfig.group,
     updateVideoConfig,
   ])
 
@@ -246,8 +341,11 @@ export function ImageGenerator() {
               config={imageGen.config}
               updateConfig={imageGen.updateConfig}
               onModelChange={handleImageModelChange}
-              models={imageModels}
+              onGroupChange={handleImageGroupChange}
+              models={imageModelsForGroup}
+              groups={groups}
               isModelLoading={isModelLoading}
+              isGroupLoading={isGroupLoading}
               isGenerating={imageGen.isGenerating}
               onGenerate={imageGen.generate}
               onCancel={imageGen.cancel}
@@ -257,9 +355,12 @@ export function ImageGenerator() {
               config={videoGen.config}
               updateConfig={videoGen.updateConfig}
               onModelChange={handleVideoModelChange}
+              onGroupChange={handleVideoGroupChange}
               models={videoModels}
-              variantModels={allVideoModels}
+              variantModels={allVideoModelsForGroup}
+              groups={groups}
               isModelLoading={isModelLoading}
+              isGroupLoading={isGroupLoading}
               isGenerating={videoGen.isGenerating}
               availableImages={availableImages}
               onGenerate={videoGen.generate}

@@ -33,7 +33,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
 import { Textarea } from '@/components/ui/textarea'
-import { ModelSelector } from '@/components/model-group-selector'
+import { GroupSelector, ModelSelector } from '@/components/model-group-selector'
 import {
   AIART_ASPECT_RATIOS,
   COUNT_OPTIONS,
@@ -47,7 +47,7 @@ import {
   SIZE_PRESETS,
   supportsReferenceImages,
 } from '../constants'
-import type { GeneratorConfig, ModelOption } from '../types'
+import type { GeneratorConfig, GroupOption, ModelOption } from '../types'
 import { ReferenceImagesInput } from './reference-images-input'
 
 interface GeneratorPanelProps {
@@ -57,8 +57,11 @@ interface GeneratorPanelProps {
     value: GeneratorConfig[K]
   ) => void
   onModelChange: (value: string) => void
+  onGroupChange: (value: string) => void
   models: ModelOption[]
+  groups: GroupOption[]
   isModelLoading: boolean
+  isGroupLoading: boolean
   isGenerating: boolean
   onGenerate: () => void
   onCancel: () => void
@@ -68,8 +71,11 @@ export function GeneratorPanel({
   config,
   updateConfig,
   onModelChange,
+  onGroupChange,
   models,
+  groups,
   isModelLoading,
+  isGroupLoading,
   isGenerating,
   onGenerate,
   onCancel,
@@ -121,6 +127,18 @@ export function GeneratorPanel({
       </div>
 
       <div className='flex-1 space-y-5 overflow-y-auto p-4'>
+        {/* Group */}
+        <div className='space-y-2'>
+          <Label className='text-sm font-medium'>{t('Group')}</Label>
+          <GroupSelector
+            className='w-full'
+            selectedGroup={config.group}
+            groups={groups}
+            onGroupChange={onGroupChange}
+            disabled={isGroupLoading || isGenerating}
+          />
+        </div>
+
         {/* Model */}
         <div className='space-y-2'>
           <Label className='text-sm font-medium'>{t('Model')}</Label>
@@ -129,7 +147,7 @@ export function GeneratorPanel({
             selectedModel={config.model}
             models={models}
             onModelChange={onModelChange}
-            disabled={isModelLoading}
+            disabled={isModelLoading || isGenerating}
           />
         </div>
 
