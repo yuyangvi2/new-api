@@ -46,23 +46,18 @@ export function HowItWorks() {
   ]
 
   return (
-    <section className='bg-muted/20 border-border/40 relative z-10 border-y px-6 py-24 md:py-32'>
-      <div className='mx-auto max-w-6xl'>
-        <AnimateInView className='mb-16 text-center md:mb-20'>
-          <p className='text-muted-foreground mb-3 text-xs font-medium tracking-widest uppercase'>
+    <section className='border-border bg-muted/25 relative z-10 border-y px-4 py-16 md:px-8'>
+      <div className='mx-auto max-w-7xl'>
+        <AnimateInView className='mb-12 text-center'>
+          <p className='text-brand mb-3 text-xs font-semibold tracking-[0.22em] uppercase'>
             {t('How It Works')}
           </p>
           <h2 className='text-2xl font-bold tracking-tight md:text-3xl'>
-            {t('Three steps to get started')}
+            {t('Launch your AI gateway in three steps')}
           </h2>
         </AnimateInView>
 
-        <div className='relative grid gap-10 md:grid-cols-3 md:gap-12'>
-          {/* Desktop connector line behind the numbered circles */}
-          <div
-            aria-hidden
-            className='bg-border/60 absolute top-8 left-[16.6%] right-[16.6%] -z-10 hidden h-px md:block'
-          />
+        <div className='grid gap-10 md:grid-cols-3 md:gap-12'>
           {steps.map((step, i) => (
             <AnimateInView
               key={step.num}
@@ -70,11 +65,13 @@ export function HowItWorks() {
               animation='fade-up'
               className='flex flex-col items-center text-center'
             >
-              <div className='border-border/60 bg-background flex size-16 items-center justify-center rounded-full border text-2xl font-bold shadow-sm'>
+              <div className='border-border bg-background flex size-16 items-center justify-center rounded-full border text-5xl leading-none font-extrabold tracking-tight shadow-sm'>
                 {step.num}
               </div>
-              <h3 className='mt-6 mb-2 text-base font-semibold'>{step.title}</h3>
-              <p className='text-muted-foreground max-w-[240px] text-sm leading-relaxed'>
+              <h3 className='mt-7 mb-3 text-base font-semibold'>
+                {step.title}
+              </h3>
+              <p className='text-muted-foreground max-w-[260px] text-sm leading-6'>
                 {step.desc}
               </p>
             </AnimateInView>

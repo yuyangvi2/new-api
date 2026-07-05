@@ -105,17 +105,17 @@ export function Stats(_props: StatsProps) {
   ]
 
   return (
-    <div className='border-border/40 bg-muted/20 relative z-10 border-y'>
-      <div className='mx-auto grid max-w-6xl grid-cols-2 gap-y-8 px-6 py-10 md:grid-cols-4 md:gap-0 md:px-0 md:py-0 md:divide-x md:divide-border/50'>
+    <div className='border-border bg-muted/25 relative z-10 border-y'>
+      <div className='md:divide-border mx-auto grid max-w-7xl grid-cols-2 md:grid-cols-4 md:divide-x'>
         {stats.map((s) => (
           <div
             key={s.label}
-            className='flex flex-col items-center px-4 text-center md:py-12'
+            className='border-border flex min-h-24 flex-col items-center justify-center px-4 py-6 text-center odd:border-r md:border-r-0 md:py-8'
           >
-            <span className='text-2xl font-bold tracking-tight md:text-3xl'>
+            <span className='text-foreground text-2xl font-bold tracking-tight md:text-3xl'>
               <Counter end={s.end} suffix={s.suffix} decimals={s.decimals} />
             </span>
-            <span className='text-muted-foreground mt-1.5 text-xs'>
+            <span className='text-muted-foreground mt-2 text-xs leading-5'>
               {s.label}
             </span>
           </div>

@@ -36,34 +36,25 @@ export function CTA(props: CTAProps) {
   }
 
   return (
-    <section className='relative z-10 px-6 py-16 md:py-24'>
+    <section className='bg-background relative z-10 px-4 py-16 md:px-8'>
       <AnimateInView
-        className='bg-primary text-primary-foreground relative mx-auto max-w-6xl overflow-hidden rounded-3xl px-6 py-16 text-center md:px-12 md:py-20'
+        className='relative mx-auto max-w-7xl overflow-hidden rounded-lg bg-black px-6 py-14 text-center text-white md:px-12 md:py-20'
         animation='scale-in'
       >
-        {/* Subtle radial glow inside the dark card */}
-        <div
-          aria-hidden
-          className='pointer-events-none absolute inset-0 -z-0 opacity-20'
-          style={{
-            background:
-              'radial-gradient(ellipse 55% 60% at 30% 40%, #2d4bff 0%, transparent 70%)',
-          }}
-        />
         <div className='relative z-10'>
-          <h2 className='text-2xl leading-tight font-bold tracking-tight md:text-4xl'>
+          <h2 className='text-3xl leading-tight font-extrabold tracking-tight md:text-5xl'>
             {t('Ready to simplify')}
             <br />
             {t('your AI integration?')}
           </h2>
-          <p className='text-primary-foreground/70 mx-auto mt-5 max-w-xl text-sm leading-relaxed md:text-base'>
+          <p className='mx-auto mt-6 max-w-2xl text-sm leading-6 text-white/75 md:text-base'>
             {t(
               'Deploy your own gateway and start routing requests through your configured upstream services.'
             )}
           </p>
           <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
             <Button
-              className='bg-background text-foreground hover:bg-background/90 group h-11 rounded-lg px-6 font-medium'
+              className='group h-12 rounded-md bg-white px-7 font-semibold text-black hover:bg-white/90'
               render={<Link to='/sign-up' />}
             >
               {t('Get Started')}
@@ -71,7 +62,7 @@ export function CTA(props: CTAProps) {
             </Button>
             <Button
               variant='outline'
-              className='border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground h-11 rounded-lg bg-transparent px-6 font-medium'
+              className='h-12 rounded-md border-white/30 bg-transparent px-7 font-semibold text-white hover:bg-white/10 hover:text-white'
               render={<Link to='/pricing' />}
             >
               {t('View Pricing')}
