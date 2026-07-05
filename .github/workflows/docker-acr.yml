@@ -3,7 +3,7 @@ name: Build & Push to Aliyun ACR (custom)
 on:
   workflow_dispatch: {}
   push:
-    branches: [main]
+    branches: [custom]
     paths-ignore:
       - 'custom/docs/**'
       - '**/*.md'
