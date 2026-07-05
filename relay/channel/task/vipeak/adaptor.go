@@ -242,7 +242,7 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 	req, err := relaycommon.GetTaskRequest(c)
 	if err == nil && requiresPublicImageURL(def) && hasNonURLImage(&req) && !taskcommon.HasCOSConfig(cosEnvPrefixes...) {
 		return service.TaskErrorWrapperLocal(
-			fmt.Errorf("123vips model %s requires uploaded/base64 images to be converted to a public URL; configure VIPEAK_COS_BUCKET, VIPEAK_COS_SECRET_ID and VIPEAK_COS_SECRET_KEY, or use a public image URL", peek.Model),
+			fmt.Errorf("123vips model %s requires uploaded/base64 images to be converted to a public URL; configure a complete COS env set (VIPEAK_COS_BUCKET/REGION/SECRET_ID/SECRET_KEY, or TASK_COS_*, or VCLM_COS_*), or use a public image URL", peek.Model),
 			"image_upload_requires_cos", http.StatusBadRequest)
 	}
 
