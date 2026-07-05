@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { FilmIcon, SquareIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -32,7 +32,7 @@ import {
 import { Slider } from '@/components/ui/slider'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { GroupSelector, ModelSelector } from '@/components/model-group-selector'
+import { ModelSelector } from '@/components/model-group-selector'
 import {
   detectModelFamily,
   FAMILY_PARAMS,
@@ -41,11 +41,11 @@ import {
   resolveVideoVariantModel,
   VIDEO_DURATIONS,
   videoModelRequiresImage,
+  videoModelSupportsImageInput,
   VIDEO_SIZE_PRESETS,
 } from '../constants'
 import type {
   FamilyParam,
-  GroupOption,
   ImageSourceType,
   ModelOption,
   VideoConfig,
@@ -60,12 +60,9 @@ interface VideoPanelProps {
     value: VideoConfig[K]
   ) => void
   onModelChange: (value: string) => void
-  onGroupChange: (value: string) => void
   models: ModelOption[]
   variantModels: ModelOption[]
-  groups: GroupOption[]
   isModelLoading: boolean
-  isGroupLoading: boolean
   isGenerating: boolean
   availableImages: { id: string; src: string }[]
   onGenerate: () => void
@@ -76,12 +73,9 @@ export function VideoPanel({
   config,
   updateConfig,
   onModelChange,
-  onGroupChange,
   models,
   variantModels,
-  groups,
   isModelLoading,
-  isGroupLoading,
   isGenerating,
   availableImages,
   onGenerate,
@@ -102,7 +96,21 @@ export function VideoPanel({
   const displayModel = variantState?.set.defaultModel ?? config.model
 
   const requiresImage = videoModelRequiresImage(config.model)
+  const showImageInput = videoModelSupportsImageInput(config.model)
   const canGenerate = (!requiresImage || !!config.image) && !isGenerating
+  const resolutionParam = familyParams.find(
+    (param) => param.key === 'resolution' && param.type === 'select'
+  )
+  const resolutionOptions =
+    resolutionParam?.options?.filter(
+      (option) =>
+        !/fast/i.test(config.model) ||
+        option.value === '480p' ||
+        option.value === '720p'
+    ) ?? []
+  const advancedParams = familyParams.filter(
+    (param) => param.key !== 'resolution'
+  )
 
   const updateMeta = (key: string, value: unknown) => {
     updateConfig('metadata', { ...config.metadata, [key]: value })
@@ -128,6 +136,14 @@ export function VideoPanel({
     }
   }
 
+  useEffect(() => {
+    if (!/seedance/i.test(config.model) || !/fast/i.test(config.model)) return
+    const resolution = String(config.metadata.resolution ?? '720p')
+    if (resolution !== '480p' && resolution !== '720p') {
+      updateConfig('metadata', { ...config.metadata, resolution: '720p' })
+    }
+  }, [config.metadata, config.model, updateConfig])
+
   return (
     <div className='flex h-full flex-col'>
       {/* Title */}
@@ -136,33 +152,8 @@ export function VideoPanel({
       </div>
 
       <div className='flex-1 space-y-5 overflow-y-auto p-4'>
-        {/* Input image */}
-        <div className='space-y-2'>
-          <Label className='text-sm font-medium'>{t('Input image')}</Label>
-          <ImageSourceInput
-            value={config.image}
-            sourceType={config.imageSourceType}
-            onChange={handleImageChange}
-            availableImages={availableImages}
-            disabled={isGenerating}
-          />
-        </div>
-
-        {/* Group */}
-        <div className='space-y-2'>
-          <Label className='text-sm font-medium'>{t('Group')}</Label>
-          <GroupSelector
-            className='w-full'
-            selectedGroup={config.group}
-            groups={groups}
-            onGroupChange={onGroupChange}
-            disabled={isGroupLoading || isGenerating}
-          />
-        </div>
-
         {/* Model */}
-        <div className='space-y-2'>
-          <Label className='text-sm font-medium'>{t('Model')}</Label>
+        <div>
           <ModelSelector
             className='w-full'
             selectedModel={displayModel}
@@ -201,6 +192,19 @@ export function VideoPanel({
           />
         </div>
 
+        {showImageInput && (
+          <div className='space-y-2'>
+            <Label className='text-sm font-medium'>{t('Input image')}</Label>
+            <ImageSourceInput
+              value={config.image}
+              sourceType={config.imageSourceType}
+              onChange={handleImageChange}
+              availableImages={availableImages}
+              disabled={isGenerating}
+            />
+          </div>
+        )}
+
         {/* Duration */}
         <div className='space-y-2'>
           <Label className='text-sm font-medium'>{t('Duration (sec)')}</Label>
@@ -228,40 +232,73 @@ export function VideoPanel({
           </Select>
         </div>
 
-        {/* Aspect ratio */}
-        <div className='space-y-2'>
-          <Label className='text-sm font-medium'>{t('Aspect ratio')}</Label>
-          <Select
-            items={VIDEO_SIZE_PRESETS.map((p) => ({
-              value: `${p.width}x${p.height}`,
-              label: `${p.ratioLabel} (${p.width}x${p.height})`,
-            }))}
-            onValueChange={(v) => {
-              if (v) updateConfig('size', v)
-            }}
-            value={config.size}
-            disabled={isGenerating}
-          >
-            <SelectTrigger className='w-full'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {VIDEO_SIZE_PRESETS.map((p) => {
-                  const val = `${p.width}x${p.height}`
-                  return (
-                    <SelectItem key={val} value={val}>
-                      {p.ratioLabel} ({val})
-                    </SelectItem>
-                  )
-                })}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+        <div className='grid grid-cols-2 gap-2'>
+          <div className='min-w-0 space-y-2'>
+            <Label className='text-sm font-medium'>{t('Aspect ratio')}</Label>
+            <Select
+              items={VIDEO_SIZE_PRESETS.map((p) => ({
+                value: `${p.width}x${p.height}`,
+                label: `${p.ratioLabel} (${p.width}x${p.height})`,
+              }))}
+              onValueChange={(v) => {
+                if (v) updateConfig('size', v)
+              }}
+              value={config.size}
+              disabled={isGenerating}
+            >
+              <SelectTrigger className='w-full min-w-0 [&>span]:truncate'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {VIDEO_SIZE_PRESETS.map((p) => {
+                    const val = `${p.width}x${p.height}`
+                    return (
+                      <SelectItem key={val} value={val}>
+                        {p.ratioLabel} ({val})
+                      </SelectItem>
+                    )
+                  })}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {resolutionParam && (
+            <div className='min-w-0 space-y-2'>
+              <Label className='text-sm font-medium'>
+                {t(resolutionParam.label)}
+              </Label>
+              <Select
+                items={resolutionOptions.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+                onValueChange={(value) => updateMeta(resolutionParam.key, value)}
+                value={String(
+                  getMetaValue(resolutionParam.key, resolutionParam.default)
+                )}
+                disabled={isGenerating}
+              >
+                <SelectTrigger className='w-full min-w-0 [&>span]:truncate'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {resolutionOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         {/* Model-family specific parameters */}
-        {familyParams.length > 0 && (
+        {advancedParams.length > 0 && (
           <>
             <div className='border-muted-foreground/20 border-t pt-4'>
               <Label className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
@@ -269,19 +306,20 @@ export function VideoPanel({
               </Label>
             </div>
             <div className='flex flex-wrap items-center gap-2'>
-              {familyParams
+              {advancedParams
                 .filter((param) => param.type === 'select' && param.options)
                 .map((param) => (
                   <SegmentedParam
                     key={param.key}
                     param={param}
+                    model={config.model}
                     value={String(getMetaValue(param.key, param.default))}
                     disabled={isGenerating}
                     onValueChange={(value) => updateMeta(param.key, value)}
                   />
                 ))}
             </div>
-            {familyParams
+            {advancedParams
               .filter((param) => param.type !== 'select')
               .map((param) => (
                 <div key={param.key} className='space-y-2'>
@@ -384,29 +422,37 @@ function SegmentedTabs({
 
 function SegmentedParam({
   param,
+  model,
   value,
   disabled,
   onValueChange,
 }: {
   param: FamilyParam
+  model: string
   value: string
   disabled: boolean
   onValueChange: (value: string) => void
 }) {
   const { t } = useTranslation()
   if (!param.options || param.options.length === 0) return null
+  const options =
+    param.key === 'resolution' && /fast/i.test(model)
+      ? param.options.filter(
+          (option) => option.value === '480p' || option.value === '720p'
+        )
+      : param.options
 
   return (
     <Tabs value={value} onValueChange={onValueChange} className='!flex-row gap-0'>
       <TabsList className='bg-background h-9 overflow-hidden rounded-lg border p-0'>
-        {param.options.map((option) => (
+        {options.map((option) => (
           <TabsTrigger
             key={option.value}
             value={option.value}
             disabled={disabled}
             className='h-9 min-w-20 rounded-none border-r px-4 text-sm shadow-none last:border-r-0 data-active:bg-muted data-active:shadow-none'
           >
-            {t(option.label)}
+            {param.key === 'resolution' ? option.label : t(option.label)}
           </TabsTrigger>
         ))}
       </TabsList>

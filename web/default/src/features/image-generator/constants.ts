@@ -265,6 +265,8 @@ export function resolveVideoVariantModel(
 const IMAGE_OPTIONAL_VIDEO_MODELS = new Set([
   'doubao-seedance-2-0-260128',
   'doubao-seedance-2-0-fast-260128',
+  'dreamina-seedance-2-0-260128',
+  'dreamina-seedance-2-0-fast-260128',
   'seedance2.0_direct',
   'seedance2.0_fast_direct',
 ])
@@ -277,6 +279,13 @@ const IMAGE_REQUIRED_VIDEO_MODELS = new Set([
 export function videoModelRequiresImage(model: string): boolean {
   if (IMAGE_REQUIRED_VIDEO_MODELS.has(model)) return true
   if (IMAGE_OPTIONAL_VIDEO_MODELS.has(model)) return false
+  return false
+}
+
+export function videoModelSupportsImageInput(model: string): boolean {
+  if (IMAGE_REQUIRED_VIDEO_MODELS.has(model)) return true
+  if (model === 'seedance2.0_direct') return false
+  if (model === 'seedance2.0_fast_direct') return false
   return true
 }
 
@@ -290,10 +299,12 @@ export const VIDEO_FAILED_STATUSES = ['failed', 'error', 'cancelled', 'canceled'
 
 const KLING_RE = /kling/i
 const VIDU_RE = /vidu/i
+const SEEDANCE_RE = /seedance|doubao-seedance/i
 
 export function detectModelFamily(model: string): ModelFamily {
   if (KLING_RE.test(model)) return 'kling'
   if (VIDU_RE.test(model)) return 'vidu'
+  if (SEEDANCE_RE.test(model)) return 'seedance'
   return 'unknown'
 }
 
@@ -473,6 +484,20 @@ export const FAMILY_PARAMS: Record<ModelFamily, FamilyParam[]> = {
         { label: 'Small', value: 'small' },
         { label: 'Medium', value: 'medium' },
         { label: 'Large', value: 'large' },
+      ],
+    },
+  ],
+  seedance: [
+    {
+      key: 'resolution',
+      label: 'Resolution',
+      type: 'select',
+      default: '720p',
+      options: [
+        { label: '480p', value: '480p' },
+        { label: '720p', value: '720p' },
+        { label: '1080p', value: '1080p' },
+        { label: '4K', value: '4k' },
       ],
     },
   ],

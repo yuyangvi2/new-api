@@ -103,10 +103,10 @@ const ModelTriggerButton = React.forwardRef<
     {...props}
   >
     <CpuIcon className='text-muted-foreground block size-4 sm:hidden' />
-    <span className='text-muted-foreground sm:text-foreground hidden truncate text-xs sm:block'>
+    <span className='text-muted-foreground sm:text-foreground hidden min-w-0 flex-1 truncate text-left text-xs sm:block'>
       {currentLabel}
     </span>
-    <ChevronsUpDown className='text-muted-foreground hidden h-4 w-4 opacity-50 sm:block' />
+    <ChevronsUpDown className='text-muted-foreground ml-auto hidden h-4 w-4 shrink-0 opacity-50 sm:block' />
   </Button>
 ))
 

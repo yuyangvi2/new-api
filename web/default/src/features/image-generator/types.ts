@@ -217,7 +217,7 @@ export type ImageModelFamily =
   | 'hunyuan-image'
   | 'generic-image'
 
-export type ModelFamily = 'kling' | 'vidu' | 'unknown'
+export type ModelFamily = 'kling' | 'vidu' | 'seedance' | 'unknown'
 
 export type ParamType = 'select' | 'slider' | 'text' | 'switch'
 

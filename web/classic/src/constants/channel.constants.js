@@ -204,6 +204,11 @@ export const CHANNEL_OPTIONS = [
     color: 'green',
     label: 'vipeak (Wan2.7/Seedance)',
   },
+  {
+    value: 9004,
+    color: 'blue',
+    label: 'apiz.ai / xskill.ai',
+  },
 ];
 
 // Channel types that support upstream model list fetching in UI.

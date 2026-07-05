@@ -412,6 +412,8 @@ export function getChannelIcon(channelType) {
       return <Kling.Color size={iconSize} />;
     case 9003: // vipeak (Wan2.7/Seedance)
       return <Kling.Color size={iconSize} />;
+    case 9004: // apiz.ai / xskill.ai
+      return <Doubao.Color size={iconSize} />;
     case 51: // 即梦 Jimeng
       return <Jimeng.Color size={iconSize} />;
     case 54: // 豆包视频 Doubao Video
