@@ -262,6 +262,24 @@ export function resolveVideoVariantModel(
   return nextModel
 }
 
+const IMAGE_OPTIONAL_VIDEO_MODELS = new Set([
+  'doubao-seedance-2-0-260128',
+  'doubao-seedance-2-0-fast-260128',
+  'seedance2.0_direct',
+  'seedance2.0_fast_direct',
+])
+
+const IMAGE_REQUIRED_VIDEO_MODELS = new Set([
+  'seedance2.0_vision',
+  'seedance2.0_fast_vision',
+])
+
+export function videoModelRequiresImage(model: string): boolean {
+  if (IMAGE_REQUIRED_VIDEO_MODELS.has(model)) return true
+  if (IMAGE_OPTIONAL_VIDEO_MODELS.has(model)) return false
+  return true
+}
+
 // Terminal task statuses reported by the backend (case-insensitive).
 export const VIDEO_SUCCESS_STATUSES = ['succeeded', 'success', 'completed']
 export const VIDEO_FAILED_STATUSES = ['failed', 'error', 'cancelled', 'canceled']

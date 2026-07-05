@@ -40,6 +40,7 @@ import {
   MAX_PROMPT_LENGTH,
   resolveVideoVariantModel,
   VIDEO_DURATIONS,
+  videoModelRequiresImage,
   VIDEO_SIZE_PRESETS,
 } from '../constants'
 import type {
@@ -100,7 +101,8 @@ export function VideoPanel({
   )
   const displayModel = variantState?.set.defaultModel ?? config.model
 
-  const canGenerate = !!config.image && !isGenerating
+  const requiresImage = videoModelRequiresImage(config.model)
+  const canGenerate = (!requiresImage || !!config.image) && !isGenerating
 
   const updateMeta = (key: string, value: unknown) => {
     updateConfig('metadata', { ...config.metadata, [key]: value })

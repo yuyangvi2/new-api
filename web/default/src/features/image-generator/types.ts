@@ -122,7 +122,7 @@ export interface VideoGenerationRequest {
   group?: string
   prompt?: string
   // Input image: a remote URL, data URI, or raw base64.
-  image: string
+  image?: string
   duration?: number
   width?: number
   height?: number
