@@ -16,17 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { type TFunction } from 'i18next'
-import {
-  Box,
-  CreditCard,
-  Layout,
-  Settings,
-  Shield,
-  ShieldAlert,
-  Wrench,
-} from 'lucide-react'
-
+import type { TFunction } from 'i18next'
 import { getAuthSectionNavItems } from '@/features/system-settings/auth/section-registry.tsx'
 import { getBillingSectionNavItems } from '@/features/system-settings/billing/section-registry.tsx'
 import { getContentSectionNavItems } from '@/features/system-settings/content/section-registry.tsx'
@@ -36,6 +26,7 @@ import { getSecuritySectionNavItems } from '@/features/system-settings/security/
 import { getSiteSectionNavItems } from '@/features/system-settings/site/section-registry.tsx'
 
 import type { NavGroup, SidebarView } from '../types'
+import { SidebarIcons } from './sidebar-icons'
 
 /**
  * Sidebar nav groups for the System Settings nested view.
@@ -52,37 +43,37 @@ function getSystemSettingsNavGroups(t: TFunction): NavGroup[] {
       items: [
         {
           title: t('Site & Branding'),
-          icon: Settings,
+          icon: SidebarIcons.siteBranding,
           items: getSiteSectionNavItems(t),
         },
         {
           title: t('Authentication'),
-          icon: Shield,
+          icon: SidebarIcons.auth,
           items: getAuthSectionNavItems(t),
         },
         {
           title: t('Billing & Payment'),
-          icon: CreditCard,
+          icon: SidebarIcons.billing,
           items: getBillingSectionNavItems(t),
         },
         {
           title: t('Models & Routing'),
-          icon: Box,
+          icon: SidebarIcons.modelsRouting,
           items: getModelsSectionNavItems(t),
         },
         {
           title: t('Security & Limits'),
-          icon: ShieldAlert,
+          icon: SidebarIcons.securityLimits,
           items: getSecuritySectionNavItems(t),
         },
         {
           title: t('Console Content'),
-          icon: Layout,
+          icon: SidebarIcons.consoleContent,
           items: getContentSectionNavItems(t),
         },
         {
           title: t('Operations'),
-          icon: Wrench,
+          icon: SidebarIcons.operations,
           items: getOperationsSectionNavItems(t),
         },
       ],

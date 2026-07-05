@@ -137,7 +137,7 @@ export function Hero(props: HeroProps) {
               {t('Powered by')}
             </span>
             <div className='text-foreground/70 flex items-center gap-4 text-sm font-semibold'>
-              <span>new-api</span>
+              <span>Tokone</span>
               <span>QuantumNous</span>
             </div>
           </div>
