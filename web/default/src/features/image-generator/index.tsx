@@ -1,3 +1,6 @@
+import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
+import { ArrowLeft, ImageIcon, FilmIcon } from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -18,27 +21,27 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useQuery } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
-import { ArrowLeft, ImageIcon, FilmIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+
 import { useSidebarPortalTarget } from '@/context/sidebar-portal'
+import { cn } from '@/lib/utils'
+
 import { getUserGroups, getUserModels } from './api'
+import { GeneratorPanel } from './components/generator-panel'
+import { ResultGallery } from './components/result-gallery'
+import { VideoPanel } from './components/video-panel'
+import { VideoResults } from './components/video-results'
 import {
   detectImageModelFamily,
   getVideoVariantDisplayName,
   isHiddenVideoVariantModel,
 } from './constants'
-import { GeneratorPanel } from './components/generator-panel'
-import { ResultGallery } from './components/result-gallery'
-import { VideoPanel } from './components/video-panel'
-import { VideoResults } from './components/video-results'
 import { useImageGenerator, useVideoGenerator } from './hooks'
 import type { GeneratorMode, GroupOption, ModelOption } from './types'
 
-const IMAGE_MODEL_RE = /dall-e|image|flux|sd|stable|gpt-image|midjourney|ideogram/i
+const IMAGE_MODEL_RE =
+  /dall-e|image|flux|sd|stable|gpt-image|midjourney|ideogram/i
 const VIDEO_MODEL_RE =
   /kling|jimeng|sora|vidu|cogvideo|video|hailuo|minimax|wan|seedance|runway|luma|pika|veo|i2v|t2v|s2v/i
 const NON_VIDEO_MODEL_RE =
@@ -167,6 +170,14 @@ export function ImageGenerator(props: ImageGeneratorProps) {
     () => models.filter(isVideoGenerationModel),
     [models]
   )
+  const selectedVideoModel = useMemo(
+    () => allVideoModels.find((model) => model.value === videoConfig.model),
+    [allVideoModels, videoConfig.model]
+  )
+  const selectedVideoGroup = useMemo(
+    () => groups.find((group) => group.value === videoConfig.group),
+    [groups, videoConfig.group]
+  )
   // Completed images from Image mode, offered as video input sources.
   const availableImages = useMemo(
     () =>
@@ -205,7 +216,10 @@ export function ImageGenerator(props: ImageGeneratorProps) {
       applyImageModelChange(value)
       const nextModel = imageModels.find((m) => m.value === value)
       if (nextModel) {
-        updateImageConfig('group', selectGroupForModel(nextModel, imageConfig.group))
+        updateImageConfig(
+          'group',
+          selectGroupForModel(nextModel, imageConfig.group)
+        )
       }
     },
     [applyImageModelChange, imageConfig.group, imageModels, updateImageConfig]
@@ -216,7 +230,10 @@ export function ImageGenerator(props: ImageGeneratorProps) {
       updateVideoConfig('model', value)
       const nextModel = allVideoModels.find((m) => m.value === value)
       if (nextModel) {
-        updateVideoConfig('group', selectGroupForModel(nextModel, videoConfig.group))
+        updateVideoConfig(
+          'group',
+          selectGroupForModel(nextModel, videoConfig.group)
+        )
       }
     },
     [allVideoModels, updateVideoConfig, videoConfig.group]
@@ -239,14 +256,15 @@ export function ImageGenerator(props: ImageGeneratorProps) {
   // Auto-select initial model when models load
   useEffect(() => {
     if (imageModels.length === 0) return
-    const currentModel = imageModels.find(
-      (m) => m.value === imageConfig.model
-    )
+    const currentModel = imageModels.find((m) => m.value === imageConfig.model)
     const nextModel = currentModel ?? imageModels[0]
     if (!currentModel) {
       applyImageModelChange(nextModel.value)
     }
-    updateImageConfig('group', selectGroupForModel(nextModel, imageConfig.group))
+    updateImageConfig(
+      'group',
+      selectGroupForModel(nextModel, imageConfig.group)
+    )
   }, [
     applyImageModelChange,
     imageConfig.group,
@@ -265,16 +283,18 @@ export function ImageGenerator(props: ImageGeneratorProps) {
     if (!currentModel) {
       updateVideoConfig('model', nextModel.value)
     }
-    updateVideoConfig('group', selectGroupForModel(nextModel, videoConfig.group))
-  }, [
-    allVideoModels,
-    videoConfig.model,
-    videoConfig.group,
-    updateVideoConfig,
-  ])
+    updateVideoConfig(
+      'group',
+      selectGroupForModel(nextModel, videoConfig.group)
+    )
+  }, [allVideoModels, videoConfig.model, videoConfig.group, updateVideoConfig])
 
   // ---- Icon rail tabs (rendered into the 80px sidebar via portal) ----
-  const railTabs: { mode: GeneratorMode; label: string; icon: typeof ImageIcon }[] = [
+  const railTabs: {
+    mode: GeneratorMode
+    label: string
+    icon: typeof ImageIcon
+  }[] = [
     { mode: 'image', label: t('Image'), icon: ImageIcon },
     { mode: 'video', label: t('Video'), icon: FilmIcon },
   ]
@@ -344,6 +364,8 @@ export function ImageGenerator(props: ImageGeneratorProps) {
               onModelChange={handleVideoModelChange}
               models={getDisplayVideoModels(allVideoModels)}
               variantModels={allVideoModels}
+              modelRatio={selectedVideoModel?.modelRatio}
+              groupRatio={selectedVideoGroup?.ratio}
               isModelLoading={isModelLoading}
               isGenerating={videoGen.isGenerating}
               availableImages={availableImages}

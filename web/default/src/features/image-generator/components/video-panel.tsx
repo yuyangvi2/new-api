@@ -1,4 +1,14 @@
-import { FilmIcon, SquareIcon } from 'lucide-react'
+import {
+  CircleHelp,
+  FilmIcon,
+  LinkIcon,
+  Loader2Icon,
+  MusicIcon,
+  PlusIcon,
+  SquareIcon,
+  Trash2Icon,
+  UploadIcon,
+} from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -17,8 +27,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { ModelSelector } from '@/components/model-group-selector'
 import { Button } from '@/components/ui/button'
@@ -35,7 +46,18 @@ import {
 import { Slider } from '@/components/ui/slider'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { formatBillingCurrencyFromUSD } from '@/lib/currency'
+import {
+  DEFAULT_CURRENCY_CONFIG,
+  useSystemConfigStore,
+} from '@/stores/system-config-store'
 
+import { uploadReferenceMedia } from '../api'
 import {
   detectModelFamily,
   estimateSeedanceVideoTokens,
@@ -46,6 +68,9 @@ import {
   getVideoModelVariantState,
   isApizSeedanceVideoModel,
   MAX_PROMPT_LENGTH,
+  MAX_REFERENCE_AUDIO_UPLOAD_BYTES,
+  MAX_REFERENCE_VIDEO_UPLOAD_BYTES,
+  MAX_IMAGE_UPLOAD_BYTES,
   resolveVideoVariantModel,
   SEEDANCE_REFERENCE_AUDIO_LIMIT,
   SEEDANCE_REFERENCE_IMAGE_LIMIT,
@@ -67,6 +92,8 @@ import type {
 } from '../types'
 import { ImageSourceInput } from './image-source-input'
 
+type ReferenceMediaKind = 'image' | 'video' | 'audio'
+
 interface VideoPanelProps {
   config: VideoConfig
   updateConfig: <K extends keyof VideoConfig>(
@@ -76,6 +103,8 @@ interface VideoPanelProps {
   onModelChange: (value: string) => void
   models: ModelOption[]
   variantModels: ModelOption[]
+  modelRatio?: number
+  groupRatio?: number
   isModelLoading: boolean
   isGenerating: boolean
   availableImages: { id: string; src: string }[]
@@ -89,6 +118,8 @@ export function VideoPanel({
   onModelChange,
   models,
   variantModels,
+  modelRatio,
+  groupRatio,
   isModelLoading,
   isGenerating,
   availableImages,
@@ -96,6 +127,7 @@ export function VideoPanel({
   onCancel,
 }: VideoPanelProps) {
   const { t } = useTranslation()
+  const currency = useSystemConfigStore((state) => state.config.currency)
 
   const family = useMemo(() => detectModelFamily(config.model), [config.model])
   const familyParams = useMemo(() => FAMILY_PARAMS[family], [family])
@@ -190,12 +222,25 @@ export function VideoPanel({
         resolution: selectedResolution,
       })
     : 0
-  const generateLabel =
-    estimatedVideoTokens > 0
-      ? t('Generate video · ~{{tokens}} tokens', {
-          tokens: formatCompactNumber(estimatedVideoTokens),
-        })
-      : t('Generate video')
+  const quotaPerUnit =
+    currency.quotaPerUnit > 0
+      ? currency.quotaPerUnit
+      : DEFAULT_CURRENCY_CONFIG.quotaPerUnit
+  const estimatedVideoCostUSD =
+    estimatedVideoTokens > 0 && modelRatio !== undefined
+      ? (estimatedVideoTokens * modelRatio * (groupRatio ?? 1)) / quotaPerUnit
+      : 0
+  const hasEstimatedVideoCost =
+    estimatedVideoTokens > 0 && modelRatio !== undefined
+  const generateLabel = hasEstimatedVideoCost
+    ? t('Generate video · {{cost}}', {
+        cost: formatBillingCurrencyFromUSD(estimatedVideoCostUSD, {
+          abbreviate: false,
+          digitsSmall: 4,
+          minimumNonZero: 0.0001,
+        }),
+      })
+    : t('Generate video')
 
   const handleImageChange = (src: string, sourceType: ImageSourceType) => {
     updateConfig('image', src)
@@ -304,34 +349,46 @@ export function VideoPanel({
 
         {isSeedanceVideo && (
           <>
-            <URLArrayField
+            <ReferenceMediaField
               label={t('Reference images')}
+              kind='image'
               value={config.referenceImagesText}
               onChange={(value) => updateConfig('referenceImagesText', value)}
               disabled={isGenerating}
-              placeholder='["https://example.com/image1.png"]'
+              placeholder={t('Paste image URL')}
+              accept='image/png,image/jpeg,image/gif,image/bmp,image/webp'
+              maxItems={SEEDANCE_REFERENCE_IMAGE_LIMIT}
+              maxBytes={MAX_IMAGE_UPLOAD_BYTES}
               error={referenceImageError}
               hint={t(
                 'Image URL array (up to 9). Supports png/jpg/jpeg/gif/bmp/webp, minimum 300px width and height. Use 【@图片N】 in the prompt to reference the image at that position.'
               )}
             />
-            <URLArrayField
+            <ReferenceMediaField
               label={t('Reference videos')}
+              kind='video'
               value={config.referenceVideosText}
               onChange={(value) => updateConfig('referenceVideosText', value)}
               disabled={isGenerating}
-              placeholder='["https://example.com/video.mp4"]'
+              placeholder={t('Paste video URL')}
+              accept='video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm,video/x-flv,.mkv,.flv'
+              maxItems={SEEDANCE_REFERENCE_VIDEO_LIMIT}
+              maxBytes={MAX_REFERENCE_VIDEO_UPLOAD_BYTES}
               error={referenceVideoError}
               hint={t(
                 'Reference video URL array (up to 3). Supports mp4/mov/avi/mkv/webm/flv. Each video must be 2-15.5 seconds, total duration up to 15.5 seconds, up to 50MB, 24-60 FPS.'
               )}
             />
-            <URLArrayField
+            <ReferenceMediaField
               label={t('Reference audios')}
+              kind='audio'
               value={config.referenceAudiosText}
               onChange={(value) => updateConfig('referenceAudiosText', value)}
               disabled={isGenerating}
-              placeholder='["https://example.com/audio.mp3"]'
+              placeholder={t('Paste audio URL')}
+              accept='audio/mpeg,audio/wav,audio/x-wav,.mp3,.wav'
+              maxItems={SEEDANCE_REFERENCE_AUDIO_LIMIT}
+              maxBytes={MAX_REFERENCE_AUDIO_UPLOAD_BYTES}
               error={referenceAudioError}
               hint={t(
                 'Reference audio URL array (up to 3). Supports mp3/wav only. Cannot be used alone; use with images or videos. Total size up to 15MB, each audio 2-15 seconds.'
@@ -592,43 +649,249 @@ function parseURLList(value: string): string[] {
     .filter((item) => item.length > 0)
 }
 
-function formatCompactNumber(value: number): string {
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(
-    value
-  )
-}
-
-function URLArrayField({
+function ReferenceMediaField({
   label,
+  kind,
   value,
   onChange,
   disabled,
   placeholder,
+  accept,
+  maxItems,
+  maxBytes,
   hint,
   error,
 }: {
   label: string
+  kind: ReferenceMediaKind
   value: string
   onChange: (value: string) => void
   disabled: boolean
   placeholder: string
+  accept: string
+  maxItems: number
+  maxBytes: number
   hint: string
   error?: string
 }) {
+  const { t } = useTranslation()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [urlText, setUrlText] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const urls = parseURLList(value)
+  const canAdd = urls.length < maxItems && !disabled && !isUploading
+  let uploadLabel = t('Upload audio')
+  if (kind === 'image') {
+    uploadLabel = t('Upload image')
+  } else if (kind === 'video') {
+    uploadLabel = t('Upload video')
+  }
+
+  const updateUrls = (nextUrls: string[]) => {
+    onChange(JSON.stringify(nextUrls))
+  }
+
+  const addUrl = (url: string) => {
+    const nextUrl = url.trim()
+    if (!nextUrl) return
+    if (!isHttpURL(nextUrl)) {
+      toast.error(t('Please enter a valid HTTP URL'))
+      return
+    }
+    if (urls.length >= maxItems) {
+      toast.error(t('Maximum {{count}} URLs', { count: maxItems }))
+      return
+    }
+    if (urls.includes(nextUrl)) {
+      setUrlText('')
+      return
+    }
+    updateUrls([...urls, nextUrl])
+    setUrlText('')
+  }
+
+  const removeUrl = (urlToRemove: string) => {
+    updateUrls(urls.filter((url) => url !== urlToRemove))
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return
+    event.preventDefault()
+    addUrl(urlText)
+  }
+
+  const handleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (file.size > maxBytes) {
+      toast.error(
+        t('File is too large (max {{size}})', { size: formatBytes(maxBytes) })
+      )
+      return
+    }
+    if (urls.length >= maxItems) {
+      toast.error(t('Maximum {{count}} URLs', { count: maxItems }))
+      return
+    }
+
+    setIsUploading(true)
+    try {
+      const uploadedUrl = await uploadReferenceMedia(file, kind)
+      if (!urls.includes(uploadedUrl)) {
+        updateUrls([...urls, uploadedUrl])
+      }
+      toast.success(t('Upload complete'))
+    } catch (uploadError: unknown) {
+      const message =
+        uploadError instanceof Error ? uploadError.message : t('Upload failed')
+      toast.error(message)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
   return (
     <div className='space-y-2'>
-      <Label className='text-sm font-medium'>{label}</Label>
-      <Textarea
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className='min-h-[64px] resize-y font-mono text-xs'
-        disabled={disabled}
-      />
-      <p className='text-muted-foreground text-xs'>{hint}</p>
+      <div className='flex items-center gap-2'>
+        <Label className='text-sm font-medium'>{label}</Label>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                type='button'
+                className='text-muted-foreground hover:text-foreground ml-auto rounded-md p-1 transition-colors'
+                aria-label={t('Show field help')}
+              />
+            }
+          >
+            <CircleHelp size={15} />
+          </TooltipTrigger>
+          <TooltipContent side='top' align='end' className='max-w-80 text-left'>
+            {hint}
+          </TooltipContent>
+        </Tooltip>
+      </div>
+      {urls.length > 0 && (
+        <div className='space-y-1.5'>
+          {urls.map((url) => {
+            let mediaIcon = (
+              <LinkIcon className='text-muted-foreground size-4 shrink-0' />
+            )
+            if (kind === 'audio') {
+              mediaIcon = (
+                <MusicIcon className='text-muted-foreground size-4 shrink-0' />
+              )
+            } else if (kind === 'video') {
+              mediaIcon = (
+                <FilmIcon className='text-muted-foreground size-4 shrink-0' />
+              )
+            }
+
+            return (
+              <div
+                key={url}
+                className='bg-muted/30 flex min-h-9 items-center gap-2 rounded-md border px-2 py-1.5'
+              >
+                {mediaIcon}
+                <span className='min-w-0 flex-1 truncate text-xs' title={url}>
+                  {url}
+                </span>
+                {!disabled && (
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='icon'
+                    className='size-7 shrink-0'
+                    onClick={() => removeUrl(url)}
+                    aria-label={t('Remove')}
+                  >
+                    <Trash2Icon size={14} />
+                  </Button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {urls.length < maxItems && (
+        <div className='flex items-center gap-2'>
+          <div className='relative min-w-0 flex-1'>
+            <Input
+              value={urlText}
+              onChange={(event) => setUrlText(event.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              disabled={disabled || isUploading}
+              className='pr-9'
+            />
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon'
+              className='text-muted-foreground hover:text-foreground absolute top-1/2 right-1 size-7 -translate-y-1/2'
+              disabled={!canAdd || !urlText.trim()}
+              onClick={() => addUrl(urlText)}
+              aria-label={t('Add URL')}
+            >
+              <PlusIcon size={15} />
+            </Button>
+          </div>
+          <Button
+            type='button'
+            variant='outline'
+            size='icon'
+            className='shrink-0'
+            disabled={!canAdd}
+            onClick={() => fileRef.current?.click()}
+            aria-label={uploadLabel}
+            title={uploadLabel}
+          >
+            {isUploading ? (
+              <Loader2Icon className='animate-spin' size={16} />
+            ) : (
+              <UploadIcon size={16} />
+            )}
+          </Button>
+          <input
+            ref={fileRef}
+            type='file'
+            accept={accept}
+            className='hidden'
+            onChange={handleFile}
+          />
+        </div>
+      )}
+      {!error && (
+        <p className='text-muted-foreground text-xs'>
+          {t('{{current}}/{{max}} URLs', {
+            current: urls.length,
+            max: maxItems,
+          })}
+        </p>
+      )}
       {error && <p className='text-destructive text-xs'>{error}</p>}
     </div>
   )
+}
+
+function isHttpURL(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) {
+    return `${Math.floor(bytes / (1024 * 1024))}MB`
+  }
+  if (bytes >= 1024) {
+    return `${Math.floor(bytes / 1024)}KB`
+  }
+  return `${bytes}B`
 }
 
 function SegmentedTabs({

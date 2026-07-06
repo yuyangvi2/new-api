@@ -22,6 +22,7 @@ export interface ModelOption {
   label: string
   value: string
   groups?: string[]
+  modelRatio?: number
 }
 
 export interface GroupOption {

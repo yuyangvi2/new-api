@@ -37,6 +37,7 @@ export const API_ENDPOINTS = {
   IMAGE_TASK: (taskId: string) => `/pg/video/generations/${taskId}`,
   VIDEO_SUBMIT: '/pg/video/generations',
   VIDEO_TASK: (taskId: string) => `/pg/video/generations/${taskId}`,
+  MEDIA_UPLOAD: '/api/media/upload',
   USER_MODELS: '/api/user/models',
   USER_GROUPS: '/api/user/self/groups',
 } as const
@@ -149,6 +150,8 @@ export const VIDEO_DURATIONS = [5, 10] as const
 
 // Max input image size for upload (bytes). Larger files are rejected.
 export const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024
+export const MAX_REFERENCE_VIDEO_UPLOAD_BYTES = 50 * 1024 * 1024
+export const MAX_REFERENCE_AUDIO_UPLOAD_BYTES = 15 * 1024 * 1024
 
 // Polling cadence and ceiling for async video tasks.
 export const VIDEO_POLL_INTERVAL_MS = 3000
