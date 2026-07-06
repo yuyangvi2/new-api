@@ -381,6 +381,12 @@ func GetModelPrice(name string, printErr bool) (float64, bool) {
 		return price, true
 	}
 
+	if family, ok := fallbackModelFamilyKey(name); ok {
+		if price, ok := modelPriceMap.Get(family); ok {
+			return price, true
+		}
+	}
+
 	if printErr {
 		common.SysError("model price not found: " + name)
 	}
@@ -410,9 +416,21 @@ func GetModelRatio(name string) (float64, bool, string) {
 			}
 			//return 0, true, name
 		}
+		if family, ok := fallbackModelFamilyKey(name); ok {
+			if familyRatio, ok := modelRatioMap.Get(family); ok {
+				return familyRatio, true, family
+			}
+		}
 		return 37.5, operation_setting.SelfUseModeEnabled, name
 	}
 	return ratio, true, name
+}
+
+func fallbackModelFamilyKey(name string) (string, bool) {
+	if strings.HasPrefix(name, "viduq") {
+		return "viduq", true
+	}
+	return "", false
 }
 
 func DefaultModelRatio2JSONString() string {
