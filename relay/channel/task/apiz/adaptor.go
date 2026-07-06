@@ -373,9 +373,9 @@ func variantForModel(modelName string) string {
 	case "seedance2.0_fast_direct", "seedance2.0_fast_vision", "doubao-seedance-2-0-fast-260128", seedanceID:
 		return "seedance_2.0_fast"
 	case "seedance2.0_mini":
-		return "seedance_2.0_mini"
+		return "seedance_2.0"
 	case "seedance2.0_fast_mini":
-		return "seedance_2.0_fast_mini"
+		return "seedance_2.0_fast"
 	default:
 		if strings.Contains(strings.ToLower(modelName), "fast") {
 			return "seedance_2.0_fast"
