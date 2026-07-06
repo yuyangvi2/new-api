@@ -1,3 +1,4 @@
+import { FilmIcon, SquareIcon } from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -17,9 +18,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect, useMemo } from 'react'
-import { FilmIcon, SquareIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+
+import { ModelSelector } from '@/components/model-group-selector'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -32,14 +35,23 @@ import {
 import { Slider } from '@/components/ui/slider'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { ModelSelector } from '@/components/model-group-selector'
+
 import {
   detectModelFamily,
+  estimateSeedanceVideoTokens,
   FAMILY_PARAMS,
+  getSeedanceOutputSize,
+  getSeedanceResolutionOptions,
   getUsableVideoImage,
   getVideoModelVariantState,
+  isApizSeedanceVideoModel,
   MAX_PROMPT_LENGTH,
   resolveVideoVariantModel,
+  SEEDANCE_REFERENCE_AUDIO_LIMIT,
+  SEEDANCE_REFERENCE_IMAGE_LIMIT,
+  SEEDANCE_REFERENCE_VIDEO_LIMIT,
+  SEEDANCE_VIDEO_DURATIONS,
+  SEEDANCE_VIDEO_RATIO_PRESETS,
   VIDEO_DURATIONS,
   videoModelAllowsImageUpload,
   videoModelRequiresImage,
@@ -97,31 +109,93 @@ export function VideoPanel({
   )
   const displayModel = variantState?.set.defaultModel ?? config.model
 
+  const isSeedanceVideo = isApizSeedanceVideoModel(config.model)
   const requiresImage = videoModelRequiresImage(config.model)
   const showImageInput = videoModelSupportsImageInput(config.model)
   const allowImageUpload = videoModelAllowsImageUpload(config.model)
   const usableImage = getUsableVideoImage(config.model, config.image)
-  const canGenerate = (!requiresImage || !!usableImage) && !isGenerating
-  const resolutionParam = familyParams.find(
-    (param) => param.key === 'resolution' && param.type === 'select'
-  )
-  const resolutionOptions =
-    resolutionParam?.options?.filter(
-      (option) =>
-        !/fast/i.test(config.model) ||
-        option.value === '480p' ||
-        option.value === '720p'
-    ) ?? []
-  const advancedParams = familyParams.filter(
-    (param) => param.key !== 'resolution'
-  )
-
   const updateMeta = (key: string, value: unknown) => {
     updateConfig('metadata', { ...config.metadata, [key]: value })
   }
-
   const getMetaValue = (key: string, defaultValue: unknown) =>
     config.metadata[key] ?? defaultValue
+  const referenceImages = parseURLList(config.referenceImagesText)
+  const referenceVideos = parseURLList(config.referenceVideosText)
+  const referenceAudios = parseURLList(config.referenceAudiosText)
+  const hasReferenceMedia =
+    !!usableImage || referenceImages.length > 0 || referenceVideos.length > 0
+  const hasTooManyReferenceImages =
+    referenceImages.length > SEEDANCE_REFERENCE_IMAGE_LIMIT
+  const hasTooManyReferenceVideos =
+    referenceVideos.length > SEEDANCE_REFERENCE_VIDEO_LIMIT
+  const hasTooManyReferenceAudios =
+    referenceAudios.length > SEEDANCE_REFERENCE_AUDIO_LIMIT
+  const hasInvalidAudioOnly = referenceAudios.length > 0 && !hasReferenceMedia
+  const hasInvalidInputVideoDuration =
+    referenceVideos.length > 0 &&
+    (config.inputVideoDuration < 0 || config.inputVideoDuration > 15.5)
+  const referenceImageError = hasTooManyReferenceImages
+    ? t('Maximum {{count}} URLs', {
+        count: SEEDANCE_REFERENCE_IMAGE_LIMIT,
+      })
+    : undefined
+  const referenceVideoError = hasTooManyReferenceVideos
+    ? t('Maximum {{count}} URLs', {
+        count: SEEDANCE_REFERENCE_VIDEO_LIMIT,
+      })
+    : undefined
+  let referenceAudioError: string | undefined
+  if (hasTooManyReferenceAudios) {
+    referenceAudioError = t('Maximum {{count}} URLs', {
+      count: SEEDANCE_REFERENCE_AUDIO_LIMIT,
+    })
+  } else if (hasInvalidAudioOnly) {
+    referenceAudioError = t(
+      'Audio references require at least one image or video reference.'
+    )
+  }
+  const canGenerate =
+    (!requiresImage || !!usableImage) &&
+    !hasInvalidAudioOnly &&
+    !hasTooManyReferenceImages &&
+    !hasTooManyReferenceVideos &&
+    !hasTooManyReferenceAudios &&
+    !hasInvalidInputVideoDuration &&
+    !isGenerating
+  const resolutionParam = familyParams.find(
+    (param) => param.key === 'resolution' && param.type === 'select'
+  )
+  const resolutionOptions = isSeedanceVideo
+    ? getSeedanceResolutionOptions(config.model)
+    : (resolutionParam?.options ?? [])
+  const durationOptions = isSeedanceVideo
+    ? SEEDANCE_VIDEO_DURATIONS
+    : VIDEO_DURATIONS
+  const advancedParams = familyParams.filter(
+    (param) => param.key !== 'resolution'
+  )
+  const selectedResolution = String(
+    getMetaValue('resolution', resolutionParam?.default ?? '720p')
+  )
+  const selectedRatio = isSeedanceVideo ? config.size : '16:9'
+  const seedanceOutputSize = getSeedanceOutputSize(
+    selectedRatio,
+    selectedResolution
+  )
+  const estimatedVideoTokens = isSeedanceVideo
+    ? estimateSeedanceVideoTokens({
+        inputDuration: config.inputVideoDuration,
+        outputDuration: config.duration,
+        ratio: selectedRatio,
+        resolution: selectedResolution,
+      })
+    : 0
+  const generateLabel =
+    estimatedVideoTokens > 0
+      ? t('Generate video · ~{{tokens}} tokens', {
+          tokens: formatCompactNumber(estimatedVideoTokens),
+        })
+      : t('Generate video')
 
   const handleImageChange = (src: string, sourceType: ImageSourceType) => {
     updateConfig('image', src)
@@ -141,12 +215,23 @@ export function VideoPanel({
   }
 
   useEffect(() => {
-    if (!/seedance/i.test(config.model) || !/fast/i.test(config.model)) return
-    const resolution = String(config.metadata.resolution ?? '720p')
-    if (resolution !== '480p' && resolution !== '720p') {
-      updateConfig('metadata', { ...config.metadata, resolution: '720p' })
+    if (isSeedanceVideo) {
+      if (
+        !SEEDANCE_VIDEO_RATIO_PRESETS.some(
+          (ratio) => ratio.value === config.size
+        )
+      ) {
+        updateConfig('size', '16:9')
+      }
+      if (!config.metadata.resolution) {
+        updateConfig('metadata', { ...config.metadata, resolution: '720p' })
+      }
+      return
     }
-  }, [config.metadata, config.model, updateConfig])
+    if (config.size.includes(':')) {
+      updateConfig('size', '1280x720')
+    }
+  }, [config.metadata, config.size, isSeedanceVideo, updateConfig])
 
   useEffect(() => {
     if (!config.image) return
@@ -217,11 +302,75 @@ export function VideoPanel({
           </div>
         )}
 
+        {isSeedanceVideo && (
+          <>
+            <URLArrayField
+              label={t('Reference images')}
+              value={config.referenceImagesText}
+              onChange={(value) => updateConfig('referenceImagesText', value)}
+              disabled={isGenerating}
+              placeholder='["https://example.com/image1.png"]'
+              error={referenceImageError}
+              hint={t(
+                'Image URL array (up to 9). Supports png/jpg/jpeg/gif/bmp/webp, minimum 300px width and height. Use 【@图片N】 in the prompt to reference the image at that position.'
+              )}
+            />
+            <URLArrayField
+              label={t('Reference videos')}
+              value={config.referenceVideosText}
+              onChange={(value) => updateConfig('referenceVideosText', value)}
+              disabled={isGenerating}
+              placeholder='["https://example.com/video.mp4"]'
+              error={referenceVideoError}
+              hint={t(
+                'Reference video URL array (up to 3). Supports mp4/mov/avi/mkv/webm/flv. Each video must be 2-15.5 seconds, total duration up to 15.5 seconds, up to 50MB, 24-60 FPS.'
+              )}
+            />
+            <URLArrayField
+              label={t('Reference audios')}
+              value={config.referenceAudiosText}
+              onChange={(value) => updateConfig('referenceAudiosText', value)}
+              disabled={isGenerating}
+              placeholder='["https://example.com/audio.mp3"]'
+              error={referenceAudioError}
+              hint={t(
+                'Reference audio URL array (up to 3). Supports mp3/wav only. Cannot be used alone; use with images or videos. Total size up to 15MB, each audio 2-15 seconds.'
+              )}
+            />
+            {referenceVideos.length > 0 && (
+              <div className='space-y-2'>
+                <Label className='text-sm font-medium'>
+                  {t('Input video duration (sec)')}
+                </Label>
+                <Input
+                  type='number'
+                  min={0}
+                  max={15.5}
+                  step={0.5}
+                  value={String(config.inputVideoDuration || '')}
+                  onChange={(event) =>
+                    updateConfig(
+                      'inputVideoDuration',
+                      Number(event.target.value) || 0
+                    )
+                  }
+                  disabled={isGenerating}
+                />
+                {hasInvalidInputVideoDuration && (
+                  <p className='text-destructive text-xs'>
+                    {t('Input video duration must be 0-15.5 seconds.')}
+                  </p>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
         {/* Duration */}
         <div className='space-y-2'>
           <Label className='text-sm font-medium'>{t('Duration (sec)')}</Label>
           <Select
-            items={VIDEO_DURATIONS.map((d) => ({
+            items={durationOptions.map((d) => ({
               value: String(d),
               label: `${d}s`,
             }))}
@@ -234,7 +383,7 @@ export function VideoPanel({
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                {VIDEO_DURATIONS.map((d) => (
+                {durationOptions.map((d) => (
                   <SelectItem key={d} value={String(d)}>
                     {d}s
                   </SelectItem>
@@ -248,10 +397,17 @@ export function VideoPanel({
           <div className='min-w-0 space-y-2'>
             <Label className='text-sm font-medium'>{t('Aspect ratio')}</Label>
             <Select
-              items={VIDEO_SIZE_PRESETS.map((p) => ({
-                value: `${p.width}x${p.height}`,
-                label: `${p.ratioLabel} (${p.width}x${p.height})`,
-              }))}
+              items={
+                isSeedanceVideo
+                  ? SEEDANCE_VIDEO_RATIO_PRESETS.map((ratio) => ({
+                      value: ratio.value,
+                      label: ratio.label,
+                    }))
+                  : VIDEO_SIZE_PRESETS.map((p) => ({
+                      value: `${p.width}x${p.height}`,
+                      label: `${p.ratioLabel} (${p.width}x${p.height})`,
+                    }))
+              }
               onValueChange={(v) => {
                 if (v) updateConfig('size', v)
               }}
@@ -263,14 +419,20 @@ export function VideoPanel({
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  {VIDEO_SIZE_PRESETS.map((p) => {
-                    const val = `${p.width}x${p.height}`
-                    return (
-                      <SelectItem key={val} value={val}>
-                        {p.ratioLabel} ({val})
-                      </SelectItem>
-                    )
-                  })}
+                  {isSeedanceVideo
+                    ? SEEDANCE_VIDEO_RATIO_PRESETS.map((ratio) => (
+                        <SelectItem key={ratio.value} value={ratio.value}>
+                          {ratio.label}
+                        </SelectItem>
+                      ))
+                    : VIDEO_SIZE_PRESETS.map((p) => {
+                        const val = `${p.width}x${p.height}`
+                        return (
+                          <SelectItem key={val} value={val}>
+                            {p.ratioLabel} ({val})
+                          </SelectItem>
+                        )
+                      })}
                 </SelectGroup>
               </SelectContent>
             </Select>
@@ -286,7 +448,9 @@ export function VideoPanel({
                   value: option.value,
                   label: option.label,
                 }))}
-                onValueChange={(value) => updateMeta(resolutionParam.key, value)}
+                onValueChange={(value) =>
+                  updateMeta(resolutionParam.key, value)
+                }
                 value={String(
                   getMetaValue(resolutionParam.key, resolutionParam.default)
                 )}
@@ -309,11 +473,18 @@ export function VideoPanel({
           )}
         </div>
 
+        {isSeedanceVideo && (
+          <div className='text-muted-foreground text-xs'>
+            {t('Estimated output size')}: {seedanceOutputSize.longEdge}×
+            {seedanceOutputSize.shortEdge}
+          </div>
+        )}
+
         {/* Model-family specific parameters */}
         {advancedParams.length > 0 && (
           <>
             <div className='border-muted-foreground/20 border-t pt-4'>
-              <Label className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+              <Label className='text-muted-foreground text-xs font-medium tracking-wide uppercase'>
                 {t('Advanced')}
               </Label>
             </div>
@@ -335,7 +506,9 @@ export function VideoPanel({
               .filter((param) => param.type !== 'select')
               .map((param) => (
                 <div key={param.key} className='space-y-2'>
-                  <Label className='text-sm font-medium'>{t(param.label)}</Label>
+                  <Label className='text-sm font-medium'>
+                    {t(param.label)}
+                  </Label>
                   {param.type === 'slider' && (
                     <div className='flex items-center gap-3'>
                       <Slider
@@ -351,7 +524,9 @@ export function VideoPanel({
                         className='flex-1'
                       />
                       <span className='text-muted-foreground w-8 text-right text-xs'>
-                        {Number(getMetaValue(param.key, param.default)).toFixed(1)}
+                        {Number(getMetaValue(param.key, param.default)).toFixed(
+                          1
+                        )}
                       </span>
                     </div>
                   )}
@@ -390,10 +565,68 @@ export function VideoPanel({
             size='lg'
           >
             <FilmIcon size={16} />
-            {t('Generate video')}
+            {generateLabel}
           </Button>
         )}
       </div>
+    </div>
+  )
+}
+
+function parseURLList(value: string): string[] {
+  const trimmed = value.trim()
+  if (!trimmed) return []
+  try {
+    const parsed = JSON.parse(trimmed) as unknown
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((item) => String(item).trim())
+        .filter((item) => item.length > 0)
+    }
+  } catch {
+    /* use line-based input */
+  }
+  return trimmed
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+}
+
+function formatCompactNumber(value: number): string {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(
+    value
+  )
+}
+
+function URLArrayField({
+  label,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+  hint,
+  error,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  disabled: boolean
+  placeholder: string
+  hint: string
+  error?: string
+}) {
+  return (
+    <div className='space-y-2'>
+      <Label className='text-sm font-medium'>{label}</Label>
+      <Textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className='min-h-[64px] resize-y font-mono text-xs'
+        disabled={disabled}
+      />
+      <p className='text-muted-foreground text-xs'>{hint}</p>
+      {error && <p className='text-destructive text-xs'>{error}</p>}
     </div>
   )
 }
@@ -421,7 +654,7 @@ function SegmentedTabs({
             key={option.value}
             value={option.value}
             disabled={disabled}
-            className='h-7 min-w-0 flex-1 rounded-none border-r px-1.5 text-[11px] leading-none shadow-none last:border-r-0 data-active:bg-muted data-active:shadow-none'
+            className='data-active:bg-muted h-7 min-w-0 flex-1 rounded-none border-r px-1.5 text-[11px] leading-none shadow-none last:border-r-0 data-active:shadow-none'
             data-index={index}
           >
             {axis.translateLabels === false ? option.label : t(option.label)}
@@ -455,14 +688,18 @@ function SegmentedParam({
       : param.options
 
   return (
-    <Tabs value={value} onValueChange={onValueChange} className='!flex-row gap-0'>
+    <Tabs
+      value={value}
+      onValueChange={onValueChange}
+      className='!flex-row gap-0'
+    >
       <TabsList className='bg-background h-9 overflow-hidden rounded-lg border p-0'>
         {options.map((option) => (
           <TabsTrigger
             key={option.value}
             value={option.value}
             disabled={disabled}
-            className='h-9 min-w-20 rounded-none border-r px-4 text-sm shadow-none last:border-r-0 data-active:bg-muted data-active:shadow-none'
+            className='data-active:bg-muted h-9 min-w-20 rounded-none border-r px-4 text-sm shadow-none last:border-r-0 data-active:shadow-none'
           >
             {param.key === 'resolution' ? option.label : t(option.label)}
           </TabsTrigger>

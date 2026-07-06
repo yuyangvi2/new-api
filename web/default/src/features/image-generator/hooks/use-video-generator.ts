@@ -22,6 +22,10 @@ import { fetchVideoTask, submitVideoTask } from '../api'
 import {
   DEFAULT_VIDEO_CONFIG,
   getUsableVideoImage,
+  isApizSeedanceVideoModel,
+  SEEDANCE_REFERENCE_AUDIO_LIMIT,
+  SEEDANCE_REFERENCE_IMAGE_LIMIT,
+  SEEDANCE_REFERENCE_VIDEO_LIMIT,
   VIDEO_FAILED_STATUSES,
   VIDEO_POLL_INTERVAL_MS,
   VIDEO_POLL_TIMEOUT_MS,
@@ -57,6 +61,25 @@ function persistConfig(config: VideoConfig): void {
 
 function genId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function parseURLList(value: string): string[] {
+  const trimmed = value.trim()
+  if (!trimmed) return []
+  try {
+    const parsed = JSON.parse(trimmed) as unknown
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((item) => String(item).trim())
+        .filter((item) => item.length > 0)
+    }
+  } catch {
+    /* use line-based input */
+  }
+  return trimmed
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
 }
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -222,7 +245,32 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
     const prompt = config.prompt.trim()
     const requiresImage = videoModelRequiresImage(config.model)
     const inputImage = getUsableVideoImage(config.model, config.image)
+    const isSeedanceVideo = isApizSeedanceVideoModel(config.model)
+    const referenceImages = isSeedanceVideo
+      ? parseURLList(config.referenceImagesText)
+      : []
+    const videoFiles = isSeedanceVideo
+      ? parseURLList(config.referenceVideosText)
+      : []
+    const audioFiles = isSeedanceVideo
+      ? parseURLList(config.referenceAudiosText)
+      : []
     if ((requiresImage && !inputImage) || isGenerating) return
+    if (
+      referenceImages.length > SEEDANCE_REFERENCE_IMAGE_LIMIT ||
+      videoFiles.length > SEEDANCE_REFERENCE_VIDEO_LIMIT ||
+      audioFiles.length > SEEDANCE_REFERENCE_AUDIO_LIMIT
+    ) {
+      return
+    }
+    if (
+      audioFiles.length > 0 &&
+      !inputImage &&
+      referenceImages.length === 0 &&
+      videoFiles.length === 0
+    ) {
+      return
+    }
 
     const batchId = genId()
     const batch: VideoBatch = {
@@ -253,6 +301,12 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
           }
         }
       }
+      if (videoFiles.length > 0) {
+        meta.video_files = videoFiles
+      }
+      if (audioFiles.length > 0) {
+        meta.audio_files = audioFiles
+      }
 
       const submit = await submitVideoTask(
         {
@@ -260,7 +314,9 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
           group: config.group,
           prompt: prompt || undefined,
           image: inputImage || undefined,
+          images: referenceImages.length > 0 ? referenceImages : undefined,
           duration: config.duration,
+          size: config.size,
           width: preset?.width,
           height: preset?.height,
           ...(Object.keys(meta).length > 0 ? { metadata: meta } : {}),

@@ -153,7 +153,7 @@ export const CHANNEL_TYPE_CONFIGS: Record<number, ChannelTypeConfig> = {
       baseUrl: 'Default: https://api.apiz.ai',
       key: 'Bearer API key',
       models:
-        'ark/seedance-2.0, seedance2.0_direct, seedance2.0_vision, seedance2.0_mini, seedance2.0_fast_mini',
+        'ark/seedance-2.0, seedance2.0_direct, seedance2.0_vision, Seedance_2.0_mini, Seedance_2.0_mini_lite',
     },
   },
 }

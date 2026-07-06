@@ -263,14 +263,10 @@ func buildSubmitPayload(req *relaycommon.TaskSubmitReq, originModel, upstreamMod
 	applySize(params, req.Size)
 
 	requestModel := firstNonEmpty(originModel, req.Model, upstreamModel)
-	images := collectImages(req)
-	if apizModelDisallowsImages(requestModel) {
-		images = nil
+	if err := applyImageInputs(params, req.Image, req.Images); err != nil {
+		return nil, err
 	}
-	if apizModelRequiresImage(requestModel) && len(images) == 0 {
-		return nil, fmt.Errorf("image is required for %s", requestModel)
-	}
-	if err := applyImages(params, images); err != nil {
+	if err := validateReferenceMedia(params); err != nil {
 		return nil, err
 	}
 
@@ -310,46 +306,121 @@ func applySize(params map[string]any, size string) {
 	params["resolution"] = size
 }
 
-func applyImages(params map[string]any, images []string) error {
+func applyImageInputs(params map[string]any, image string, referenceImages []string) error {
+	image = strings.TrimSpace(image)
+	if image != "" {
+		if !isAPIZImageURI(image) {
+			return fmt.Errorf("image_url must be a valid HTTP/HTTPS URL or Asset:// URI")
+		}
+		params["image_url"] = image
+	}
+
+	images := normalizeStringList(referenceImages)
 	if len(images) == 0 {
 		return nil
 	}
+	if len(images) > 9 {
+		return fmt.Errorf("reference_images supports up to 9 URLs")
+	}
 	for i, img := range images {
 		if !isAPIZImageURI(img) {
-			return fmt.Errorf("image %d must be a valid HTTP/HTTPS URL or Asset:// URI", i+1)
+			return fmt.Errorf("reference_images %d must be a valid HTTP/HTTPS URL or Asset:// URI", i+1)
 		}
-	}
-	if len(images) == 1 {
-		params["image_url"] = images[0]
-		return nil
 	}
 	params["reference_images"] = images
 	return nil
 }
 
-func collectImages(req *relaycommon.TaskSubmitReq) []string {
-	out := make([]string, 0, len(req.Images)+1)
-	seen := map[string]struct{}{}
-	add := func(v string) {
-		v = strings.TrimSpace(v)
-		if v == "" {
-			return
-		}
-		if _, ok := seen[v]; ok {
-			return
-		}
-		seen[v] = struct{}{}
-		out = append(out, v)
+func validateReferenceMedia(params map[string]any) error {
+	videoFiles, err := validateURLListParam(params, "video_files", 3)
+	if err != nil {
+		return err
 	}
-	add(req.Image)
-	for _, img := range req.Images {
-		add(img)
+	audioFiles, err := validateURLListParam(params, "audio_files", 3)
+	if err != nil {
+		return err
+	}
+	if len(audioFiles) == 0 {
+		return nil
+	}
+	if len(videoFiles) > 0 {
+		return nil
+	}
+	if strings.TrimSpace(asString(params["image_url"])) != "" {
+		return nil
+	}
+	if images, _ := stringListFromAny(params["reference_images"]); len(images) > 0 {
+		return nil
+	}
+	return fmt.Errorf(
+		"audio_files cannot be used alone; provide image_url, reference_images, or video_files",
+	)
+}
+
+func validateURLListParam(params map[string]any, key string, limit int) ([]string, error) {
+	raw, ok := params[key]
+	if !ok {
+		return nil, nil
+	}
+	values, err := stringListFromAny(raw)
+	if err != nil {
+		return nil, fmt.Errorf("%s must be a URL array", key)
+	}
+	if len(values) == 0 {
+		delete(params, key)
+		return nil, nil
+	}
+	if len(values) > limit {
+		return nil, fmt.Errorf("%s supports up to %d URLs", key, limit)
+	}
+	for i, value := range values {
+		if !taskcommon.IsHTTPURL(value) {
+			return nil, fmt.Errorf("%s %d must be a valid HTTP/HTTPS URL", key, i+1)
+		}
+	}
+	params[key] = values
+	return values, nil
+}
+
+func stringListFromAny(v any) ([]string, error) {
+	switch values := v.(type) {
+	case []string:
+		return normalizeStringList(values), nil
+	case []any:
+		out := make([]string, 0, len(values))
+		for _, item := range values {
+			s, ok := item.(string)
+			if !ok {
+				return nil, fmt.Errorf("non-string item")
+			}
+			s = strings.TrimSpace(s)
+			if s != "" {
+				out = append(out, s)
+			}
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("not an array")
+	}
+}
+
+func normalizeStringList(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			out = append(out, value)
+		}
 	}
 	return out
 }
 
 func hasVideoInput(req relaycommon.TaskSubmitReq) bool {
 	if strings.TrimSpace(req.InputReference) != "" {
+		return true
+	}
+	if videoFiles, err := stringListFromAny(req.Metadata["video_files"]); err == nil &&
+		len(videoFiles) > 0 {
 		return true
 	}
 	content, ok := req.Metadata["content"].([]interface{})
@@ -383,24 +454,6 @@ func isSupportedModel(modelName string) bool {
 	return false
 }
 
-func apizModelRequiresImage(modelName string) bool {
-	switch strings.ToLower(strings.TrimSpace(modelName)) {
-	case "seedance2.0_vision", "seedance2.0_fast_vision":
-		return true
-	default:
-		return false
-	}
-}
-
-func apizModelDisallowsImages(modelName string) bool {
-	switch strings.ToLower(strings.TrimSpace(modelName)) {
-	case "seedance2.0_direct", "seedance2.0_fast_direct", "seedance2.0_mini", "seedance2.0_fast_mini":
-		return true
-	default:
-		return false
-	}
-}
-
 func isAPIZImageURI(s string) bool {
 	s = strings.TrimSpace(s)
 	return taskcommon.IsHTTPURL(s) || strings.HasPrefix(s, "Asset://")
@@ -412,10 +465,10 @@ func variantForModel(modelName string) string {
 		return "seedance_2.0"
 	case "seedance2.0_fast_direct", "seedance2.0_fast_vision", "doubao-seedance-2-0-fast-260128", seedanceID:
 		return "seedance_2.0_fast"
-	case "seedance2.0_mini":
-		return "seedance_2.0_mini"
-	case "seedance2.0_fast_mini":
-		return "seedance_2.0_fast_mini"
+	case "seedance_2.0_mini", "seedance2.0_mini":
+		return "Seedance_2.0_mini"
+	case "seedance_2.0_mini_lite", "seedance2.0_mini_lite", "seedance2.0_fast_mini":
+		return "Seedance_2.0_mini_lite"
 	default:
 		if strings.Contains(strings.ToLower(modelName), "fast") {
 			return "seedance_2.0_fast"
