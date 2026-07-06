@@ -140,13 +140,20 @@ func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInf
 	if err != nil {
 		return nil
 	}
-	hasVideo := hasVideoInMetadata(req.Metadata)
-	resolution, _ := req.Metadata["resolution"].(string)
-	ratio, ok := GetVideoInputRatio(info.OriginModelName, resolution, hasVideo)
-	if !ok || ratio == 1.0 {
+	quota, _, _, ok := EstimateSeedanceQuotaForRequest(
+		info.OriginModelName,
+		req,
+		hasVideoInMetadata(req.Metadata),
+		info.PriceData.GroupRatioInfo.GroupRatio,
+	)
+	if !ok || info.PriceData.Quota <= 0 {
 		return nil
 	}
-	return map[string]float64{"video_input": ratio}
+	ratio := float64(quota) / float64(info.PriceData.Quota)
+	if ratio == 1.0 {
+		return nil
+	}
+	return map[string]float64{"seedance_estimated_price": ratio}
 }
 
 // hasVideoInMetadata 直接检查 metadata 的 content 数组是否包含 video_url 条目，

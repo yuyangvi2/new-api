@@ -82,6 +82,19 @@ function parseURLList(value: string): string[] {
     .filter((item) => item.length > 0)
 }
 
+function sumVideoDurations(
+  durations: Record<string, number> | undefined,
+  videos: string[]
+): number {
+  if (!durations) return 0
+  const total = videos.reduce((sum, video) => {
+    const duration = durations[video]
+    if (!Number.isFinite(duration) || duration <= 0) return sum
+    return sum + duration
+  }, 0)
+  return Math.round(total * 100) / 100
+}
+
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(resolve, ms)
@@ -255,6 +268,10 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
     const audioFiles = isSeedanceVideo
       ? parseURLList(config.referenceAudiosText)
       : []
+    const inputVideoDuration = Math.max(
+      config.inputVideoDuration,
+      sumVideoDurations(config.referenceVideoDurations, videoFiles)
+    )
     if ((requiresImage && !inputImage) || isGenerating) return
     if (
       referenceImages.length > SEEDANCE_REFERENCE_IMAGE_LIMIT ||
@@ -303,6 +320,7 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
       }
       if (videoFiles.length > 0) {
         meta.video_files = videoFiles
+        meta.input_video_duration = inputVideoDuration
       }
       if (audioFiles.length > 0) {
         meta.audio_files = audioFiles

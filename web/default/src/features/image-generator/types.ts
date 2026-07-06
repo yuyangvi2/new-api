@@ -173,6 +173,7 @@ export interface VideoConfig {
   imageSourceType: ImageSourceType
   referenceImagesText: string
   referenceVideosText: string
+  referenceVideoDurations: Record<string, number>
   referenceAudiosText: string
   inputVideoDuration: number
   duration: number

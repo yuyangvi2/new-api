@@ -170,10 +170,6 @@ export function ImageGenerator(props: ImageGeneratorProps) {
     () => models.filter(isVideoGenerationModel),
     [models]
   )
-  const selectedVideoModel = useMemo(
-    () => allVideoModels.find((model) => model.value === videoConfig.model),
-    [allVideoModels, videoConfig.model]
-  )
   const selectedVideoGroup = useMemo(
     () => groups.find((group) => group.value === videoConfig.group),
     [groups, videoConfig.group]
@@ -364,7 +360,6 @@ export function ImageGenerator(props: ImageGeneratorProps) {
               onModelChange={handleVideoModelChange}
               models={getDisplayVideoModels(allVideoModels)}
               variantModels={allVideoModels}
-              modelRatio={selectedVideoModel?.modelRatio}
               groupRatio={selectedVideoGroup?.ratio}
               isModelLoading={isModelLoading}
               isGenerating={videoGen.isGenerating}

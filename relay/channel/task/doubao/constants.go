@@ -13,6 +13,10 @@ var ModelList = []string{
 	"seedance2.0_vision",
 	"seedance2.0_fast_direct",
 	"seedance2.0_fast_vision",
+	"Seedance_2.0_mini",
+	"Seedance_2.0_mini_lite",
+	"seedance2.0_mini",
+	"seedance2.0_fast_mini",
 }
 
 var ChannelName = "doubao-video"
@@ -38,11 +42,11 @@ var videoPriceTable = map[string]map[videoPriceKey]float64{
 	},
 	"ark/seedance-2.0": {
 		{hasVideo: false}: 37.0,
-		{hasVideo: true}:  22.0,
+		{hasVideo: true}:  14.0,
 	},
 	"doubao-seedance-2-0-fast-260128": {
 		{hasVideo: false}: 37.0,
-		{hasVideo: true}:  22.0,
+		{hasVideo: true}:  14.0,
 	},
 	"seedance2.0_direct": {
 		{hasVideo: false}:                46.0,
@@ -60,20 +64,28 @@ var videoPriceTable = map[string]map[videoPriceKey]float64{
 		{is4k: true, hasVideo: false}:    26.0,
 		{is4k: true, hasVideo: true}:     16.0,
 	},
+	"Seedance_2.0_mini": {
+		{hasVideo: false}: 23.0,
+		{hasVideo: true}:  14.0,
+	},
 	"seedance2.0_fast_direct": {
 		{hasVideo: false}: 37.0,
-		{hasVideo: true}:  22.0,
+		{hasVideo: true}:  14.0,
 	},
 	"seedance2.0_fast_vision": {
 		{hasVideo: false}: 37.0,
-		{hasVideo: true}:  22.0,
+		{hasVideo: true}:  14.0,
+	},
+	"Seedance_2.0_mini_lite": {
+		{hasVideo: false}: 23.0,
+		{hasVideo: true}:  14.0,
 	},
 }
 
 // GetVideoInputRatio 返回指定模型在给定输出分辨率/是否含视频输入下，相对基准价的计费倍率。
 // 第二个返回值表示该模型是否配置了价格表；倍率为 1.0 时调用方可忽略该 OtherRatio。
 func GetVideoInputRatio(modelName, resolution string, hasVideo bool) (float64, bool) {
-	prices, ok := videoPriceTable[modelName]
+	prices, ok := videoPriceTable[NormalizeSeedanceModelName(modelName)]
 	base := prices[videoPriceKey{}] // 零值键 = {480p/720p, 不含视频} 基准价
 	if !ok || base <= 0 {
 		return 0, false

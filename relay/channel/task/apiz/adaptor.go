@@ -102,15 +102,20 @@ func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInf
 	if err != nil {
 		return nil
 	}
-	resolution := strings.TrimSpace(asString(req.Metadata["resolution"]))
-	if resolution == "" {
-		resolution = strings.TrimSpace(req.Size)
-	}
-	ratio, ok := doubaotask.GetVideoInputRatio(info.OriginModelName, resolution, hasVideoInput(req))
-	if !ok || ratio == 1.0 {
+	quota, _, _, ok := doubaotask.EstimateSeedanceQuotaForRequest(
+		info.OriginModelName,
+		req,
+		hasVideoInput(req),
+		info.PriceData.GroupRatioInfo.GroupRatio,
+	)
+	if !ok || info.PriceData.Quota <= 0 {
 		return nil
 	}
-	return map[string]float64{"video_input": ratio}
+	ratio := float64(quota) / float64(info.PriceData.Quota)
+	if ratio == 1.0 {
+		return nil
+	}
+	return map[string]float64{"seedance_estimated_price": ratio}
 }
 
 func (a *TaskAdaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, requestBody io.Reader) (*http.Response, error) {

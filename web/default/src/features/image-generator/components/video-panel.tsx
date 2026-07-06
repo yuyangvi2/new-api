@@ -1,14 +1,3 @@
-import {
-  CircleHelp,
-  FilmIcon,
-  LinkIcon,
-  Loader2Icon,
-  MusicIcon,
-  PlusIcon,
-  SquareIcon,
-  Trash2Icon,
-  UploadIcon,
-} from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -29,6 +18,17 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import {
+  CircleHelp,
+  FilmIcon,
+  LinkIcon,
+  Loader2Icon,
+  MusicIcon,
+  PlusIcon,
+  SquareIcon,
+  Trash2Icon,
+  UploadIcon,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { ModelSelector } from '@/components/model-group-selector'
@@ -51,17 +51,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { formatBillingCurrencyFromUSD } from '@/lib/currency'
-import {
-  DEFAULT_CURRENCY_CONFIG,
-  useSystemConfigStore,
-} from '@/stores/system-config-store'
 
 import { uploadReferenceMedia } from '../api'
 import {
   detectModelFamily,
   estimateSeedanceVideoTokens,
   FAMILY_PARAMS,
+  getSeedancePricePerMillionCNY,
   getSeedanceOutputSize,
   getSeedanceResolutionOptions,
   getUsableVideoImage,
@@ -75,6 +71,7 @@ import {
   SEEDANCE_REFERENCE_AUDIO_LIMIT,
   SEEDANCE_REFERENCE_IMAGE_LIMIT,
   SEEDANCE_REFERENCE_VIDEO_LIMIT,
+  SEEDANCE_REFERENCE_VIDEO_DURATION_LIMIT,
   SEEDANCE_VIDEO_DURATIONS,
   SEEDANCE_VIDEO_RATIO_PRESETS,
   VIDEO_DURATIONS,
@@ -103,7 +100,6 @@ interface VideoPanelProps {
   onModelChange: (value: string) => void
   models: ModelOption[]
   variantModels: ModelOption[]
-  modelRatio?: number
   groupRatio?: number
   isModelLoading: boolean
   isGenerating: boolean
@@ -118,7 +114,6 @@ export function VideoPanel({
   onModelChange,
   models,
   variantModels,
-  modelRatio,
   groupRatio,
   isModelLoading,
   isGenerating,
@@ -127,7 +122,6 @@ export function VideoPanel({
   onCancel,
 }: VideoPanelProps) {
   const { t } = useTranslation()
-  const currency = useSystemConfigStore((state) => state.config.currency)
 
   const family = useMemo(() => detectModelFamily(config.model), [config.model])
   const familyParams = useMemo(() => FAMILY_PARAMS[family], [family])
@@ -146,6 +140,7 @@ export function VideoPanel({
   const showImageInput = videoModelSupportsImageInput(config.model)
   const allowImageUpload = videoModelAllowsImageUpload(config.model)
   const usableImage = getUsableVideoImage(config.model, config.image)
+  const referenceVideoDurations = config.referenceVideoDurations ?? {}
   const updateMeta = (key: string, value: unknown) => {
     updateConfig('metadata', { ...config.metadata, [key]: value })
   }
@@ -154,6 +149,13 @@ export function VideoPanel({
   const referenceImages = parseURLList(config.referenceImagesText)
   const referenceVideos = parseURLList(config.referenceVideosText)
   const referenceAudios = parseURLList(config.referenceAudiosText)
+  const uploadedReferenceVideoDuration = sumVideoDurations(
+    normalizeVideoDurationMap(referenceVideoDurations, referenceVideos)
+  )
+  const effectiveInputVideoDuration = Math.max(
+    config.inputVideoDuration,
+    uploadedReferenceVideoDuration
+  )
   const hasReferenceMedia =
     !!usableImage || referenceImages.length > 0 || referenceVideos.length > 0
   const hasTooManyReferenceImages =
@@ -165,7 +167,8 @@ export function VideoPanel({
   const hasInvalidAudioOnly = referenceAudios.length > 0 && !hasReferenceMedia
   const hasInvalidInputVideoDuration =
     referenceVideos.length > 0 &&
-    (config.inputVideoDuration < 0 || config.inputVideoDuration > 15.5)
+    (effectiveInputVideoDuration < 0 ||
+      effectiveInputVideoDuration > SEEDANCE_REFERENCE_VIDEO_DURATION_LIMIT)
   const referenceImageError = hasTooManyReferenceImages
     ? t('Maximum {{count}} URLs', {
         count: SEEDANCE_REFERENCE_IMAGE_LIMIT,
@@ -216,35 +219,58 @@ export function VideoPanel({
   )
   const estimatedVideoTokens = isSeedanceVideo
     ? estimateSeedanceVideoTokens({
-        inputDuration: config.inputVideoDuration,
+        inputDuration: effectiveInputVideoDuration,
         outputDuration: config.duration,
         ratio: selectedRatio,
         resolution: selectedResolution,
       })
     : 0
-  const quotaPerUnit =
-    currency.quotaPerUnit > 0
-      ? currency.quotaPerUnit
-      : DEFAULT_CURRENCY_CONFIG.quotaPerUnit
-  const estimatedVideoCostUSD =
-    estimatedVideoTokens > 0 && modelRatio !== undefined
-      ? (estimatedVideoTokens * modelRatio * (groupRatio ?? 1)) / quotaPerUnit
+  const pricePerMillionCNY = getSeedancePricePerMillionCNY({
+    model: config.model,
+    resolution: selectedResolution,
+    hasVideoInput: referenceVideos.length > 0,
+  })
+  const estimatedVideoCostCNY =
+    estimatedVideoTokens > 0 && pricePerMillionCNY !== undefined
+      ? (estimatedVideoTokens * pricePerMillionCNY * (groupRatio ?? 1)) /
+        1_000_000
       : 0
   const hasEstimatedVideoCost =
-    estimatedVideoTokens > 0 && modelRatio !== undefined
+    estimatedVideoTokens > 0 && pricePerMillionCNY !== undefined
   const generateLabel = hasEstimatedVideoCost
     ? t('Generate video · {{cost}}', {
-        cost: formatBillingCurrencyFromUSD(estimatedVideoCostUSD, {
-          abbreviate: false,
-          digitsSmall: 4,
-          minimumNonZero: 0.0001,
-        }),
+        cost: formatCNYAmount(estimatedVideoCostCNY),
       })
     : t('Generate video')
 
   const handleImageChange = (src: string, sourceType: ImageSourceType) => {
     updateConfig('image', src)
     updateConfig('imageSourceType', sourceType)
+  }
+
+  const updateReferenceVideoDurations = (
+    nextDurations: Record<string, number>,
+    nextVideos: string[]
+  ) => {
+    const normalized = normalizeVideoDurationMap(nextDurations, nextVideos)
+    updateConfig('referenceVideoDurations', normalized)
+    updateConfig('inputVideoDuration', sumVideoDurations(normalized))
+  }
+
+  const handleReferenceVideosChange = (value: string) => {
+    const nextVideos = parseURLList(value)
+    updateConfig('referenceVideosText', value)
+    updateReferenceVideoDurations(referenceVideoDurations, nextVideos)
+  }
+
+  const handleUploadedReferenceVideoDuration = (
+    url: string,
+    duration: number
+  ) => {
+    updateReferenceVideoDurations(
+      { ...referenceVideoDurations, [url]: duration },
+      referenceVideos.includes(url) ? referenceVideos : [...referenceVideos, url]
+    )
   }
 
   const handleVariantChange = (axisId: string, value: string) => {
@@ -284,6 +310,11 @@ export function VideoPanel({
     updateConfig('image', '')
     updateConfig('imageSourceType', 'upload')
   }, [config.image, config.model, updateConfig])
+
+  useEffect(() => {
+    if (uploadedReferenceVideoDuration <= config.inputVideoDuration) return
+    updateConfig('inputVideoDuration', uploadedReferenceVideoDuration)
+  }, [config.inputVideoDuration, uploadedReferenceVideoDuration, updateConfig])
 
   return (
     <div className='flex h-full flex-col'>
@@ -368,12 +399,15 @@ export function VideoPanel({
               label={t('Reference videos')}
               kind='video'
               value={config.referenceVideosText}
-              onChange={(value) => updateConfig('referenceVideosText', value)}
+              onChange={handleReferenceVideosChange}
               disabled={isGenerating}
               placeholder={t('Paste video URL')}
               accept='video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm,video/x-flv,.mkv,.flv'
               maxItems={SEEDANCE_REFERENCE_VIDEO_LIMIT}
               maxBytes={MAX_REFERENCE_VIDEO_UPLOAD_BYTES}
+              videoDurations={referenceVideoDurations}
+              maxTotalVideoDuration={SEEDANCE_REFERENCE_VIDEO_DURATION_LIMIT}
+              onVideoDurationChange={handleUploadedReferenceVideoDuration}
               error={referenceVideoError}
               hint={t(
                 'Reference video URL array (up to 3). Supports mp4/mov/avi/mkv/webm/flv. Each video must be 2-15.5 seconds, total duration up to 15.5 seconds, up to 50MB, 24-60 FPS.'
@@ -401,14 +435,17 @@ export function VideoPanel({
                 </Label>
                 <Input
                   type='number'
-                  min={0}
-                  max={15.5}
+                  min={uploadedReferenceVideoDuration}
+                  max={SEEDANCE_REFERENCE_VIDEO_DURATION_LIMIT}
                   step={0.5}
                   value={String(config.inputVideoDuration || '')}
                   onChange={(event) =>
                     updateConfig(
                       'inputVideoDuration',
-                      Number(event.target.value) || 0
+                      Math.max(
+                        Number(event.target.value) || 0,
+                        uploadedReferenceVideoDuration
+                      )
                     )
                   }
                   disabled={isGenerating}
@@ -649,6 +686,13 @@ function parseURLList(value: string): string[] {
     .filter((item) => item.length > 0)
 }
 
+function formatCNYAmount(value: number): string {
+  const formatted = new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 4,
+  }).format(value)
+  return `¥${formatted}`
+}
+
 function ReferenceMediaField({
   label,
   kind,
@@ -659,6 +703,9 @@ function ReferenceMediaField({
   accept,
   maxItems,
   maxBytes,
+  videoDurations,
+  maxTotalVideoDuration,
+  onVideoDurationChange,
   hint,
   error,
 }: {
@@ -671,6 +718,9 @@ function ReferenceMediaField({
   accept: string
   maxItems: number
   maxBytes: number
+  videoDurations?: Record<string, number>
+  maxTotalVideoDuration?: number
+  onVideoDurationChange?: (url: string, duration: number) => void
   hint: string
   error?: string
 }) {
@@ -735,11 +785,34 @@ function ReferenceMediaField({
       return
     }
 
+    let videoDuration = 0
+    if (kind === 'video') {
+      try {
+        videoDuration = await readVideoFileDuration(file)
+      } catch {
+        toast.error(t('Upload failed'))
+        return
+      }
+
+      const nextTotalDuration =
+        sumVideoDurations(videoDurations ?? {}) + videoDuration
+      if (
+        maxTotalVideoDuration !== undefined &&
+        nextTotalDuration > maxTotalVideoDuration
+      ) {
+        toast.error(t('Input video duration must be 0-15.5 seconds.'))
+        return
+      }
+    }
+
     setIsUploading(true)
     try {
       const uploadedUrl = await uploadReferenceMedia(file, kind)
       if (!urls.includes(uploadedUrl)) {
         updateUrls([...urls, uploadedUrl])
+      }
+      if (kind === 'video' && videoDuration > 0) {
+        onVideoDurationChange?.(uploadedUrl, videoDuration)
       }
       toast.success(t('Upload complete'))
     } catch (uploadError: unknown) {
@@ -797,6 +870,11 @@ function ReferenceMediaField({
                 <span className='min-w-0 flex-1 truncate text-xs' title={url}>
                   {url}
                 </span>
+                {kind === 'video' && videoDurations?.[url] !== undefined && (
+                  <span className='text-muted-foreground shrink-0 text-xs'>
+                    {formatDurationSeconds(videoDurations[url])}
+                  </span>
+                )}
                 {!disabled && (
                   <Button
                     type='button'
@@ -892,6 +970,65 @@ function formatBytes(bytes: number): string {
     return `${Math.floor(bytes / 1024)}KB`
   }
   return `${bytes}B`
+}
+
+function normalizeVideoDurationMap(
+  durations: Record<string, number>,
+  videos: string[]
+): Record<string, number> {
+  const nextDurations: Record<string, number> = {}
+  for (const video of videos) {
+    const duration = durations[video]
+    if (Number.isFinite(duration) && duration > 0) {
+      nextDurations[video] = roundVideoDuration(duration)
+    }
+  }
+  return nextDurations
+}
+
+function sumVideoDurations(durations: Record<string, number>): number {
+  const total = Object.values(durations).reduce((sum, duration) => {
+    if (!Number.isFinite(duration) || duration <= 0) return sum
+    return sum + duration
+  }, 0)
+  return roundVideoDuration(total)
+}
+
+function roundVideoDuration(duration: number): number {
+  return Math.round(duration * 100) / 100
+}
+
+function formatDurationSeconds(duration: number): string {
+  return `${roundVideoDuration(duration)}s`
+}
+
+function readVideoFileDuration(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const video = document.createElement('video')
+
+    const cleanup = () => {
+      video.removeAttribute('src')
+      video.load()
+      URL.revokeObjectURL(url)
+    }
+
+    video.preload = 'metadata'
+    video.addEventListener('loadedmetadata', () => {
+      const duration = video.duration
+      cleanup()
+      if (!Number.isFinite(duration) || duration <= 0) {
+        reject(new Error('invalid video duration'))
+        return
+      }
+      resolve(roundVideoDuration(duration))
+    }, { once: true })
+    video.addEventListener('error', () => {
+      cleanup()
+      reject(new Error('failed to read video duration'))
+    }, { once: true })
+    video.src = url
+  })
 }
 
 function SegmentedTabs({

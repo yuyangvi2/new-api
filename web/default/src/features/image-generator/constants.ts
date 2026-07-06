@@ -141,6 +141,7 @@ export const SEEDANCE_VIDEO_RATIO_PRESETS: VideoRatioPreset[] = [
 export const SEEDANCE_REFERENCE_IMAGE_LIMIT = 9
 export const SEEDANCE_REFERENCE_VIDEO_LIMIT = 3
 export const SEEDANCE_REFERENCE_AUDIO_LIMIT = 3
+export const SEEDANCE_REFERENCE_VIDEO_DURATION_LIMIT = 15.5
 
 export const SEEDANCE_VIDEO_DURATIONS = [
   4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
@@ -167,6 +168,7 @@ export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
   imageSourceType: 'upload',
   referenceImagesText: '',
   referenceVideosText: '',
+  referenceVideoDurations: {},
   referenceAudiosText: '',
   inputVideoDuration: 0,
   duration: 5,
@@ -279,9 +281,6 @@ function getAvailableVideoVariantModel(
   availableSet: Set<string>
 ): string | undefined {
   if (availableSet.has(model)) return model
-  for (const [alias, canonical] of Object.entries(VIDEO_MODEL_ALIASES)) {
-    if (canonical === model && availableSet.has(alias)) return alias
-  }
   return undefined
 }
 
@@ -474,6 +473,48 @@ export function estimateSeedanceVideoTokens({
   const { longEdge, shortEdge } = getSeedanceOutputSize(ratio, resolution)
   const seconds = Math.max(0, inputDuration) + Math.max(0, outputDuration)
   return Math.round((seconds * longEdge * shortEdge * 24) / 1024)
+}
+
+export function getSeedancePricePerMillionCNY({
+  model,
+  resolution,
+  hasVideoInput,
+}: {
+  model: string
+  resolution: string
+  hasVideoInput: boolean
+}): number | undefined {
+  const normalizedModel = normalizeVideoVariantModel(model)
+  const normalizedModelKey = normalizedModel.toLowerCase()
+  const normalizedResolution = resolution.toLowerCase().trim()
+  const isHighQuality =
+    normalizedModelKey === 'seedance_2.0' ||
+    normalizedModelKey === 'doubao-seedance-2-0-260128' ||
+    normalizedModelKey === 'seedance2.0_direct' ||
+    normalizedModelKey === 'seedance2.0_vision'
+
+  if (isHighQuality) {
+    if (normalizedResolution === '4k') return hasVideoInput ? 16 : 26
+    if (normalizedResolution === '1080p') return hasVideoInput ? 31 : 51
+    return hasVideoInput ? 28 : 46
+  }
+
+  const isMini =
+    normalizedModelKey === 'seedance_2.0_mini' ||
+    normalizedModelKey === 'seedance_2.0_mini_lite'
+
+  if (isMini) return hasVideoInput ? 14 : 23
+
+  const isFast =
+    normalizedModelKey === 'seedance_2.0_fast' ||
+    normalizedModelKey === 'ark/seedance-2.0' ||
+    normalizedModelKey === 'doubao-seedance-2-0-fast-260128' ||
+    normalizedModelKey === 'seedance2.0_fast_direct' ||
+    normalizedModelKey === 'seedance2.0_fast_vision' ||
+    normalizedModelKey === 'seedance_2.0_mini_lite'
+
+  if (isFast) return hasVideoInput ? 14 : 37
+  return undefined
 }
 
 // Terminal task statuses reported by the backend (case-insensitive).
