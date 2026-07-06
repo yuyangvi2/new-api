@@ -13,7 +13,7 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 )
 
-func TestBuildRequestBodyDropsUnsupportedMovementAmplitudeForVidu(t *testing.T) {
+func TestBuildRequestBodyDropsUnsupportedFrontendParamsForVidu(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Set("task_request", relaycommon.TaskSubmitReq{
@@ -24,6 +24,8 @@ func TestBuildRequestBodyDropsUnsupportedMovementAmplitudeForVidu(t *testing.T) 
 		Metadata: map[string]interface{}{
 			"MovementAmplitude": "auto",
 			"Resolution":        "720p",
+			"resolution":        "1080p",
+			"Payload":           "client-payload",
 		},
 	})
 
@@ -40,10 +42,12 @@ func TestBuildRequestBodyDropsUnsupportedMovementAmplitudeForVidu(t *testing.T) 
 	require.NoError(t, common.Unmarshal(payload, &got))
 
 	assert.NotContains(t, got, "MovementAmplitude")
-	assert.Equal(t, "720p", got["Resolution"])
+	assert.NotContains(t, got, "Resolution")
+	assert.NotContains(t, got, "resolution")
+	assert.Equal(t, "client-payload", got["Payload"])
 }
 
-func TestBuildRequestBodyDropsUnsupportedMovementAmplitudeForKling(t *testing.T) {
+func TestBuildRequestBodyDropsUnsupportedFrontendParamsForKling(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Set("task_request", relaycommon.TaskSubmitReq{
@@ -53,6 +57,7 @@ func TestBuildRequestBodyDropsUnsupportedMovementAmplitudeForKling(t *testing.T)
 		Duration: 5,
 		Metadata: map[string]interface{}{
 			"MovementAmplitude": "auto",
+			"Resolution":        "720p",
 			"NegativePrompt":    "low quality",
 			"CfgScale":          0.5,
 		},
@@ -71,6 +76,7 @@ func TestBuildRequestBodyDropsUnsupportedMovementAmplitudeForKling(t *testing.T)
 	require.NoError(t, common.Unmarshal(payload, &got))
 
 	assert.NotContains(t, got, "MovementAmplitude")
+	assert.NotContains(t, got, "Resolution")
 	assert.Equal(t, "low quality", got["NegativePrompt"])
 	assert.Equal(t, 0.5, got["CfgScale"])
 }

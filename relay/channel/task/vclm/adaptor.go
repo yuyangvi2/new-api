@@ -212,7 +212,7 @@ func sanitizeVCLMMetadata(metadata map[string]interface{}) map[string]interface{
 	filtered := make(map[string]interface{}, len(metadata))
 	for key, value := range metadata {
 		switch key {
-		case "MovementAmplitude", "movement_amplitude":
+		case "MovementAmplitude", "movement_amplitude", "Resolution", "resolution":
 			continue
 		default:
 			filtered[key] = value
