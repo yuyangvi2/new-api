@@ -56,6 +56,46 @@ function normalizeDebugResult(value: unknown): string | undefined {
     : trimmed
 }
 
+function recordFrom(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined
+}
+
+function stringFrom(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed || undefined
+}
+
+function firstMessage(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    const message = stringFrom(value)
+    if (message) return message
+  }
+  return undefined
+}
+
+function extractTaskErrorMessage(
+  raw: Record<string, unknown>
+): string | undefined {
+  const debugResult = recordFrom(raw.debug_result)
+  const debugData = recordFrom(debugResult?.data)
+  const result = recordFrom(debugData?.result)
+  const output = recordFrom(debugData?.output)
+  const rawError = recordFrom(raw.error)
+
+  return firstMessage(
+    result?.error,
+    output?.error,
+    result?.message,
+    output?.message,
+    raw.fail_reason,
+    rawError?.message,
+    raw.message
+  )
+}
+
 /**
  * Get user available models.
  */
@@ -156,6 +196,7 @@ export async function fetchImageTask(
   } as Record<string, unknown>)
 
   const raw = (res.data?.data ?? res.data) as Record<string, unknown>
+  const errorMessage = extractTaskErrorMessage(raw)
 
   return {
     task_id: (raw.task_id as string) || taskId,
@@ -163,7 +204,7 @@ export async function fetchImageTask(
     progress: normalizeTaskProgress(raw.progress),
     url: (raw.result_url as string) || (raw.url as string) || undefined,
     debugResult: normalizeDebugResult(raw.debug_result),
-    error: raw.fail_reason ? { message: raw.fail_reason as string } : undefined,
+    error: errorMessage ? { message: errorMessage } : undefined,
   } as VideoTaskResponse
 }
 
@@ -203,6 +244,7 @@ export async function fetchVideoTask(
 
   // Unwrap the standard { code, message, data } envelope.
   const raw = (res.data?.data ?? res.data) as Record<string, unknown>
+  const errorMessage = extractTaskErrorMessage(raw)
 
   return {
     task_id: (raw.task_id as string) || taskId,
@@ -210,6 +252,6 @@ export async function fetchVideoTask(
     progress: normalizeTaskProgress(raw.progress),
     url: (raw.result_url as string) || (raw.url as string) || undefined,
     debugResult: normalizeDebugResult(raw.debug_result),
-    error: raw.fail_reason ? { message: raw.fail_reason as string } : undefined,
+    error: errorMessage ? { message: errorMessage } : undefined,
   } as VideoTaskResponse
 }

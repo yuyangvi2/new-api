@@ -291,7 +291,13 @@ export function videoModelSupportsImageInput(model: string): boolean {
 
 // Terminal task statuses reported by the backend (case-insensitive).
 export const VIDEO_SUCCESS_STATUSES = ['succeeded', 'success', 'completed']
-export const VIDEO_FAILED_STATUSES = ['failed', 'error', 'cancelled', 'canceled']
+export const VIDEO_FAILED_STATUSES = [
+  'failed',
+  'failure',
+  'error',
+  'cancelled',
+  'canceled',
+]
 
 // ---------------------------------------------------------------------------
 // Model-family detection & per-family parameter schemas
@@ -429,7 +435,13 @@ export const IMAGE_FAMILY_PARAMS: Record<ImageModelFamily, FamilyParam[]> = {
 export const IMAGE_TASK_POLL_INTERVAL_MS = 3000
 export const IMAGE_TASK_POLL_TIMEOUT_MS = 5 * 60 * 1000
 export const IMAGE_TASK_SUCCESS_STATUSES = ['succeeded', 'success', 'completed']
-export const IMAGE_TASK_FAILED_STATUSES = ['failed', 'error', 'cancelled', 'canceled']
+export const IMAGE_TASK_FAILED_STATUSES = [
+  'failed',
+  'failure',
+  'error',
+  'cancelled',
+  'canceled',
+]
 
 // Max reference images for AIART
 export const MAX_REFERENCE_IMAGES = 5

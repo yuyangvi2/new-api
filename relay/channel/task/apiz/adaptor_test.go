@@ -6,6 +6,8 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBuildSubmitPayloadSeedanceAlias(t *testing.T) {
@@ -75,6 +77,33 @@ func TestParseTaskResultSuccess(t *testing.T) {
 	if info.TotalTokens != 1200 || info.CompletionTokens != 1000 {
 		t.Fatalf("tokens = %d/%d", info.CompletionTokens, info.TotalTokens)
 	}
+}
+
+func TestParseTaskResultFailureUsesNestedProviderError(t *testing.T) {
+	body, err := common.Marshal(map[string]any{
+		"code":    200,
+		"message": "查询成功",
+		"data": map[string]any{
+			"task_id":  "task-upstream",
+			"status":   "failed",
+			"progress": 100,
+			"result": map[string]any{
+				"error": "copyright restriction",
+			},
+			"output": map[string]any{
+				"error": "fallback error",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	adaptor := &TaskAdaptor{}
+	info, err := adaptor.ParseTaskResult(body)
+	require.NoError(t, err)
+
+	assert.EqualValues(t, model.TaskStatusFailure, info.Status)
+	assert.Equal(t, "copyright restriction", info.Reason)
+	assert.Equal(t, "100%", info.Progress)
 }
 
 func TestVariantForModelGenericArkDefaultsToFast(t *testing.T) {

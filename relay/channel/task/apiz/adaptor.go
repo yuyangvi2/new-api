@@ -216,6 +216,10 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 		info.Reason = firstNonEmpty(
 			asString(data["fail_reason"]),
 			asString(data["error"]),
+			asString(lookupNested(data, "result", "error")),
+			asString(lookupNested(data, "output", "error")),
+			asString(lookupNested(data, "result", "message")),
+			asString(lookupNested(data, "output", "message")),
 			asString(data["message"]),
 			asString(envelope["message"]),
 			"generation failed",
