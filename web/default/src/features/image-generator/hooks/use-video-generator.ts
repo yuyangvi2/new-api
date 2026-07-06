@@ -85,10 +85,7 @@ function applyVideoTaskResult(
   patchBatch: PatchVideoBatch
 ): boolean {
   const status = (task.status || '').toLowerCase()
-  const progressPatch = {
-    ...(task.progress ? { progress: task.progress } : {}),
-    ...(task.debugResult ? { debugResult: task.debugResult } : {}),
-  }
+  const progressPatch = task.progress ? { progress: task.progress } : {}
 
   if (VIDEO_SUCCESS_STATUSES.includes(status)) {
     patchBatch(batchId, {

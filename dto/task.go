@@ -55,12 +55,11 @@ type TaskDto struct {
 // TaskPollDto 是面向用户的精简轮询响应，只包含前端渲染所需字段。
 // 不暴露内部信息（channel_id、quota、上游原始数据等）。
 type TaskPollDto struct {
-	TaskID      string          `json:"task_id"`
-	Status      string          `json:"status"`
-	FailReason  string          `json:"fail_reason,omitempty"`
-	ResultURL   string          `json:"result_url,omitempty"`
-	Progress    string          `json:"progress,omitempty"`
-	DebugResult json.RawMessage `json:"debug_result,omitempty"`
+	TaskID     string `json:"task_id"`
+	Status     string `json:"status"`
+	FailReason string `json:"fail_reason,omitempty"`
+	ResultURL  string `json:"result_url,omitempty"`
+	Progress   string `json:"progress,omitempty"`
 }
 
 type FetchReq struct {

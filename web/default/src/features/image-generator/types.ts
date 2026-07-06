@@ -142,7 +142,6 @@ export interface VideoTaskResponse {
   progress?: string
   url?: string
   format?: string
-  debugResult?: string
   error?: { code?: number; message?: string }
 }
 
@@ -157,7 +156,6 @@ export interface VideoBatch {
   imagePreview?: string
   taskId?: string
   progress?: string
-  debugResult?: string
   videoUrl?: string
   errorMessage?: string
   createdAt: number

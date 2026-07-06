@@ -49,25 +49,6 @@ function StatusOverlay({ label }: { label: string }) {
   )
 }
 
-function DebugResult({ value }: { value?: string }) {
-  const { t } = useTranslation()
-
-  if (!value) {
-    return null
-  }
-
-  return (
-    <div className='border-border bg-muted/30 rounded-md border p-2'>
-      <div className='text-muted-foreground mb-1 text-xs font-medium'>
-        {t('Latest polling result')}
-      </div>
-      <pre className='text-muted-foreground max-h-40 overflow-auto text-xs leading-relaxed break-words whitespace-pre-wrap'>
-        {value}
-      </pre>
-    </div>
-  )
-}
-
 interface TaskIdLookupProps {
   className?: string
   onRecoverTask: (taskId: string) => void
@@ -169,28 +150,22 @@ export function VideoResults(props: VideoResultsProps) {
             )}
 
             {batch.status === 'polling' && (
-              <>
-                <StatusOverlay
-                  label={
-                    batch.progress
-                      ? t('Generating video ({{progress}})...', {
-                          progress: batch.progress,
-                        })
-                      : t('Generating video...')
-                  }
-                />
-                <DebugResult value={batch.debugResult} />
-              </>
+              <StatusOverlay
+                label={
+                  batch.progress
+                    ? t('Generating video ({{progress}})...', {
+                        progress: batch.progress,
+                      })
+                    : t('Generating video...')
+                }
+              />
             )}
 
             {batch.status === 'error' && (
-              <>
-                <div className='border-destructive/30 bg-destructive/5 text-destructive flex items-center gap-2 rounded-lg border p-3 text-sm'>
-                  <AlertCircleIcon size={16} />
-                  {batch.errorMessage || t('Video generation failed')}
-                </div>
-                <DebugResult value={batch.debugResult} />
-              </>
+              <div className='border-destructive/30 bg-destructive/5 text-destructive flex items-center gap-2 rounded-lg border p-3 text-sm'>
+                <AlertCircleIcon size={16} />
+                {batch.errorMessage || t('Video generation failed')}
+              </div>
             )}
 
             {batch.status === 'complete' && batch.videoUrl && (

@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTaskModel2PollDtoDoesNotExposeFailReasonAsResultURL(t *testing.T) {
@@ -23,4 +25,8 @@ func TestTaskModel2PollDtoDoesNotExposeFailReasonAsResultURL(t *testing.T) {
 	assert.Equal(t, "FAILURE", dto.Status)
 	assert.Equal(t, "copyright restriction", dto.FailReason)
 	assert.Empty(t, dto.ResultURL)
+
+	data, err := common.Marshal(dto)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "debug_result")
 }

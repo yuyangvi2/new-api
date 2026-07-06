@@ -44,18 +44,6 @@ function normalizeTaskProgress(progress: unknown): string | undefined {
   return normalized || undefined
 }
 
-function normalizeDebugResult(value: unknown): string | undefined {
-  if (value === undefined || value === null) return undefined
-  const normalized =
-    typeof value === 'string' ? value : JSON.stringify(value, null, 2)
-  const trimmed = normalized.trim()
-  if (!trimmed) return undefined
-  const maxLength = 6000
-  return trimmed.length > maxLength
-    ? `${trimmed.slice(0, maxLength)}...`
-    : trimmed
-}
-
 function recordFrom(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -79,17 +67,9 @@ function firstMessage(...values: unknown[]): string | undefined {
 function extractTaskErrorMessage(
   raw: Record<string, unknown>
 ): string | undefined {
-  const debugResult = recordFrom(raw.debug_result)
-  const debugData = recordFrom(debugResult?.data)
-  const result = recordFrom(debugData?.result)
-  const output = recordFrom(debugData?.output)
   const rawError = recordFrom(raw.error)
 
   return firstMessage(
-    result?.error,
-    output?.error,
-    result?.message,
-    output?.message,
     raw.fail_reason,
     rawError?.message,
     raw.message
@@ -203,7 +183,6 @@ export async function fetchImageTask(
     status: (raw.status as string) || '',
     progress: normalizeTaskProgress(raw.progress),
     url: (raw.result_url as string) || (raw.url as string) || undefined,
-    debugResult: normalizeDebugResult(raw.debug_result),
     error: errorMessage ? { message: errorMessage } : undefined,
   } as VideoTaskResponse
 }
@@ -251,7 +230,6 @@ export async function fetchVideoTask(
     status: (raw.status as string) || '',
     progress: normalizeTaskProgress(raw.progress),
     url: (raw.result_url as string) || (raw.url as string) || undefined,
-    debugResult: normalizeDebugResult(raw.debug_result),
     error: errorMessage ? { message: errorMessage } : undefined,
   } as VideoTaskResponse
 }

@@ -601,11 +601,10 @@ func TaskModel2PollDto(task *model.Task) *dto.TaskPollDto {
 		resultURL = ""
 	}
 	return &dto.TaskPollDto{
-		TaskID:      task.TaskID,
-		Status:      string(task.Status),
-		FailReason:  task.FailReason,
-		ResultURL:   resultURL,
-		Progress:    task.Progress,
-		DebugResult: task.Data,
+		TaskID:     task.TaskID,
+		Status:     string(task.Status),
+		FailReason: task.FailReason,
+		ResultURL:  resultURL,
+		Progress:   task.Progress,
 	}
 }
