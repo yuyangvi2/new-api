@@ -155,6 +155,7 @@ export const VIDEO_MODEL_VARIANT_SETS: VideoModelVariantSet[] = [
         options: [
           { label: 'Direct', value: 'direct' },
           { label: 'Vision', value: 'vision' },
+          { label: 'Mini', value: 'mini' },
         ],
       },
       {
@@ -171,6 +172,8 @@ export const VIDEO_MODEL_VARIANT_SETS: VideoModelVariantSet[] = [
       'direct:fast': 'seedance2.0_fast_direct',
       'vision:standard': 'seedance2.0_vision',
       'vision:fast': 'seedance2.0_fast_vision',
+      'mini:standard': 'seedance2.0_mini',
+      'mini:fast': 'seedance2.0_fast_mini',
     },
   },
 ]
@@ -269,6 +272,8 @@ const IMAGE_OPTIONAL_VIDEO_MODELS = new Set([
   'dreamina-seedance-2-0-fast-260128',
   'seedance2.0_direct',
   'seedance2.0_fast_direct',
+  'seedance2.0_mini',
+  'seedance2.0_fast_mini',
 ])
 
 const IMAGE_REQUIRED_VIDEO_MODELS = new Set([
@@ -286,6 +291,8 @@ export function videoModelSupportsImageInput(model: string): boolean {
   if (IMAGE_REQUIRED_VIDEO_MODELS.has(model)) return true
   if (model === 'seedance2.0_direct') return false
   if (model === 'seedance2.0_fast_direct') return false
+  if (model === 'seedance2.0_mini') return false
+  if (model === 'seedance2.0_fast_mini') return false
   return true
 }
 

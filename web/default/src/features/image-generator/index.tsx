@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
@@ -66,6 +66,10 @@ function getDisplayVideoModels(models: ModelOption[]): ModelOption[] {
     }))
 }
 
+interface ImageGeneratorProps {
+  initialVideoTaskId?: string
+}
+
 function mergeGroupOptions(
   groups: GroupOption[],
   models: ModelOption[],
@@ -96,9 +100,10 @@ function mergeGroupOptions(
   return [...merged.values()]
 }
 
-export function ImageGenerator() {
+export function ImageGenerator(props: ImageGeneratorProps) {
   const { t } = useTranslation()
   const [mode, setMode] = useState<GeneratorMode>('image')
+  const recoveredVideoTaskIdRef = useRef<string | null>(null)
   const portalTarget = useSidebarPortalTarget()
 
   const imageGen = useImageGenerator()
@@ -107,6 +112,18 @@ export function ImageGenerator() {
   const videoConfig = videoGen.config
   const updateImageConfig = imageGen.updateConfig
   const updateVideoConfig = videoGen.updateConfig
+  const recoverVideoTask = videoGen.recoverTask
+  const isVideoGenerating = videoGen.isGenerating
+
+  useEffect(() => {
+    const taskId = props.initialVideoTaskId?.trim()
+    if (!taskId || recoveredVideoTaskIdRef.current === taskId) return
+    if (isVideoGenerating) return
+
+    recoveredVideoTaskIdRef.current = taskId
+    setMode('video')
+    recoverVideoTask(taskId)
+  }, [props.initialVideoTaskId, isVideoGenerating, recoverVideoTask])
 
   const { data: models = [], isLoading: isModelLoading } = useQuery({
     queryKey: ['image-generator-models', t],
@@ -346,6 +363,7 @@ export function ImageGenerator() {
           ) : (
             <VideoResults
               batches={videoGen.batches}
+              onRecoverTask={videoGen.recoverTask}
               onClearHistory={videoGen.clearHistory}
             />
           )}

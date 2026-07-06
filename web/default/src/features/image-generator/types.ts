@@ -154,7 +154,7 @@ export interface VideoBatch {
   prompt: string
   model: string
   // Displayable source of the input image (data URI or URL).
-  imagePreview: string
+  imagePreview?: string
   taskId?: string
   progress?: string
   debugResult?: string

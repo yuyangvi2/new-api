@@ -17,7 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { ColumnDef } from '@tanstack/react-table'
-import { Music } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import { Film, Music } from 'lucide-react'
 /* eslint-disable react-refresh/only-export-components */
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -87,6 +88,24 @@ function AudioPreviewCell({ log }: { log: TaskLog }) {
         clips={clips as AudioClip[]}
       />
     </>
+  )
+}
+
+function isVideoTaskAction(action: string): boolean {
+  return (
+    action === TASK_ACTIONS.GENERATE ||
+    action === TASK_ACTIONS.TEXT_GENERATE ||
+    action === TASK_ACTIONS.FIRST_TAIL_GENERATE ||
+    action === TASK_ACTIONS.REFERENCE_GENERATE ||
+    action === TASK_ACTIONS.REMIX_GENERATE
+  )
+}
+
+function canOpenVideoTask(log: TaskLog): boolean {
+  return (
+    log.task_id !== '' &&
+    log.status !== TASK_STATUS.FAILURE &&
+    isVideoTaskAction(log.action)
   )
 }
 
@@ -184,6 +203,16 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
             <span className='text-muted-foreground/60 truncate text-[11px]'>
               {t(log.platform)} · {t(taskActionMapper.getLabel(log.action))}
             </span>
+            {canOpenVideoTask(log) && (
+              <Link
+                to='/image-generator'
+                search={{ task_id: taskId }}
+                className='text-primary hover:text-primary/80 inline-flex items-center gap-1 text-[11px] hover:underline'
+              >
+                <Film className='size-3' />
+                {t('View in generator')}
+              </Link>
+            )}
           </div>
         )
       },
@@ -238,26 +267,30 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
           }
         }
 
-        const isVideoTask =
-          log.action === TASK_ACTIONS.GENERATE ||
-          log.action === TASK_ACTIONS.TEXT_GENERATE ||
-          log.action === TASK_ACTIONS.FIRST_TAIL_GENERATE ||
-          log.action === TASK_ACTIONS.REFERENCE_GENERATE ||
-          log.action === TASK_ACTIONS.REMIX_GENERATE
+        const isVideoTask = isVideoTaskAction(log.action)
         const isSuccess = status === TASK_STATUS.SUCCESS
-        const isUrl = failReason?.startsWith('http')
 
-        if (isSuccess && isVideoTask && isUrl) {
+        if (isSuccess && isVideoTask) {
           const videoUrl = `/v1/videos/${log.task_id}/content`
           return (
-            <a
-              href={videoUrl}
-              target='_blank'
-              rel='noopener noreferrer'
-              className='text-foreground text-xs hover:underline'
-            >
-              {t('Click to preview video')}
-            </a>
+            <div className='flex flex-col gap-1 text-xs'>
+              <a
+                href={videoUrl}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='text-foreground hover:underline'
+              >
+                {t('Click to preview video')}
+              </a>
+              <Link
+                to='/image-generator'
+                search={{ task_id: log.task_id }}
+                className='text-primary hover:text-primary/80 inline-flex items-center gap-1 hover:underline'
+              >
+                <Film className='size-3' />
+                {t('View in generator')}
+              </Link>
+            </div>
           )
         }
 

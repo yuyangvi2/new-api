@@ -30,7 +30,7 @@ import {
   videoModelRequiresImage,
   videoModelSupportsImageInput,
 } from '../constants'
-import type { VideoBatch, VideoConfig } from '../types'
+import type { VideoBatch, VideoConfig, VideoTaskResponse } from '../types'
 
 function loadConfig(): VideoConfig {
   try {
@@ -73,6 +73,117 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   })
 }
 
+type PatchVideoBatch = (id: string, patch: Partial<VideoBatch>) => void
+
+function videoContentUrl(taskId: string): string {
+  return `/v1/videos/${taskId}/content`
+}
+
+function applyVideoTaskResult(
+  batchId: string,
+  task: VideoTaskResponse,
+  patchBatch: PatchVideoBatch
+): boolean {
+  const status = (task.status || '').toLowerCase()
+  const progressPatch = {
+    ...(task.progress ? { progress: task.progress } : {}),
+    ...(task.debugResult ? { debugResult: task.debugResult } : {}),
+  }
+
+  if (VIDEO_SUCCESS_STATUSES.includes(status)) {
+    patchBatch(batchId, {
+      ...progressPatch,
+      status: 'complete',
+      videoUrl: videoContentUrl(task.task_id),
+    })
+    return true
+  }
+
+  if (VIDEO_FAILED_STATUSES.includes(status)) {
+    patchBatch(batchId, {
+      ...progressPatch,
+      status: 'error',
+      errorMessage: task.error?.message || 'Video generation failed',
+    })
+    return true
+  }
+
+  if (Object.keys(progressPatch).length > 0) {
+    patchBatch(batchId, progressPatch)
+  }
+  return false
+}
+
+async function pollVideoTask(
+  taskId: string,
+  batchId: string,
+  signal: AbortSignal,
+  patchBatch: PatchVideoBatch,
+  fetchImmediately: boolean
+): Promise<void> {
+  const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS
+
+  if (fetchImmediately) {
+    const task = await fetchVideoTask(taskId, signal)
+    if (applyVideoTaskResult(batchId, task, patchBatch)) {
+      return
+    }
+  }
+
+  while (true) {
+    await sleep(VIDEO_POLL_INTERVAL_MS, signal)
+
+    const task = await fetchVideoTask(taskId, signal)
+    if (applyVideoTaskResult(batchId, task, patchBatch)) {
+      return
+    }
+
+    if (Date.now() > deadline) {
+      patchBatch(batchId, {
+        status: 'error',
+        errorMessage: 'Timed out waiting for the video',
+      })
+      return
+    }
+  }
+}
+
+function extractErrorMessage(error: unknown): string {
+  const err = error as {
+    response?: {
+      data?: { message?: string; error?: { message?: string } }
+    }
+    message?: string
+  }
+
+  return (
+    err?.response?.data?.error?.message ||
+    err?.response?.data?.message ||
+    err?.message ||
+    'Video generation failed'
+  )
+}
+
+function patchVideoTaskError(
+  batchId: string,
+  error: unknown,
+  patchBatch: PatchVideoBatch
+): void {
+  const err = error as { name?: string }
+  if (err?.name === 'CanceledError' || err?.name === 'AbortError') {
+    patchBatch(batchId, {
+      status: 'error',
+      errorMessage: 'Generation cancelled',
+    })
+    return
+  }
+
+  patchBatch(batchId, {
+    status: 'error',
+    errorMessage: extractErrorMessage(error),
+  })
+}
+
 interface UseVideoGeneratorResult {
   config: VideoConfig
   updateConfig: <K extends keyof VideoConfig>(
@@ -82,6 +193,7 @@ interface UseVideoGeneratorResult {
   batches: VideoBatch[]
   isGenerating: boolean
   generate: () => Promise<void>
+  recoverTask: (taskId: string) => void
   cancel: () => void
   clearHistory: () => void
 }
@@ -167,74 +279,52 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
 
       patchBatch(batchId, { status: 'polling', taskId: submit.task_id })
 
-      // Poll until the task reaches a terminal state or times out.
-      const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS
-      while (true) {
-        await sleep(VIDEO_POLL_INTERVAL_MS, controller.signal)
-
-        const task = await fetchVideoTask(submit.task_id, controller.signal)
-        const status = (task.status || '').toLowerCase()
-        if (task.progress || task.debugResult) {
-          patchBatch(batchId, {
-            ...(task.progress ? { progress: task.progress } : {}),
-            ...(task.debugResult ? { debugResult: task.debugResult } : {}),
-          })
-        }
-
-        if (VIDEO_SUCCESS_STATUSES.includes(status)) {
-          if (task.url) {
-            patchBatch(batchId, { status: 'complete', videoUrl: task.url })
-          } else {
-            patchBatch(batchId, {
-              status: 'error',
-              errorMessage: 'Task succeeded but no video URL was returned',
-            })
-          }
-          break
-        }
-
-        if (VIDEO_FAILED_STATUSES.includes(status)) {
-          patchBatch(batchId, {
-            status: 'error',
-            errorMessage: task.error?.message || 'Video generation failed',
-          })
-          break
-        }
-
-        if (Date.now() > deadline) {
-          patchBatch(batchId, {
-            status: 'error',
-            errorMessage: 'Timed out waiting for the video',
-          })
-          break
-        }
-      }
+      await pollVideoTask(
+        submit.task_id,
+        batchId,
+        controller.signal,
+        patchBatch,
+        false
+      )
     } catch (error: unknown) {
-      const err = error as {
-        name?: string
-        response?: {
-          data?: { message?: string; error?: { message?: string } }
-        }
-        message?: string
-      }
-      if (err?.name === 'CanceledError' || err?.name === 'AbortError') {
-        patchBatch(batchId, {
-          status: 'error',
-          errorMessage: 'Generation cancelled',
-        })
-      } else {
-        const message =
-          err?.response?.data?.error?.message ||
-          err?.response?.data?.message ||
-          err?.message ||
-          'Video generation failed'
-        patchBatch(batchId, { status: 'error', errorMessage: message })
-      }
+      patchVideoTaskError(batchId, error, patchBatch)
     } finally {
       abortRef.current = null
       setIsGenerating(false)
     }
   }, [config, isGenerating, patchBatch])
+
+  const recoverTask = useCallback(
+    (taskIdInput: string) => {
+      const taskId = taskIdInput.trim()
+      if (!taskId || isGenerating) return
+
+      const batchId = genId()
+      const batch: VideoBatch = {
+        id: batchId,
+        status: 'polling',
+        prompt: '',
+        model: '',
+        taskId,
+        createdAt: Date.now(),
+      }
+      setBatches((prev) => [batch, ...prev.filter((b) => b.taskId !== taskId)])
+      setIsGenerating(true)
+
+      const controller = new AbortController()
+      abortRef.current = controller
+
+      void pollVideoTask(taskId, batchId, controller.signal, patchBatch, true)
+        .catch((error: unknown) => {
+          patchVideoTaskError(batchId, error, patchBatch)
+        })
+        .finally(() => {
+          abortRef.current = null
+          setIsGenerating(false)
+        })
+    },
+    [isGenerating, patchBatch]
+  )
 
   const cancel = useCallback(() => {
     abortRef.current?.abort()
@@ -250,6 +340,7 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
     batches,
     isGenerating,
     generate,
+    recoverTask,
     cancel,
     clearHistory,
   }

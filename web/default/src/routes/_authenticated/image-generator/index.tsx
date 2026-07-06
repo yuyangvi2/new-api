@@ -17,9 +17,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
+import { z } from 'zod'
+
 import { isSidebarModuleEnabled } from '@/lib/nav-modules'
 import { Main } from '@/components/layout'
 import { ImageGenerator } from '@/features/image-generator'
+
+const imageGeneratorSearchSchema = z.object({
+  task_id: z.string().optional().catch(''),
+})
 
 export const Route = createFileRoute('/_authenticated/image-generator/')({
   beforeLoad: () => {
@@ -27,13 +33,16 @@ export const Route = createFileRoute('/_authenticated/image-generator/')({
       throw redirect({ to: '/dashboard' })
     }
   },
+  validateSearch: imageGeneratorSearchSchema,
   component: ImageGeneratorPage,
 })
 
 function ImageGeneratorPage() {
+  const { task_id } = Route.useSearch()
+
   return (
     <Main className='p-0'>
-      <ImageGenerator />
+      <ImageGenerator initialVideoTaskId={task_id} />
     </Main>
   )
 }

@@ -16,22 +16,27 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useState, type FormEvent } from 'react'
 import {
   AlertCircleIcon,
   DownloadIcon,
   FilmIcon,
+  SearchIcon,
   Trash2Icon,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
+import { cn } from '@/lib/utils'
 
 import type { VideoBatch } from '../types'
 
 interface VideoResultsProps {
   batches: VideoBatch[]
+  onRecoverTask: (taskId: string) => void
   onClearHistory: () => void
 }
 
@@ -63,10 +68,47 @@ function DebugResult({ value }: { value?: string }) {
   )
 }
 
-export function VideoResults({ batches, onClearHistory }: VideoResultsProps) {
+interface TaskIdLookupProps {
+  className?: string
+  onRecoverTask: (taskId: string) => void
+}
+
+function TaskIdLookup(props: TaskIdLookupProps) {
+  const { t } = useTranslation()
+  const [taskId, setTaskId] = useState('')
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const trimmedTaskId = taskId.trim()
+    if (!trimmedTaskId) return
+    props.onRecoverTask(trimmedTaskId)
+    setTaskId('')
+  }
+
+  return (
+    <form
+      className={cn('flex w-full max-w-md items-center gap-2', props.className)}
+      onSubmit={handleSubmit}
+    >
+      <Input
+        value={taskId}
+        onChange={(event) => setTaskId(event.target.value)}
+        placeholder={t('Enter task ID')}
+        aria-label={t('Task ID')}
+        className='font-mono text-xs'
+      />
+      <Button type='submit' size='sm' disabled={!taskId.trim()}>
+        <SearchIcon size={14} />
+        {t('Find')}
+      </Button>
+    </form>
+  )
+}
+
+export function VideoResults(props: VideoResultsProps) {
   const { t } = useTranslation()
 
-  if (batches.length === 0) {
+  if (props.batches.length === 0) {
     return (
       <div className='flex h-full flex-col items-center justify-center p-8 text-center'>
         <div className='bg-muted text-muted-foreground mb-4 flex size-16 items-center justify-center rounded-2xl'>
@@ -78,34 +120,47 @@ export function VideoResults({ batches, onClearHistory }: VideoResultsProps) {
             'Pick an input image and click Generate video to animate it. This can take a minute or two.'
           )}
         </p>
+        <TaskIdLookup className='mt-6' onRecoverTask={props.onRecoverTask} />
       </div>
     )
   }
 
   return (
     <div className='flex h-full flex-col'>
-      <div className='flex items-center justify-between border-b p-4'>
+      <div className='flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between'>
         <h2 className='text-base font-semibold'>{t('Results')}</h2>
-        <Button variant='ghost' size='sm' onClick={onClearHistory}>
-          <Trash2Icon size={14} />
-          {t('Clear')}
-        </Button>
+        <div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
+          <TaskIdLookup
+            className='max-w-none sm:w-80'
+            onRecoverTask={props.onRecoverTask}
+          />
+          <Button variant='ghost' size='sm' onClick={props.onClearHistory}>
+            <Trash2Icon size={14} />
+            {t('Clear')}
+          </Button>
+        </div>
       </div>
 
       <div className='flex-1 space-y-6 overflow-y-auto p-4'>
-        {batches.map((batch) => (
+        {props.batches.map((batch) => (
           <div key={batch.id} className='space-y-2'>
             <div className='flex items-start gap-3'>
-              <img
-                src={batch.imagePreview}
-                alt=''
-                className='size-12 shrink-0 rounded-md border object-cover'
-              />
+              {batch.imagePreview ? (
+                <img
+                  src={batch.imagePreview}
+                  alt=''
+                  className='size-12 shrink-0 rounded-md border object-cover'
+                />
+              ) : (
+                <div className='bg-muted text-muted-foreground flex size-12 shrink-0 items-center justify-center rounded-md border'>
+                  <FilmIcon size={18} />
+                </div>
+              )}
               <p className='text-muted-foreground line-clamp-2 flex-1 text-sm'>
-                {batch.prompt || t('(no prompt)')}
+                {batch.prompt || batch.taskId || t('(no prompt)')}
               </p>
               <Badge variant='secondary' className='shrink-0'>
-                {batch.model}
+                {batch.model || t('Recovered task')}
               </Badge>
             </div>
 
