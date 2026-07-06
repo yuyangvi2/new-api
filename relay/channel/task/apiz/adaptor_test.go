@@ -111,3 +111,10 @@ func TestVariantForModelGenericArkDefaultsToFast(t *testing.T) {
 		t.Fatalf("variantForModel(%q) = %q, want seedance_2.0_fast", seedanceID, got)
 	}
 }
+
+func TestVariantForModelSeedanceMini(t *testing.T) {
+	assert.True(t, isSupportedModel("seedance2.0_mini"))
+	assert.True(t, isSupportedModel("seedance2.0_fast_mini"))
+	assert.Equal(t, "seedance_2.0_mini", variantForModel("seedance2.0_mini"))
+	assert.Equal(t, "seedance_2.0_fast_mini", variantForModel("seedance2.0_fast_mini"))
+}

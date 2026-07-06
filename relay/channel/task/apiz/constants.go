@@ -8,6 +8,8 @@ var ModelList = []string{
 	"seedance2.0_vision",
 	"seedance2.0_fast_direct",
 	"seedance2.0_fast_vision",
+	"seedance2.0_mini",
+	"seedance2.0_fast_mini",
 }
 
 var ChannelName = "apiz"

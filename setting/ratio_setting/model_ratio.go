@@ -210,10 +210,12 @@ var defaultModelRatio = map[string]float64{
 	"doubao-seedance-2-0-260128":      46.0 / 14.0,
 	"seedance2.0_direct":              46.0 / 14.0,
 	"seedance2.0_vision":              46.0 / 14.0,
+	"seedance2.0_mini":                46.0 / 14.0,
 	"ark/seedance-2.0":                37.0 / 14.0,
 	"doubao-seedance-2-0-fast-260128": 37.0 / 14.0,
 	"seedance2.0_fast_direct":         37.0 / 14.0,
 	"seedance2.0_fast_vision":         37.0 / 14.0,
+	"seedance2.0_fast_mini":           37.0 / 14.0,
 	"text-embedding-v1":               0.05,   // ￥0.0007 / 1k tokens
 	"SparkDesk-v1.1":                  1.2858, // ￥0.018 / 1k tokens
 	"SparkDesk-v2.1":                  1.2858, // ￥0.018 / 1k tokens
