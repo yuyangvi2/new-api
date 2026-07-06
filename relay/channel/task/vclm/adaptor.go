@@ -6,6 +6,7 @@
 //   - Vidu       : 有图→SubmitImageToVideoViduJob / 无图→SubmitTextToVideoViduJob
 //   - Hunyuan    : SubmitHunyuanToVideoJob
 //   - General    : SubmitImageToVideoGeneralJob
+//
 // 其它能力（换脸/数字人/模板/视频编辑等）可后续往 modelDefs / buildRequest 里加。
 //
 // task.Action 存「提交 Action 名」，轮询时 FetchTask 据此推出对应 Describe Action。
@@ -191,7 +192,7 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	body := buildRequest(action, &req, info.UpstreamModelName)
 
 	// metadata 透传/覆盖（PascalCase 键，供各 Action 特有参数）
-	if err := taskcommon.UnmarshalMetadata(req.Metadata, &body); err != nil {
+	if err := taskcommon.UnmarshalMetadata(sanitizeVCLMMetadata(req.Metadata), &body); err != nil {
 		return nil, errors.Wrap(err, "unmarshal metadata failed")
 	}
 
@@ -202,6 +203,25 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	c.Set(ctxPayloadKey, data)
 	c.Set(ctxActionKey, action)
 	return bytes.NewReader(data), nil
+}
+
+func sanitizeVCLMMetadata(metadata map[string]interface{}) map[string]interface{} {
+	if len(metadata) == 0 {
+		return nil
+	}
+	filtered := make(map[string]interface{}, len(metadata))
+	for key, value := range metadata {
+		switch key {
+		case "MovementAmplitude", "movement_amplitude":
+			continue
+		default:
+			filtered[key] = value
+		}
+	}
+	if len(filtered) == 0 {
+		return nil
+	}
+	return filtered
 }
 
 // buildTcImage 根据输入是 URL 还是 base64，放入 VCLM Image 对象对应的字段。
