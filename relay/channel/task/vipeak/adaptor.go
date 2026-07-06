@@ -293,26 +293,55 @@ func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInf
 		return nil
 	}
 
-	resolution := strings.TrimSpace(asString(req.Metadata["resolution"]))
-	if resolution == "" {
-		resolution = strings.TrimSpace(req.Size)
-	}
-	ratio, ok := doubaotask.GetVideoInputRatio(info.OriginModelName, resolution, hasVideoInput(req))
-	if !ok || ratio == 1.0 {
+	billingModel, ok := seedanceBillingModel(info.OriginModelName)
+	if !ok {
 		return nil
 	}
-	return map[string]float64{"video_input": ratio}
+	quota, _, _, ok := doubaotask.EstimateSeedanceQuotaForRequest(
+		billingModel,
+		req,
+		hasVideoInput(req),
+		info.PriceData.GroupRatioInfo.GroupRatio,
+	)
+	if !ok || info.PriceData.Quota <= 0 {
+		return nil
+	}
+	ratio := float64(quota) / float64(info.PriceData.Quota)
+	if ratio == 1.0 {
+		return nil
+	}
+	return map[string]float64{"seedance_estimated_price": ratio}
+}
+
+func seedanceBillingModel(modelName string) (string, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(modelName))
+	switch normalized {
+	case "dreamina-seedance-2-0-260128", "seedance":
+		return "seedance2.0_direct", true
+	case "dreamina-seedance-2-0-fast-260128", "seedance-fast":
+		return "seedance2.0_fast_direct", true
+	default:
+		if doubaotask.IsSeedanceModel(modelName) {
+			return modelName, true
+		}
+		return "", false
+	}
 }
 
 func hasVideoInput(req relaycommon.TaskSubmitReq) bool {
 	if strings.TrimSpace(req.InputReference) != "" {
 		return true
 	}
-	contentRaw, ok := req.Metadata["content"]
-	if !ok {
-		return false
+	if metadataHasNonEmptyList(req.Metadata,
+		"video_files",
+		"referenceVideoUrls",
+		"reference_video_urls",
+		"referenceVideoAssetIds",
+		"reference_video_asset_ids",
+	) {
+		return true
 	}
-	content, ok := contentRaw.([]interface{})
+	content, ok := req.Metadata["content"].([]interface{})
 	if !ok {
 		return false
 	}
@@ -321,8 +350,31 @@ func hasVideoInput(req relaycommon.TaskSubmitReq) bool {
 		if !ok {
 			continue
 		}
+		if itemMap["type"] == "video_url" {
+			return true
+		}
 		if _, ok := itemMap["video_url"]; ok {
 			return true
+		}
+	}
+	return false
+}
+
+func metadataHasNonEmptyList(metadata map[string]interface{}, keys ...string) bool {
+	for _, key := range keys {
+		switch value := metadata[key].(type) {
+		case []string:
+			for _, item := range value {
+				if strings.TrimSpace(item) != "" {
+					return true
+				}
+			}
+		case []interface{}:
+			for _, item := range value {
+				if strings.TrimSpace(asString(item)) != "" {
+					return true
+				}
+			}
 		}
 	}
 	return false
