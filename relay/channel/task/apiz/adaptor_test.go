@@ -113,10 +113,14 @@ func TestVariantForModelGenericArkDefaultsToFast(t *testing.T) {
 }
 
 func TestVariantForModelSeedanceMini(t *testing.T) {
+	assert.True(t, isSupportedModel("Seedance_2.0_mini"))
+	assert.True(t, isSupportedModel("Seedance_2.0_mini_lite"))
 	assert.True(t, isSupportedModel("seedance2.0_mini"))
 	assert.True(t, isSupportedModel("seedance2.0_fast_mini"))
-	assert.Equal(t, "seedance_2.0_mini", variantForModel("seedance2.0_mini"))
-	assert.Equal(t, "seedance_2.0_fast_mini", variantForModel("seedance2.0_fast_mini"))
+	assert.Equal(t, "Seedance_2.0_mini", variantForModel("Seedance_2.0_mini"))
+	assert.Equal(t, "Seedance_2.0_mini_lite", variantForModel("Seedance_2.0_mini_lite"))
+	assert.Equal(t, "Seedance_2.0_mini", variantForModel("seedance2.0_mini"))
+	assert.Equal(t, "Seedance_2.0_mini_lite", variantForModel("seedance2.0_fast_mini"))
 }
 
 func TestBuildSubmitPayloadSeedanceVisionRejectsUploadImage(t *testing.T) {
@@ -145,17 +149,79 @@ func TestBuildSubmitPayloadSeedanceVisionAcceptsAssetURI(t *testing.T) {
 	assert.Equal(t, "Asset://image-id", payload.Params["image_url"])
 }
 
-func TestBuildSubmitPayloadSeedanceMiniDropsStaleImage(t *testing.T) {
+func TestBuildSubmitPayloadSeedanceVisionAllowsMissingImage(t *testing.T) {
+	req := &relaycommon.TaskSubmitReq{
+		Model:    "seedance2.0_vision",
+		Prompt:   "move",
+		Metadata: map[string]interface{}{},
+	}
+
+	payload, err := buildSubmitPayload(req, "seedance2.0_vision", seedanceID)
+	require.NoError(t, err)
+	assert.Equal(t, "seedance_2.0", payload.Params["model"])
+	assert.NotContains(t, payload.Params, "image_url")
+	assert.NotContains(t, payload.Params, "reference_images")
+}
+
+func TestBuildSubmitPayloadSeedanceMiniAcceptsAssetURI(t *testing.T) {
 	req := &relaycommon.TaskSubmitReq{
 		Model:    "seedance2.0_mini",
 		Prompt:   "move",
-		Image:    "data:image/png;base64,abcd",
+		Image:    "Asset://image-id",
 		Metadata: map[string]interface{}{},
 	}
 
 	payload, err := buildSubmitPayload(req, "seedance2.0_mini", seedanceID)
 	require.NoError(t, err)
-	assert.Equal(t, "seedance_2.0_mini", payload.Params["model"])
+	assert.Equal(t, "Seedance_2.0_mini", payload.Params["model"])
+	assert.Equal(t, "Asset://image-id", payload.Params["image_url"])
+}
+
+func TestBuildSubmitPayloadSeedanceReferenceImagesUseArray(t *testing.T) {
+	req := &relaycommon.TaskSubmitReq{
+		Model:  "seedance2.0_direct",
+		Prompt: "move with references",
+		Images: []string{"https://example.com/reference.png"},
+		Metadata: map[string]interface{}{
+			"resolution": "720p",
+		},
+	}
+
+	payload, err := buildSubmitPayload(req, "seedance2.0_direct", seedanceID)
+	require.NoError(t, err)
+
 	assert.NotContains(t, payload.Params, "image_url")
-	assert.NotContains(t, payload.Params, "reference_images")
+	assert.Equal(t, []string{"https://example.com/reference.png"}, payload.Params["reference_images"])
+}
+
+func TestBuildSubmitPayloadSeedanceReferenceMedia(t *testing.T) {
+	req := &relaycommon.TaskSubmitReq{
+		Model:  "seedance2.0_direct",
+		Prompt: "move with references",
+		Metadata: map[string]interface{}{
+			"video_files": []interface{}{"https://example.com/reference.mp4"},
+			"audio_files": []interface{}{"https://example.com/reference.mp3"},
+		},
+	}
+
+	payload, err := buildSubmitPayload(req, "seedance2.0_direct", seedanceID)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"https://example.com/reference.mp4"}, payload.Params["video_files"])
+	assert.Equal(t, []string{"https://example.com/reference.mp3"}, payload.Params["audio_files"])
+	assert.True(t, hasVideoInput(*req))
+}
+
+func TestBuildSubmitPayloadSeedanceRejectsAudioOnly(t *testing.T) {
+	req := &relaycommon.TaskSubmitReq{
+		Model:  "seedance2.0_direct",
+		Prompt: "move with audio",
+		Metadata: map[string]interface{}{
+			"audio_files": []interface{}{"https://example.com/reference.mp3"},
+		},
+	}
+
+	_, err := buildSubmitPayload(req, "seedance2.0_direct", seedanceID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "audio_files cannot be used alone")
 }

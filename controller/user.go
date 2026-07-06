@@ -20,6 +20,7 @@ import (
 	"github.com/QuantumNous/new-api/service/authz"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
 	"github.com/QuantumNous/new-api/constant"
 
@@ -636,11 +637,15 @@ func GetUserModels(c *gin.Context) {
 	if c.Query("with_groups") == "true" {
 		data := make([]gin.H, 0, len(models))
 		for _, modelName := range models {
-			data = append(data, gin.H{
+			item := gin.H{
 				"label":  modelName,
 				"value":  modelName,
 				"groups": modelGroups[modelName],
-			})
+			}
+			if modelRatio, ok, _ := ratio_setting.GetModelRatio(modelName); ok {
+				item["model_ratio"] = modelRatio
+			}
+			data = append(data, item)
 		}
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,

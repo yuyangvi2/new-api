@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	Port         = flag.Int("port", 3000, "the listening port")
-	PrintVersion = flag.Bool("version", false, "print version and exit")
-	PrintHelp    = flag.Bool("help", false, "print help and exit")
-	LogDir       = flag.String("log-dir", "./logs", "specify the log directory")
+	Port           = flag.Int("port", 3000, "the listening port")
+	PrintVersion   = flag.Bool("version", false, "print version and exit")
+	PrintHelp      = flag.Bool("help", false, "print help and exit")
+	LogDir         = flag.String("log-dir", "./logs", "specify the log directory")
+	MediaUploadDir = flag.String("media-upload-dir", "./public/uploads/media", "specify the media upload directory")
 )
 
 func printHelp() {
@@ -72,6 +73,19 @@ func InitEnv() {
 		}
 		if _, err := os.Stat(*LogDir); os.IsNotExist(err) {
 			err = os.Mkdir(*LogDir, 0777)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
+	if *MediaUploadDir != "" {
+		var err error
+		*MediaUploadDir, err = filepath.Abs(*MediaUploadDir)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if _, err := os.Stat(*MediaUploadDir); os.IsNotExist(err) {
+			err = os.MkdirAll(*MediaUploadDir, 0755)
 			if err != nil {
 				log.Fatal(err)
 			}

@@ -37,6 +37,7 @@ export const API_ENDPOINTS = {
   IMAGE_TASK: (taskId: string) => `/pg/video/generations/${taskId}`,
   VIDEO_SUBMIT: '/pg/video/generations',
   VIDEO_TASK: (taskId: string) => `/pg/video/generations/${taskId}`,
+  MEDIA_UPLOAD: '/api/media/upload',
   USER_MODELS: '/api/user/models',
   USER_GROUPS: '/api/user/self/groups',
 } as const
@@ -122,10 +123,36 @@ export const VIDEO_SIZE_PRESETS: VideoSizePreset[] = [
   },
 ]
 
+export interface VideoRatioPreset {
+  label: string
+  value: string
+  ratio: number
+}
+
+export const SEEDANCE_VIDEO_RATIO_PRESETS: VideoRatioPreset[] = [
+  { label: '16:9', value: '16:9', ratio: 16 / 9 },
+  { label: '21:9', value: '21:9', ratio: 21 / 9 },
+  { label: '4:3', value: '4:3', ratio: 4 / 3 },
+  { label: '1:1', value: '1:1', ratio: 1 },
+  { label: '3:4', value: '3:4', ratio: 3 / 4 },
+  { label: '9:16', value: '9:16', ratio: 9 / 16 },
+]
+
+export const SEEDANCE_REFERENCE_IMAGE_LIMIT = 9
+export const SEEDANCE_REFERENCE_VIDEO_LIMIT = 3
+export const SEEDANCE_REFERENCE_AUDIO_LIMIT = 3
+export const SEEDANCE_REFERENCE_VIDEO_DURATION_LIMIT = 15.5
+
+export const SEEDANCE_VIDEO_DURATIONS = [
+  4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+] as const
+
 export const VIDEO_DURATIONS = [5, 10] as const
 
 // Max input image size for upload (bytes). Larger files are rejected.
 export const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024
+export const MAX_REFERENCE_VIDEO_UPLOAD_BYTES = 50 * 1024 * 1024
+export const MAX_REFERENCE_AUDIO_UPLOAD_BYTES = 15 * 1024 * 1024
 
 // Polling cadence and ceiling for async video tasks.
 export const VIDEO_POLL_INTERVAL_MS = 3000
@@ -139,6 +166,11 @@ export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
   prompt: '',
   image: '',
   imageSourceType: 'upload',
+  referenceImagesText: '',
+  referenceVideosText: '',
+  referenceVideoDurations: {},
+  referenceAudiosText: '',
+  inputVideoDuration: 0,
   duration: 5,
   size: '1280x720',
   metadata: {},
@@ -153,17 +185,18 @@ export const VIDEO_MODEL_VARIANT_SETS: VideoModelVariantSet[] = [
         id: 'quality',
         translateLabels: false,
         options: [
-          { label: 'Direct', value: 'direct' },
-          { label: 'Vision', value: 'vision' },
-          { label: 'Mini', value: 'mini' },
+          { label: 'direct', value: 'direct' },
+          { label: 'vision', value: 'vision' },
+          { label: 'mini', value: 'mini' },
         ],
       },
       {
         id: 'speed',
         translateLabels: false,
         options: [
-          { label: 'Standard', value: 'standard' },
-          { label: 'Fast', value: 'fast' },
+          { label: 'standard', value: 'standard' },
+          { label: 'fast', value: 'fast' },
+          { label: 'lite', value: 'lite' },
         ],
       },
     ],
@@ -172,17 +205,41 @@ export const VIDEO_MODEL_VARIANT_SETS: VideoModelVariantSet[] = [
       'direct:fast': 'seedance2.0_fast_direct',
       'vision:standard': 'seedance2.0_vision',
       'vision:fast': 'seedance2.0_fast_vision',
-      'mini:standard': 'seedance2.0_mini',
-      'mini:fast': 'seedance2.0_fast_mini',
+      'mini:standard': 'Seedance_2.0_mini',
+      'mini:lite': 'Seedance_2.0_mini_lite',
     },
   },
 ]
+
+const VIDEO_MODEL_ALIASES: Record<string, string> = {
+  'seedance_2.0_mini': 'Seedance_2.0_mini',
+  'seedance_2.0_mini_lite': 'Seedance_2.0_mini_lite',
+  'seedance2.0_mini': 'Seedance_2.0_mini',
+  'seedance2.0_fast_mini': 'Seedance_2.0_mini_lite',
+  'seedance2.0_mini_lite': 'Seedance_2.0_mini_lite',
+}
+
+function normalizeVideoVariantModel(model: string): string {
+  return (
+    VIDEO_MODEL_ALIASES[model] ??
+    VIDEO_MODEL_ALIASES[model.toLowerCase()] ??
+    model
+  )
+}
 
 function getVariantKey(
   set: VideoModelVariantSet,
   selection: Record<string, string>
 ): string {
   return set.axes.map((axis) => selection[axis.id]).join(':')
+}
+
+function getSelectionFromVariantKey(
+  set: VideoModelVariantSet,
+  key: string
+): Record<string, string> {
+  const values = key.split(':')
+  return Object.fromEntries(set.axes.map((axis, i) => [axis.id, values[i]]))
 }
 
 function getDefaultSelection(
@@ -196,8 +253,9 @@ function getDefaultSelection(
 export function getVideoVariantSet(
   model: string
 ): VideoModelVariantSet | undefined {
+  const normalizedModel = normalizeVideoVariantModel(model)
   return VIDEO_MODEL_VARIANT_SETS.find((set) =>
-    Object.values(set.variants).includes(model)
+    Object.values(set.variants).includes(normalizedModel)
   )
 }
 
@@ -210,10 +268,20 @@ export function getSelectionForVideoModel(
   set: VideoModelVariantSet,
   model: string
 ): Record<string, string> {
-  const match = Object.entries(set.variants).find(([, m]) => m === model)
+  const normalizedModel = normalizeVideoVariantModel(model)
+  const match = Object.entries(set.variants).find(
+    ([, m]) => m === normalizedModel
+  )
   if (!match) return getDefaultSelection(set)
-  const values = match[0].split(':')
-  return Object.fromEntries(set.axes.map((axis, i) => [axis.id, values[i]]))
+  return getSelectionFromVariantKey(set, match[0])
+}
+
+function getAvailableVideoVariantModel(
+  model: string,
+  availableSet: Set<string>
+): string | undefined {
+  if (availableSet.has(model)) return model
+  return undefined
 }
 
 export function isHiddenVideoVariantModel(
@@ -235,11 +303,22 @@ export function getVideoModelVariantState(
   const availableSet = new Set(availableModels)
   const selection = getSelectionForVideoModel(set, model)
   const axes: VideoModelVariantAxisState[] = set.axes
-    .map((axis) => {
+    .map((axis, axisIndex) => {
       const options = axis.options.filter((option) => {
-        const nextSelection = { ...selection, [axis.id]: option.value }
-        const nextModel = set.variants[getVariantKey(set, nextSelection)]
-        return !!nextModel && availableSet.has(nextModel)
+        return Object.entries(set.variants).some(([key, variantModel]) => {
+          const variantSelection = getSelectionFromVariantKey(set, key)
+          if (variantSelection[axis.id] !== option.value) return false
+          for (let i = 0; i < axisIndex; i++) {
+            const previousAxis = set.axes[i]
+            if (!previousAxis) return false
+            if (
+              variantSelection[previousAxis.id] !== selection[previousAxis.id]
+            ) {
+              return false
+            }
+          }
+          return !!getAvailableVideoVariantModel(variantModel, availableSet)
+        })
       })
       return { id: axis.id, value: selection[axis.id], options }
     })
@@ -261,8 +340,39 @@ export function resolveVideoVariantModel(
   const selection = getSelectionForVideoModel(set, model)
   const nextSelection = { ...selection, [axisId]: value }
   const nextModel = set.variants[getVariantKey(set, nextSelection)]
-  if (!nextModel || !availableModels.includes(nextModel)) return undefined
-  return nextModel
+  const availableSet = new Set(availableModels)
+  if (nextModel) {
+    const availableModel = getAvailableVideoVariantModel(
+      nextModel,
+      availableSet
+    )
+    if (availableModel) return availableModel
+  }
+
+  const axisIndex = set.axes.findIndex((axis) => axis.id === axisId)
+  if (axisIndex < 0) return undefined
+  for (const [key, variantModel] of Object.entries(set.variants)) {
+    const variantSelection = getSelectionFromVariantKey(set, key)
+    let matches = true
+    for (let i = 0; i <= axisIndex; i++) {
+      const axis = set.axes[i]
+      if (!axis) {
+        matches = false
+        break
+      }
+      if (variantSelection[axis.id] !== nextSelection[axis.id]) {
+        matches = false
+        break
+      }
+    }
+    if (!matches) continue
+    const availableModel = getAvailableVideoVariantModel(
+      variantModel,
+      availableSet
+    )
+    if (availableModel) return availableModel
+  }
+  return undefined
 }
 
 const IMAGE_OPTIONAL_VIDEO_MODELS = new Set([
@@ -272,14 +382,15 @@ const IMAGE_OPTIONAL_VIDEO_MODELS = new Set([
   'dreamina-seedance-2-0-fast-260128',
   'seedance2.0_direct',
   'seedance2.0_fast_direct',
+  'seedance2.0_vision',
+  'seedance2.0_fast_vision',
+  'Seedance_2.0_mini',
+  'Seedance_2.0_mini_lite',
   'seedance2.0_mini',
   'seedance2.0_fast_mini',
 ])
 
-const IMAGE_REQUIRED_VIDEO_MODELS = new Set([
-  'seedance2.0_vision',
-  'seedance2.0_fast_vision',
-])
+const IMAGE_REQUIRED_VIDEO_MODELS = new Set<string>()
 
 export function videoModelRequiresImage(model: string): boolean {
   if (IMAGE_REQUIRED_VIDEO_MODELS.has(model)) return true
@@ -289,16 +400,17 @@ export function videoModelRequiresImage(model: string): boolean {
 
 export function videoModelSupportsImageInput(model: string): boolean {
   if (IMAGE_REQUIRED_VIDEO_MODELS.has(model)) return true
-  if (model === 'seedance2.0_direct') return false
-  if (model === 'seedance2.0_fast_direct') return false
-  if (model === 'seedance2.0_mini') return false
-  if (model === 'seedance2.0_fast_mini') return false
   return true
 }
 
 export function videoModelAllowsImageUpload(model: string): boolean {
+  const normalizedModel = normalizeVideoVariantModel(model)
+  if (model === 'seedance2.0_direct') return false
+  if (model === 'seedance2.0_fast_direct') return false
   if (model === 'seedance2.0_vision') return false
   if (model === 'seedance2.0_fast_vision') return false
+  if (normalizedModel === 'Seedance_2.0_mini') return false
+  if (normalizedModel === 'Seedance_2.0_mini_lite') return false
   return videoModelSupportsImageInput(model)
 }
 
@@ -315,6 +427,94 @@ export function getUsableVideoImage(model: string, image: string): string {
   if (!videoModelSupportsImageInput(model)) return ''
   if (videoModelAllowsImageUpload(model)) return image
   return isExternalImageUri(image) ? image : ''
+}
+
+export function isApizSeedanceVideoModel(model: string): boolean {
+  return /^(seedance2\.0|seedance_2\.0)/i.test(model)
+}
+
+export function getSeedanceResolutionOptions(
+  model: string
+): NonNullable<FamilyParam['options']> {
+  void model
+  return FAMILY_PARAMS.seedance[0]?.options ?? []
+}
+
+export function getSeedanceOutputSize(
+  ratioValue: string,
+  resolutionValue: string
+): { longEdge: number; shortEdge: number } {
+  const shortEdgeByResolution: Record<string, number> = {
+    '480p': 480,
+    '720p': 720,
+    '1080p': 1080,
+    '4k': 2160,
+  }
+  const shortEdge = shortEdgeByResolution[resolutionValue] ?? 720
+  const preset = SEEDANCE_VIDEO_RATIO_PRESETS.find(
+    (ratio) => ratio.value === ratioValue
+  )
+  const ratio = preset?.ratio ?? 16 / 9
+  const longEdge = Math.round(shortEdge * Math.max(ratio, 1 / ratio))
+  return { longEdge, shortEdge }
+}
+
+export function estimateSeedanceVideoTokens({
+  inputDuration,
+  outputDuration,
+  ratio,
+  resolution,
+}: {
+  inputDuration: number
+  outputDuration: number
+  ratio: string
+  resolution: string
+}): number {
+  const { longEdge, shortEdge } = getSeedanceOutputSize(ratio, resolution)
+  const seconds = Math.max(0, inputDuration) + Math.max(0, outputDuration)
+  return Math.round((seconds * longEdge * shortEdge * 24) / 1024)
+}
+
+export function getSeedancePricePerMillionCNY({
+  model,
+  resolution,
+  hasVideoInput,
+}: {
+  model: string
+  resolution: string
+  hasVideoInput: boolean
+}): number | undefined {
+  const normalizedModel = normalizeVideoVariantModel(model)
+  const normalizedModelKey = normalizedModel.toLowerCase()
+  const normalizedResolution = resolution.toLowerCase().trim()
+  const isHighQuality =
+    normalizedModelKey === 'seedance_2.0' ||
+    normalizedModelKey === 'doubao-seedance-2-0-260128' ||
+    normalizedModelKey === 'seedance2.0_direct' ||
+    normalizedModelKey === 'seedance2.0_vision'
+
+  if (isHighQuality) {
+    if (normalizedResolution === '4k') return hasVideoInput ? 16 : 26
+    if (normalizedResolution === '1080p') return hasVideoInput ? 31 : 51
+    return hasVideoInput ? 28 : 46
+  }
+
+  const isMini =
+    normalizedModelKey === 'seedance_2.0_mini' ||
+    normalizedModelKey === 'seedance_2.0_mini_lite'
+
+  if (isMini) return hasVideoInput ? 14 : 23
+
+  const isFast =
+    normalizedModelKey === 'seedance_2.0_fast' ||
+    normalizedModelKey === 'ark/seedance-2.0' ||
+    normalizedModelKey === 'doubao-seedance-2-0-fast-260128' ||
+    normalizedModelKey === 'seedance2.0_fast_direct' ||
+    normalizedModelKey === 'seedance2.0_fast_vision' ||
+    normalizedModelKey === 'seedance_2.0_mini_lite'
+
+  if (isFast) return hasVideoInput ? 14 : 37
+  return undefined
 }
 
 // Terminal task statuses reported by the backend (case-insensitive).
@@ -363,12 +563,20 @@ export function detectImageModelFamily(model: string): ImageModelFamily {
 
 /** Whether the model uses async task-based generation (submit/poll) */
 export function isTaskBasedImageModel(family: ImageModelFamily): boolean {
-  return family === 'image-gi' || family === 'image-gi2' || family === 'hunyuan-image'
+  return (
+    family === 'image-gi' ||
+    family === 'image-gi2' ||
+    family === 'hunyuan-image'
+  )
 }
 
 /** Whether the model supports reference image input */
 export function supportsReferenceImages(family: ImageModelFamily): boolean {
-  return family === 'image-gi' || family === 'image-gi2' || family === 'hunyuan-image'
+  return (
+    family === 'image-gi' ||
+    family === 'image-gi2' ||
+    family === 'hunyuan-image'
+  )
 }
 
 /** AIART aspect ratio presets (different from dall-e WxH format) */
@@ -415,7 +623,7 @@ export const GPT_IMAGE_BACKGROUND_OPTIONS = [
 ] as const
 
 export const IMAGE_FAMILY_PARAMS: Record<ImageModelFamily, FamilyParam[]> = {
-  'dall-e': [],      // dall-e quality/n handled inline
+  'dall-e': [], // dall-e quality/n handled inline
   'gpt-image': [
     {
       key: 'background',

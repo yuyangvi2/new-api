@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/require"
@@ -29,6 +30,16 @@ type listModelsResponse struct {
 type userModelsResponse struct {
 	Success bool     `json:"success"`
 	Data    []string `json:"data"`
+}
+
+type userModelsWithGroupsResponse struct {
+	Success bool `json:"success"`
+	Data    []struct {
+		Label      string   `json:"label"`
+		Value      string   `json:"value"`
+		Groups     []string `json:"groups"`
+		ModelRatio float64  `json:"model_ratio"`
+	} `json:"data"`
 }
 
 func setupModelListControllerTestDB(t *testing.T) *gorm.DB {
@@ -162,6 +173,16 @@ func decodeUserModelsResponse(t *testing.T, recorder *httptest.ResponseRecorder)
 	return payload.Data
 }
 
+func decodeUserModelsWithGroupsResponse(t *testing.T, recorder *httptest.ResponseRecorder) userModelsWithGroupsResponse {
+	t.Helper()
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var payload userModelsWithGroupsResponse
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &payload))
+	require.True(t, payload.Success)
+	return payload
+}
+
 func TestGetUserModelsFiltersByRequestedGroup(t *testing.T) {
 	db := setupModelListControllerTestDB(t)
 	require.NoError(t, db.Create(&model.User{
@@ -194,6 +215,42 @@ func TestGetUserModelsFiltersByRequestedGroup(t *testing.T) {
 	GetUserModels(vipContext)
 
 	require.Empty(t, decodeUserModelsResponse(t, vipRecorder))
+}
+
+func TestGetUserModelsWithGroupsIncludesModelRatio(t *testing.T) {
+	originalModelRatio := ratio_setting.ModelRatio2JSONString()
+	t.Cleanup(func() {
+		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(originalModelRatio))
+	})
+	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{"zz-priced-video-model":2.5}`))
+
+	db := setupModelListControllerTestDB(t)
+	require.NoError(t, db.Create(&model.User{
+		Id:       1003,
+		Username: "playground-priced-model-user",
+		Password: "password",
+		Group:    "default",
+		Status:   common.UserStatusEnabled,
+	}).Error)
+	require.NoError(t, db.Create(&model.Ability{
+		Group:     "default",
+		Model:     "zz-priced-video-model",
+		ChannelId: 1,
+		Enabled:   true,
+	}).Error)
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/user/self/models?with_groups=true", nil)
+	ctx.Set("id", 1003)
+
+	GetUserModels(ctx)
+
+	payload := decodeUserModelsWithGroupsResponse(t, recorder)
+	require.Len(t, payload.Data, 1)
+	require.Equal(t, "zz-priced-video-model", payload.Data[0].Value)
+	require.ElementsMatch(t, []string{"default"}, payload.Data[0].Groups)
+	require.InDelta(t, 2.5, payload.Data[0].ModelRatio, 0.000001)
 }
 
 func TestListModelsIncludesTieredBillingModel(t *testing.T) {

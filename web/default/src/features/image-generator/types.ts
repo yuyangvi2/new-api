@@ -22,6 +22,7 @@ export interface ModelOption {
   label: string
   value: string
   groups?: string[]
+  modelRatio?: number
 }
 
 export interface GroupOption {
@@ -123,6 +124,8 @@ export interface VideoGenerationRequest {
   prompt?: string
   // Input image: a remote URL, data URI, or raw base64.
   image?: string
+  images?: string[]
+  size?: string
   duration?: number
   width?: number
   height?: number
@@ -168,6 +171,11 @@ export interface VideoConfig {
   // Displayable input image (data URI or URL); normalized at submit time.
   image: string
   imageSourceType: ImageSourceType
+  referenceImagesText: string
+  referenceVideosText: string
+  referenceVideoDurations: Record<string, number>
+  referenceAudiosText: string
+  inputVideoDuration: number
   duration: number
   size: string
   // Model-family-specific parameters, keyed by PascalCase upstream names.

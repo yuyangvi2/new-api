@@ -30,12 +30,16 @@ import type {
   VideoTaskResponse,
 } from './types'
 
+type MediaUploadKind = 'image' | 'video' | 'audio'
+
 type RawUserModel =
   | string
   | {
       label?: string
       value?: string
       groups?: string[]
+      model_ratio?: number
+      modelRatio?: number
     }
 
 function normalizeTaskProgress(progress: unknown): string | undefined {
@@ -69,11 +73,7 @@ function extractTaskErrorMessage(
 ): string | undefined {
   const rawError = recordFrom(raw.error)
 
-  return firstMessage(
-    raw.fail_reason,
-    rawError?.message,
-    raw.message
-  )
+  return firstMessage(raw.fail_reason, rawError?.message, raw.message)
 }
 
 /**
@@ -103,6 +103,10 @@ export async function getUserModels(): Promise<ModelOption[]> {
         label: model.label || value,
         value,
         groups: Array.isArray(model.groups) ? model.groups : undefined,
+        modelRatio:
+          typeof model.model_ratio === 'number'
+            ? model.model_ratio
+            : model.modelRatio,
       }
     })
     .filter((model: ModelOption | null): model is ModelOption => model !== null)
@@ -232,4 +236,29 @@ export async function fetchVideoTask(
     url: (raw.result_url as string) || (raw.url as string) || undefined,
     error: errorMessage ? { message: errorMessage } : undefined,
   } as VideoTaskResponse
+}
+
+export async function uploadReferenceMedia(
+  file: File,
+  kind: MediaUploadKind,
+  signal?: AbortSignal
+): Promise<string> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const res = await api.post(API_ENDPOINTS.MEDIA_UPLOAD, formData, {
+    params: { kind },
+    skipBusinessError: true,
+    signal,
+  } as Record<string, unknown>)
+
+  const data = res.data as {
+    success?: boolean
+    message?: string
+    data?: { url?: string }
+  }
+  if (!data.success || !data.data?.url) {
+    throw new Error(data.message || 'Upload failed')
+  }
+  return data.data.url
 }
