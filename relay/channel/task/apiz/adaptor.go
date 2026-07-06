@@ -261,13 +261,24 @@ func buildSubmitPayload(req *relaycommon.TaskSubmitReq, originModel, upstreamMod
 		params["duration"] = sec
 	}
 	applySize(params, req.Size)
-	applyImages(params, collectImages(req))
+
+	requestModel := firstNonEmpty(originModel, req.Model, upstreamModel)
+	images := collectImages(req)
+	if apizModelDisallowsImages(requestModel) {
+		images = nil
+	}
+	if apizModelRequiresImage(requestModel) && len(images) == 0 {
+		return nil, fmt.Errorf("image is required for %s", requestModel)
+	}
+	if err := applyImages(params, images); err != nil {
+		return nil, err
+	}
 
 	outerModel := seedanceID
 	if strings.HasPrefix(upstreamModel, "ark/") {
 		outerModel = upstreamModel
 	}
-	params["model"] = variantForModel(firstNonEmpty(originModel, upstreamModel, req.Model))
+	params["model"] = variantForModel(requestModel)
 
 	return &submitPayload{
 		Model:   outerModel,
@@ -299,15 +310,21 @@ func applySize(params map[string]any, size string) {
 	params["resolution"] = size
 }
 
-func applyImages(params map[string]any, images []string) {
+func applyImages(params map[string]any, images []string) error {
 	if len(images) == 0 {
-		return
+		return nil
+	}
+	for i, img := range images {
+		if !isAPIZImageURI(img) {
+			return fmt.Errorf("image %d must be a valid HTTP/HTTPS URL or Asset:// URI", i+1)
+		}
 	}
 	if len(images) == 1 {
 		params["image_url"] = images[0]
-		return
+		return nil
 	}
 	params["reference_images"] = images
+	return nil
 }
 
 func collectImages(req *relaycommon.TaskSubmitReq) []string {
@@ -366,6 +383,29 @@ func isSupportedModel(modelName string) bool {
 	return false
 }
 
+func apizModelRequiresImage(modelName string) bool {
+	switch strings.ToLower(strings.TrimSpace(modelName)) {
+	case "seedance2.0_vision", "seedance2.0_fast_vision":
+		return true
+	default:
+		return false
+	}
+}
+
+func apizModelDisallowsImages(modelName string) bool {
+	switch strings.ToLower(strings.TrimSpace(modelName)) {
+	case "seedance2.0_direct", "seedance2.0_fast_direct", "seedance2.0_mini", "seedance2.0_fast_mini":
+		return true
+	default:
+		return false
+	}
+}
+
+func isAPIZImageURI(s string) bool {
+	s = strings.TrimSpace(s)
+	return taskcommon.IsHTTPURL(s) || strings.HasPrefix(s, "Asset://")
+}
+
 func variantForModel(modelName string) string {
 	switch strings.ToLower(strings.TrimSpace(modelName)) {
 	case "seedance2.0_direct", "seedance2.0_vision", "doubao-seedance-2-0-260128":
@@ -373,9 +413,9 @@ func variantForModel(modelName string) string {
 	case "seedance2.0_fast_direct", "seedance2.0_fast_vision", "doubao-seedance-2-0-fast-260128", seedanceID:
 		return "seedance_2.0_fast"
 	case "seedance2.0_mini":
-		return "seedance_2.0"
+		return "seedance_2.0_mini"
 	case "seedance2.0_fast_mini":
-		return "seedance_2.0_fast"
+		return "seedance_2.0_fast_mini"
 	default:
 		if strings.Contains(strings.ToLower(modelName), "fast") {
 			return "seedance_2.0_fast"

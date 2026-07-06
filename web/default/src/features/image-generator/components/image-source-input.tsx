@@ -21,7 +21,7 @@ import { UploadIcon, XIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
-import { MAX_IMAGE_UPLOAD_BYTES } from '../constants'
+import { isExternalImageUri, MAX_IMAGE_UPLOAD_BYTES } from '../constants'
 import type { ImageSourceType } from '../types'
 
 interface ImageSourceInputProps {
@@ -32,6 +32,7 @@ interface ImageSourceInputProps {
   availableImages?: { id: string; src: string }[]
   disabled?: boolean
   placeholder?: string
+  allowUpload?: boolean
 }
 
 /**
@@ -45,6 +46,7 @@ export function ImageSourceInput({
   onChange,
   disabled,
   placeholder,
+  allowUpload = true,
 }: ImageSourceInputProps) {
   const { t } = useTranslation()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -86,7 +88,7 @@ export function ImageSourceInput({
 
   const commitUrl = () => {
     const url = inputText.trim()
-    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+    if (url && isExternalImageUri(url)) {
       onChange(url, 'url')
     }
   }
@@ -114,17 +116,19 @@ export function ImageSourceInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder ?? t('Paste image URL')}
           disabled={disabled}
-          className='pr-9'
+          className={allowUpload ? 'pr-9' : undefined}
         />
-        <button
-          type='button'
-          disabled={disabled}
-          onClick={() => fileRef.current?.click()}
-          className='text-muted-foreground hover:text-foreground absolute right-1.5 rounded-md p-1 transition-colors disabled:opacity-50'
-          aria-label={t('Upload image')}
-        >
-          <UploadIcon size={16} />
-        </button>
+        {allowUpload && (
+          <button
+            type='button'
+            disabled={disabled}
+            onClick={() => fileRef.current?.click()}
+            className='text-muted-foreground hover:text-foreground absolute right-1.5 rounded-md p-1 transition-colors disabled:opacity-50'
+            aria-label={t('Upload image')}
+          >
+            <UploadIcon size={16} />
+          </button>
+        )}
       </div>
 
       {/* Preview */}
@@ -149,13 +153,15 @@ export function ImageSourceInput({
       )}
 
       {/* Hidden file input */}
-      <input
-        ref={fileRef}
-        type='file'
-        accept='image/*'
-        className='hidden'
-        onChange={handleFile}
-      />
+      {allowUpload && (
+        <input
+          ref={fileRef}
+          type='file'
+          accept='image/*'
+          className='hidden'
+          onChange={handleFile}
+        />
+      )}
     </div>
   )
 }
@@ -163,7 +169,7 @@ export function ImageSourceInput({
 /** Derive the text to display in the input field. */
 function displayText(value: string, sourceType: ImageSourceType): string {
   if (!value) return ''
-  if (sourceType === 'url' || value.startsWith('http')) return value
+  if (sourceType === 'url' || isExternalImageUri(value)) return value
   // For uploaded / data-URI images, show a truncated indicator.
   if (value.startsWith('data:')) {
     const semi = value.indexOf(';')

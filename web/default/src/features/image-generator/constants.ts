@@ -296,6 +296,27 @@ export function videoModelSupportsImageInput(model: string): boolean {
   return true
 }
 
+export function videoModelAllowsImageUpload(model: string): boolean {
+  if (model === 'seedance2.0_vision') return false
+  if (model === 'seedance2.0_fast_vision') return false
+  return videoModelSupportsImageInput(model)
+}
+
+export function isExternalImageUri(value: string): boolean {
+  const trimmed = value.trim()
+  return (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('Asset://')
+  )
+}
+
+export function getUsableVideoImage(model: string, image: string): string {
+  if (!videoModelSupportsImageInput(model)) return ''
+  if (videoModelAllowsImageUpload(model)) return image
+  return isExternalImageUri(image) ? image : ''
+}
+
 // Terminal task statuses reported by the backend (case-insensitive).
 export const VIDEO_SUCCESS_STATUSES = ['succeeded', 'success', 'completed']
 export const VIDEO_FAILED_STATUSES = [

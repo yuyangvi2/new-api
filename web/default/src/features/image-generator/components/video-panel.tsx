@@ -36,10 +36,12 @@ import { ModelSelector } from '@/components/model-group-selector'
 import {
   detectModelFamily,
   FAMILY_PARAMS,
+  getUsableVideoImage,
   getVideoModelVariantState,
   MAX_PROMPT_LENGTH,
   resolveVideoVariantModel,
   VIDEO_DURATIONS,
+  videoModelAllowsImageUpload,
   videoModelRequiresImage,
   videoModelSupportsImageInput,
   VIDEO_SIZE_PRESETS,
@@ -97,7 +99,9 @@ export function VideoPanel({
 
   const requiresImage = videoModelRequiresImage(config.model)
   const showImageInput = videoModelSupportsImageInput(config.model)
-  const canGenerate = (!requiresImage || !!config.image) && !isGenerating
+  const allowImageUpload = videoModelAllowsImageUpload(config.model)
+  const usableImage = getUsableVideoImage(config.model, config.image)
+  const canGenerate = (!requiresImage || !!usableImage) && !isGenerating
   const resolutionParam = familyParams.find(
     (param) => param.key === 'resolution' && param.type === 'select'
   )
@@ -143,6 +147,13 @@ export function VideoPanel({
       updateConfig('metadata', { ...config.metadata, resolution: '720p' })
     }
   }, [config.metadata, config.model, updateConfig])
+
+  useEffect(() => {
+    if (!config.image) return
+    if (getUsableVideoImage(config.model, config.image)) return
+    updateConfig('image', '')
+    updateConfig('imageSourceType', 'upload')
+  }, [config.image, config.model, updateConfig])
 
   return (
     <div className='flex h-full flex-col'>
@@ -201,6 +212,7 @@ export function VideoPanel({
               onChange={handleImageChange}
               availableImages={availableImages}
               disabled={isGenerating}
+              allowUpload={allowImageUpload}
             />
           </div>
         )}

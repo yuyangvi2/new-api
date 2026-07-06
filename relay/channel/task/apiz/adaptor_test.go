@@ -115,6 +115,47 @@ func TestVariantForModelGenericArkDefaultsToFast(t *testing.T) {
 func TestVariantForModelSeedanceMini(t *testing.T) {
 	assert.True(t, isSupportedModel("seedance2.0_mini"))
 	assert.True(t, isSupportedModel("seedance2.0_fast_mini"))
-	assert.Equal(t, "seedance_2.0", variantForModel("seedance2.0_mini"))
-	assert.Equal(t, "seedance_2.0_fast", variantForModel("seedance2.0_fast_mini"))
+	assert.Equal(t, "seedance_2.0_mini", variantForModel("seedance2.0_mini"))
+	assert.Equal(t, "seedance_2.0_fast_mini", variantForModel("seedance2.0_fast_mini"))
+}
+
+func TestBuildSubmitPayloadSeedanceVisionRejectsUploadImage(t *testing.T) {
+	req := &relaycommon.TaskSubmitReq{
+		Model:    "seedance2.0_vision",
+		Prompt:   "move",
+		Image:    "data:image/png;base64,abcd",
+		Metadata: map[string]interface{}{},
+	}
+
+	_, err := buildSubmitPayload(req, "seedance2.0_vision", seedanceID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "HTTP/HTTPS URL or Asset:// URI")
+}
+
+func TestBuildSubmitPayloadSeedanceVisionAcceptsAssetURI(t *testing.T) {
+	req := &relaycommon.TaskSubmitReq{
+		Model:    "seedance2.0_vision",
+		Prompt:   "move",
+		Image:    "Asset://image-id",
+		Metadata: map[string]interface{}{},
+	}
+
+	payload, err := buildSubmitPayload(req, "seedance2.0_vision", seedanceID)
+	require.NoError(t, err)
+	assert.Equal(t, "Asset://image-id", payload.Params["image_url"])
+}
+
+func TestBuildSubmitPayloadSeedanceMiniDropsStaleImage(t *testing.T) {
+	req := &relaycommon.TaskSubmitReq{
+		Model:    "seedance2.0_mini",
+		Prompt:   "move",
+		Image:    "data:image/png;base64,abcd",
+		Metadata: map[string]interface{}{},
+	}
+
+	payload, err := buildSubmitPayload(req, "seedance2.0_mini", seedanceID)
+	require.NoError(t, err)
+	assert.Equal(t, "seedance_2.0_mini", payload.Params["model"])
+	assert.NotContains(t, payload.Params, "image_url")
+	assert.NotContains(t, payload.Params, "reference_images")
 }

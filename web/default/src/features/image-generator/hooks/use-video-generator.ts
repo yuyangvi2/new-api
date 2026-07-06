@@ -21,6 +21,7 @@ import { useCallback, useRef, useState } from 'react'
 import { fetchVideoTask, submitVideoTask } from '../api'
 import {
   DEFAULT_VIDEO_CONFIG,
+  getUsableVideoImage,
   VIDEO_FAILED_STATUSES,
   VIDEO_POLL_INTERVAL_MS,
   VIDEO_POLL_TIMEOUT_MS,
@@ -28,7 +29,6 @@ import {
   VIDEO_STORAGE_KEY,
   VIDEO_SUCCESS_STATUSES,
   videoModelRequiresImage,
-  videoModelSupportsImageInput,
 } from '../constants'
 import type { VideoBatch, VideoConfig, VideoTaskResponse } from '../types'
 
@@ -224,9 +224,7 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
   const generate = useCallback(async () => {
     const prompt = config.prompt.trim()
     const requiresImage = videoModelRequiresImage(config.model)
-    const inputImage = videoModelSupportsImageInput(config.model)
-      ? config.image
-      : ''
+    const inputImage = getUsableVideoImage(config.model, config.image)
     if ((requiresImage && !inputImage) || isGenerating) return
 
     const batchId = genId()
