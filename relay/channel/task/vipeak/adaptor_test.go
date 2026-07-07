@@ -1,12 +1,16 @@
 package vipeak
 
 import (
-	"math"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBuildRequestUsesCanonicalSeedanceModel(t *testing.T) {
@@ -101,24 +105,78 @@ func TestBuildRequestRoutesOfficialSeedanceFastModelByImageInput(t *testing.T) {
 	}
 }
 
-func TestEstimateBillingUsesOfficialSeedanceResolutionRatio(t *testing.T) {
+func TestEstimateBillingUsesAPIZSeedancePricingForDreaminaStandard(t *testing.T) {
+	originalQuotaPerUnit := common.QuotaPerUnit
+	originalExchangeRate := operation_setting.USDExchangeRate
+	t.Cleanup(func() {
+		common.QuotaPerUnit = originalQuotaPerUnit
+		operation_setting.USDExchangeRate = originalExchangeRate
+	})
+	common.QuotaPerUnit = 1_000_000
+	operation_setting.USDExchangeRate = 1
+
 	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ctx.Set("task_request", relaycommon.TaskSubmitReq{
-		Model: "doubao-seedance-2-0-260128",
-		Size:  "1080p",
+		Model:    "dreamina-seedance-2-0-260128",
+		Duration: 5,
+		Size:     "16:9",
+		Metadata: map[string]interface{}{
+			"resolution":           "720p",
+			"video_files":          []interface{}{"https://example.com/reference.mp4"},
+			"input_video_duration": 5,
+		},
 	})
 
 	adaptor := &TaskAdaptor{}
 	ratios := adaptor.EstimateBilling(ctx, &relaycommon.RelayInfo{
-		OriginModelName: "doubao-seedance-2-0-260128",
+		OriginModelName: "dreamina-seedance-2-0-260128",
+		PriceData: types.PriceData{
+			Quota:          4_968_000,
+			GroupRatioInfo: types.GroupRatioInfo{GroupRatio: 1},
+		},
 	})
 
-	got := ratios["video_input"]
-	want := 51.0 / 46.0
-	if math.Abs(got-want) > 0.000001 {
-		t.Fatalf("video_input ratio = %v, want %v", got, want)
-	}
+	got, ok := ratios["seedance_estimated_price"]
+	require.True(t, ok)
+	assert.InDelta(t, 6_048_000.0/4_968_000.0, got, 0.000001)
+}
+
+func TestEstimateBillingUsesAPIZSeedancePricingForDreaminaFast(t *testing.T) {
+	originalQuotaPerUnit := common.QuotaPerUnit
+	originalExchangeRate := operation_setting.USDExchangeRate
+	t.Cleanup(func() {
+		common.QuotaPerUnit = originalQuotaPerUnit
+		operation_setting.USDExchangeRate = originalExchangeRate
+	})
+	common.QuotaPerUnit = 1_000_000
+	operation_setting.USDExchangeRate = 1
+
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Set("task_request", relaycommon.TaskSubmitReq{
+		Model:    "dreamina-seedance-2-0-fast-260128",
+		Duration: 5,
+		Size:     "16:9",
+		Metadata: map[string]interface{}{
+			"resolution":           "720p",
+			"referenceVideoUrls":   []interface{}{"https://example.com/reference.mp4"},
+			"input_video_duration": 2.5,
+		},
+	})
+
+	adaptor := &TaskAdaptor{}
+	ratios := adaptor.EstimateBilling(ctx, &relaycommon.RelayInfo{
+		OriginModelName: "dreamina-seedance-2-0-fast-260128",
+		PriceData: types.PriceData{
+			Quota:          3_996_000,
+			GroupRatioInfo: types.GroupRatioInfo{GroupRatio: 1},
+		},
+	})
+
+	got, ok := ratios["seedance_estimated_price"]
+	require.True(t, ok)
+	assert.InDelta(t, 2_268_000.0/3_996_000.0, got, 0.000001)
 }
 
 func TestEnforceCoreRequestFieldsKeepsOfficialSeedanceCanonicalModel(t *testing.T) {
