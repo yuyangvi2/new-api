@@ -433,6 +433,20 @@ export function isApizSeedanceVideoModel(model: string): boolean {
   return /^(seedance2\.0|seedance_2\.0)/i.test(model)
 }
 
+export function isVipeakSeedanceVideoModel(model: string): boolean {
+  const normalizedModel = model.toLowerCase().trim()
+  return (
+    normalizedModel === 'dreamina-seedance-2-0-260128' ||
+    normalizedModel === 'dreamina-seedance-2-0-fast-260128' ||
+    normalizedModel === 'seedance' ||
+    normalizedModel === 'seedance-fast'
+  )
+}
+
+export function isSeedanceVideoModel(model: string): boolean {
+  return isApizSeedanceVideoModel(model) || isVipeakSeedanceVideoModel(model)
+}
+
 export function getSeedanceResolutionOptions(
   model: string
 ): NonNullable<FamilyParam['options']> {
@@ -490,6 +504,8 @@ export function getSeedancePricePerMillionCNY({
   const isHighQuality =
     normalizedModelKey === 'seedance_2.0' ||
     normalizedModelKey === 'doubao-seedance-2-0-260128' ||
+    normalizedModelKey === 'dreamina-seedance-2-0-260128' ||
+    normalizedModelKey === 'seedance' ||
     normalizedModelKey === 'seedance2.0_direct' ||
     normalizedModelKey === 'seedance2.0_vision'
 
@@ -509,6 +525,8 @@ export function getSeedancePricePerMillionCNY({
     normalizedModelKey === 'seedance_2.0_fast' ||
     normalizedModelKey === 'ark/seedance-2.0' ||
     normalizedModelKey === 'doubao-seedance-2-0-fast-260128' ||
+    normalizedModelKey === 'dreamina-seedance-2-0-fast-260128' ||
+    normalizedModelKey === 'seedance-fast' ||
     normalizedModelKey === 'seedance2.0_fast_direct' ||
     normalizedModelKey === 'seedance2.0_fast_vision' ||
     normalizedModelKey === 'seedance_2.0_mini_lite'

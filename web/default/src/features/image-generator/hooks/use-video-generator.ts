@@ -22,7 +22,8 @@ import { fetchVideoTask, submitVideoTask } from '../api'
 import {
   DEFAULT_VIDEO_CONFIG,
   getUsableVideoImage,
-  isApizSeedanceVideoModel,
+  isSeedanceVideoModel,
+  isVipeakSeedanceVideoModel,
   SEEDANCE_REFERENCE_AUDIO_LIMIT,
   SEEDANCE_REFERENCE_IMAGE_LIMIT,
   SEEDANCE_REFERENCE_VIDEO_LIMIT,
@@ -258,7 +259,8 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
     const prompt = config.prompt.trim()
     const requiresImage = videoModelRequiresImage(config.model)
     const inputImage = getUsableVideoImage(config.model, config.image)
-    const isSeedanceVideo = isApizSeedanceVideoModel(config.model)
+    const isSeedanceVideo = isSeedanceVideoModel(config.model)
+    const isVipeakSeedanceVideo = isVipeakSeedanceVideoModel(config.model)
     const referenceImages = isSeedanceVideo
       ? parseURLList(config.referenceImagesText)
       : []
@@ -319,11 +321,22 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
         }
       }
       if (videoFiles.length > 0) {
-        meta.video_files = videoFiles
         meta.input_video_duration = inputVideoDuration
+        if (isVipeakSeedanceVideo) {
+          meta.seedanceMode = 'reference_video'
+          meta.referenceVideoUrls = videoFiles
+          meta.referenceVideoDurationSeconds = inputVideoDuration
+          meta.inputVideoSeconds = inputVideoDuration
+        } else {
+          meta.video_files = videoFiles
+        }
       }
       if (audioFiles.length > 0) {
-        meta.audio_files = audioFiles
+        if (isVipeakSeedanceVideo) {
+          meta.referenceAudioUrls = audioFiles
+        } else {
+          meta.audio_files = audioFiles
+        }
       }
 
       const submit = await submitVideoTask(

@@ -62,7 +62,7 @@ import {
   getSeedanceResolutionOptions,
   getUsableVideoImage,
   getVideoModelVariantState,
-  isApizSeedanceVideoModel,
+  isSeedanceVideoModel,
   MAX_PROMPT_LENGTH,
   MAX_REFERENCE_AUDIO_UPLOAD_BYTES,
   MAX_REFERENCE_VIDEO_UPLOAD_BYTES,
@@ -135,7 +135,7 @@ export function VideoPanel({
   )
   const displayModel = variantState?.set.defaultModel ?? config.model
 
-  const isSeedanceVideo = isApizSeedanceVideoModel(config.model)
+  const isSeedanceVideo = isSeedanceVideoModel(config.model)
   const requiresImage = videoModelRequiresImage(config.model)
   const showImageInput = videoModelSupportsImageInput(config.model)
   const allowImageUpload = videoModelAllowsImageUpload(config.model)
@@ -269,7 +269,9 @@ export function VideoPanel({
   ) => {
     updateReferenceVideoDurations(
       { ...referenceVideoDurations, [url]: duration },
-      referenceVideos.includes(url) ? referenceVideos : [...referenceVideos, url]
+      referenceVideos.includes(url)
+        ? referenceVideos
+        : [...referenceVideos, url]
     )
   }
 
@@ -1014,19 +1016,27 @@ function readVideoFileDuration(file: File): Promise<number> {
     }
 
     video.preload = 'metadata'
-    video.addEventListener('loadedmetadata', () => {
-      const duration = video.duration
-      cleanup()
-      if (!Number.isFinite(duration) || duration <= 0) {
-        reject(new Error('invalid video duration'))
-        return
-      }
-      resolve(roundVideoDuration(duration))
-    }, { once: true })
-    video.addEventListener('error', () => {
-      cleanup()
-      reject(new Error('failed to read video duration'))
-    }, { once: true })
+    video.addEventListener(
+      'loadedmetadata',
+      () => {
+        const duration = video.duration
+        cleanup()
+        if (!Number.isFinite(duration) || duration <= 0) {
+          reject(new Error('invalid video duration'))
+          return
+        }
+        resolve(roundVideoDuration(duration))
+      },
+      { once: true }
+    )
+    video.addEventListener(
+      'error',
+      () => {
+        cleanup()
+        reject(new Error('failed to read video duration'))
+      },
+      { once: true }
+    )
     video.src = url
   })
 }
