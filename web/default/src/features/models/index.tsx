@@ -87,6 +87,15 @@ function ModelsContent() {
     <>
       <SectionPageLayout fixedContent>
         <SectionPageLayout.Title>{t(meta.titleKey)}</SectionPageLayout.Title>
+        <SectionPageLayout.Description>
+          {activeSection === 'metadata'
+            ? t(
+                'Curate model metadata, provider identity, capability tags, and visibility for the Tokone model marketplace.'
+              )
+            : t(
+                'Create and monitor model deployments with a consistent operational workflow.'
+              )}
+        </SectionPageLayout.Description>
         <SectionPageLayout.Actions>
           {activeSection === 'metadata' ? (
             <ModelsPrimaryButtons />

@@ -85,6 +85,78 @@ For commercial licensing, please contact support@quantumnous.com
   }
 }
 
+@layer components {
+  .tokone-shell {
+    background:
+      radial-gradient(
+        ellipse 58% 48% at 12% -10%,
+        color-mix(in oklch, var(--brand) 18%, transparent) 0%,
+        transparent 64%
+      ),
+      radial-gradient(
+        ellipse 44% 34% at 88% 0%,
+        color-mix(in oklch, var(--chart-4) 18%, transparent) 0%,
+        transparent 68%
+      ),
+      var(--background);
+  }
+
+  .tokone-surface {
+    @apply bg-card/92 border-border/80 shadow-xs backdrop-blur;
+  }
+
+  .tokone-panel {
+    @apply bg-card/92 border-border/80 rounded-lg border shadow-xs backdrop-blur;
+  }
+
+  .tokone-control-bar {
+    @apply bg-card/86 border-border/80 rounded-lg border p-2 shadow-xs backdrop-blur;
+  }
+
+  .tokone-kpi-card {
+    @apply bg-card/92 border-border/80 rounded-lg border p-4 shadow-xs backdrop-blur transition-colors;
+  }
+
+  .tokone-kpi-card:hover {
+    border-color: color-mix(in oklch, var(--brand) 28%, var(--border));
+  }
+
+  .tokone-cta-band {
+    @apply relative overflow-hidden rounded-lg border p-4 shadow-xs;
+    background:
+      radial-gradient(
+        ellipse 50% 130% at 84% 0%,
+        color-mix(in oklch, var(--chart-4) 34%, transparent) 0%,
+        transparent 60%
+      ),
+      linear-gradient(
+        135deg,
+        color-mix(in oklch, var(--brand) 15%, var(--card)) 0%,
+        color-mix(in oklch, var(--card) 95%, var(--background)) 58%,
+        color-mix(in oklch, var(--accent) 65%, var(--card)) 100%
+      );
+  }
+
+  .tokone-hero-media {
+    @apply relative overflow-hidden rounded-lg border;
+    background:
+      linear-gradient(
+        135deg,
+        color-mix(in oklch, var(--foreground) 96%, var(--brand)) 0%,
+        color-mix(in oklch, var(--foreground) 84%, var(--brand)) 52%,
+        color-mix(in oklch, var(--brand) 72%, var(--foreground)) 100%
+      );
+  }
+
+  .tokone-page-title {
+    @apply text-xl font-semibold tracking-tight sm:text-2xl;
+  }
+
+  .tokone-page-description {
+    @apply text-muted-foreground max-w-3xl text-sm leading-relaxed;
+  }
+}
+
 /* Vercel Geist-style skeleton shimmer */
 .skeleton-shimmer {
   background: linear-gradient(

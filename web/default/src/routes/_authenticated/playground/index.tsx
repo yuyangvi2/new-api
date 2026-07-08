@@ -17,8 +17,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 
-import { Main } from '@/components/layout'
+import { SectionPageLayout } from '@/components/layout'
 import { Playground } from '@/features/playground'
 import { isSidebarModuleEnabled } from '@/lib/nav-modules'
 
@@ -32,9 +33,21 @@ export const Route = createFileRoute('/_authenticated/playground/')({
 })
 
 function PlaygroundPage() {
+  const { t } = useTranslation()
+
   return (
-    <Main className='p-0'>
-      <Playground />
-    </Main>
+    <SectionPageLayout fixedContent>
+      <SectionPageLayout.Title>{t('Playground')}</SectionPageLayout.Title>
+      <SectionPageLayout.Description>
+        {t(
+          'Test models, compare groups, tune parameters, and validate streaming responses before moving traffic to production.'
+        )}
+      </SectionPageLayout.Description>
+      <SectionPageLayout.Content>
+        <div className='tokone-panel h-full min-h-0 overflow-hidden'>
+          <Playground />
+        </div>
+      </SectionPageLayout.Content>
+    </SectionPageLayout>
   )
 }

@@ -27,6 +27,8 @@ import { initReactI18next } from 'react-i18next'
 const localeLoaders = {
   en: () => import('./locales/en.json'),
   zh: () => import('./locales/zh.json'),
+  'zh-TW': () => import('./locales/zh-TW.json'),
+  ko: () => import('./locales/ko.json'),
   fr: () => import('./locales/fr.json'),
   ru: () => import('./locales/ru.json'),
   ja: () => import('./locales/ja.json'),
@@ -37,7 +39,16 @@ type SupportedLanguage = keyof typeof localeLoaders
 
 function normalizeLanguage(language?: string): SupportedLanguage {
   const normalized = language?.trim().replace(/_/g, '-').toLowerCase()
+  if (
+    normalized?.startsWith('zh-tw') ||
+    normalized?.startsWith('zh-hk') ||
+    normalized?.startsWith('zh-mo') ||
+    normalized?.startsWith('zh-hant')
+  ) {
+    return 'zh-TW'
+  }
   if (normalized?.startsWith('zh')) return 'zh'
+  if (normalized?.startsWith('ko')) return 'ko'
 
   if (
     normalized &&
@@ -84,8 +95,8 @@ export function initI18n() {
     .use(initReactI18next)
     .init({
       fallbackLng: 'en',
-      supportedLngs: ['en', 'zh', 'fr', 'ru', 'ja', 'vi'],
-      load: 'languageOnly', // Convert zh-CN -> zh
+      supportedLngs: ['en', 'zh', 'zh-TW', 'ko', 'fr', 'ru', 'ja', 'vi'],
+      load: 'currentOnly',
       nsSeparator: false, // Allow literal colons in keys (e.g., URLs, labels)
       defaultNS: 'translation',
       ns: ['translation'],

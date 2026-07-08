@@ -29,7 +29,7 @@ const (
 func normalizeLocale(locale string) (string, bool) {
 	l := strings.ToLower(strings.TrimSpace(locale))
 	switch l {
-	case "en", "zh-CN", "zh-TW", "ja":
+	case "en", "zh-CN", "zh-TW", "ja", "ko":
 		return l, true
 	default:
 		return "", false

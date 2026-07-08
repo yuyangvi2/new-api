@@ -161,13 +161,10 @@ export function Pricing() {
       <div className='relative'>
         <div
           aria-hidden
-          className='pointer-events-none absolute inset-x-0 top-0 h-[600px] opacity-20 dark:opacity-[0.10]'
+          className='pointer-events-none absolute inset-x-0 top-0 h-[520px] opacity-80 dark:opacity-30'
           style={{
-            background: [
-              'radial-gradient(ellipse 60% 50% at 20% 20%, oklch(0.72 0.18 250 / 80%) 0%, transparent 70%)',
-              'radial-gradient(ellipse 50% 40% at 80% 15%, oklch(0.65 0.15 200 / 60%) 0%, transparent 70%)',
-              'radial-gradient(ellipse 40% 35% at 50% 70%, oklch(0.70 0.12 280 / 40%) 0%, transparent 70%)',
-            ].join(', '),
+            background:
+              'linear-gradient(180deg, color-mix(in oklch, var(--brand) 11%, transparent) 0%, color-mix(in oklch, var(--accent) 38%, transparent) 44%, transparent 100%)',
             maskImage:
               'linear-gradient(to bottom, black 40%, transparent 100%)',
             WebkitMaskImage:
@@ -175,7 +172,10 @@ export function Pricing() {
           }}
         />
         <PageTransition className='relative mx-auto w-full max-w-[1800px] px-3 pt-16 pb-8 sm:px-6 sm:pt-20 sm:pb-10 xl:px-8'>
-          <header className='mx-auto mb-5 max-w-3xl pt-5 text-center sm:mb-10 sm:pt-10'>
+          <header className='tokone-panel mx-auto mb-5 max-w-4xl px-5 py-8 text-center sm:mb-10 sm:px-8 sm:py-10'>
+            <div className='text-muted-foreground mb-3 text-xs font-medium tracking-wider uppercase'>
+              {t('Model marketplace')}
+            </div>
             <h1 className='text-[clamp(2rem,5.5vw,3.5rem)] leading-[1.15] font-bold tracking-tight'>
               {t('Model Square')}
             </h1>
