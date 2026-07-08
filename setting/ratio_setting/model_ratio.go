@@ -207,24 +207,28 @@ var defaultModelRatio = map[string]float64{
 	"qwen-turbo":                                0.8572, // ￥0.012 / 1k tokens
 	"qwen-plus":                                 10,     // ￥0.14 / 1k tokens
 	// Doubao Seedance 2.0 video base tier: official 480p/720p, no video input, RMB per 1M tokens.
-	"doubao-seedance-2-0-260128":      46.0 / 14.0,
-	"seedance2.0_direct":              46.0 / 14.0,
-	"seedance2.0_vision":              46.0 / 14.0,
-	"Seedance_2.0_mini":               46.0 / 14.0,
-	"seedance2.0_mini":                46.0 / 14.0,
-	"ark/seedance-2.0":                37.0 / 14.0,
-	"doubao-seedance-2-0-fast-260128": 37.0 / 14.0,
-	"seedance2.0_fast_direct":         37.0 / 14.0,
-	"seedance2.0_fast_vision":         37.0 / 14.0,
-	"Seedance_2.0_mini_lite":          37.0 / 14.0,
-	"seedance2.0_fast_mini":           37.0 / 14.0,
-	"text-embedding-v1":               0.05,   // ￥0.0007 / 1k tokens
-	"SparkDesk-v1.1":                  1.2858, // ￥0.018 / 1k tokens
-	"SparkDesk-v2.1":                  1.2858, // ￥0.018 / 1k tokens
-	"SparkDesk-v3.1":                  1.2858, // ￥0.018 / 1k tokens
-	"SparkDesk-v3.5":                  1.2858, // ￥0.018 / 1k tokens
-	"SparkDesk-v4.0":                  1.2858,
-	"hunyuan":                         7.143, // ¥0.1 / 1k tokens  // https://cloud.tencent.com/document/product/1729/97731#e0e6be58-60c8-469f-bdeb-6c264ce3b4d0
+	"doubao-seedance-2-0-260128":        46.0 / 14.0,
+	"dreamina-seedance-2-0-260128":      46.0 / 14.0,
+	"seedance":                          46.0 / 14.0,
+	"seedance2.0_direct":                46.0 / 14.0,
+	"seedance2.0_vision":                46.0 / 14.0,
+	"Seedance_2.0_mini":                 46.0 / 14.0,
+	"seedance2.0_mini":                  46.0 / 14.0,
+	"ark/seedance-2.0":                  37.0 / 14.0,
+	"doubao-seedance-2-0-fast-260128":   37.0 / 14.0,
+	"dreamina-seedance-2-0-fast-260128": 37.0 / 14.0,
+	"seedance-fast":                     37.0 / 14.0,
+	"seedance2.0_fast_direct":           37.0 / 14.0,
+	"seedance2.0_fast_vision":           37.0 / 14.0,
+	"Seedance_2.0_mini_lite":            37.0 / 14.0,
+	"seedance2.0_fast_mini":             37.0 / 14.0,
+	"text-embedding-v1":                 0.05,   // ￥0.0007 / 1k tokens
+	"SparkDesk-v1.1":                    1.2858, // ￥0.018 / 1k tokens
+	"SparkDesk-v2.1":                    1.2858, // ￥0.018 / 1k tokens
+	"SparkDesk-v3.1":                    1.2858, // ￥0.018 / 1k tokens
+	"SparkDesk-v3.5":                    1.2858, // ￥0.018 / 1k tokens
+	"SparkDesk-v4.0":                    1.2858,
+	"hunyuan":                           7.143, // ¥0.1 / 1k tokens  // https://cloud.tencent.com/document/product/1729/97731#e0e6be58-60c8-469f-bdeb-6c264ce3b4d0
 	// https://platform.lingyiwanwu.com/docs#-计费单元
 	// 已经按照 7.2 来换算美元价格
 	"yi-34b-chat-0205":       0.18,

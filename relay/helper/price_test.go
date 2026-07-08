@@ -87,3 +87,41 @@ func TestModelPriceHelperPerCallFallsBackToDefaultModelRatio(t *testing.T) {
 	require.InDelta(t, 46.0/14.0, priceData.ModelRatio, 0.000001)
 	require.True(t, HasModelBillingConfig("doubao-seedance-2-0-260128"))
 }
+
+func TestModelPriceHelperPerCallFallsBackToDefaultVipeakSeedanceRatio(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	originalModelRatio := ratio_setting.ModelRatio2JSONString()
+	t.Cleanup(func() {
+		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(originalModelRatio))
+	})
+	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{}`))
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Set("group", "default")
+
+	tests := []struct {
+		model string
+		ratio float64
+	}{
+		{model: "dreamina-seedance-2-0-260128", ratio: 46.0 / 14.0},
+		{model: "dreamina-seedance-2-0-fast-260128", ratio: 37.0 / 14.0},
+		{model: "seedance", ratio: 46.0 / 14.0},
+		{model: "seedance-fast", ratio: 37.0 / 14.0},
+	}
+
+	for _, tt := range tests {
+		info := &relaycommon.RelayInfo{
+			OriginModelName: tt.model,
+			UserGroup:       "default",
+			UsingGroup:      "default",
+		}
+
+		priceData, err := ModelPriceHelperPerCall(ctx, info)
+		require.NoError(t, err)
+		require.False(t, priceData.UsePrice)
+		require.InDelta(t, tt.ratio, priceData.ModelRatio, 0.000001)
+		require.True(t, HasModelBillingConfig(tt.model))
+	}
+}
