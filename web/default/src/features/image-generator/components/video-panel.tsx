@@ -200,9 +200,13 @@ export function VideoPanel({
   const resolutionParam = familyParams.find(
     (param) => param.key === 'resolution' && param.type === 'select'
   )
-  const resolutionOptions = isSeedanceVideo
-    ? getSeedanceResolutionOptions(config.model)
-    : (resolutionParam?.options ?? [])
+  const resolutionOptions = useMemo(
+    () =>
+      isSeedanceVideo
+        ? getSeedanceResolutionOptions(config.model)
+        : (resolutionParam?.options ?? []),
+    [config.model, isSeedanceVideo, resolutionParam?.options]
+  )
   const durationOptions = isSeedanceVideo
     ? SEEDANCE_VIDEO_DURATIONS
     : VIDEO_DURATIONS
@@ -296,15 +300,30 @@ export function VideoPanel({
       ) {
         updateConfig('size', '16:9')
       }
-      if (!config.metadata.resolution) {
-        updateConfig('metadata', { ...config.metadata, resolution: '720p' })
+      const currentResolution = String(config.metadata.resolution ?? '')
+      const nextResolution = resolutionOptions.some(
+        (option) => option.value === currentResolution
+      )
+        ? currentResolution
+        : (resolutionOptions[0]?.value ?? '720p')
+      if (currentResolution !== nextResolution) {
+        updateConfig('metadata', {
+          ...config.metadata,
+          resolution: nextResolution,
+        })
       }
       return
     }
     if (config.size.includes(':')) {
       updateConfig('size', '1280x720')
     }
-  }, [config.metadata, config.size, isSeedanceVideo, updateConfig])
+  }, [
+    config.metadata,
+    config.size,
+    isSeedanceVideo,
+    resolutionOptions,
+    updateConfig,
+  ])
 
   useEffect(() => {
     if (!config.image) return

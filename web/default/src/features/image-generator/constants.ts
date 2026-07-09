@@ -380,6 +380,9 @@ const IMAGE_OPTIONAL_VIDEO_MODELS = new Set([
   'doubao-seedance-2-0-fast-260128',
   'dreamina-seedance-2-0-260128',
   'dreamina-seedance-2-0-fast-260128',
+  'seedance-2',
+  'seedance-2-fast',
+  'seedance-2-mini',
   'seedance2.0_direct',
   'seedance2.0_fast_direct',
   'seedance2.0_vision',
@@ -443,15 +446,47 @@ export function isVipeakSeedanceVideoModel(model: string): boolean {
   )
 }
 
+export function isToAPIsSeedanceVideoModel(model: string): boolean {
+  const normalizedModel = model.toLowerCase().trim()
+  return (
+    normalizedModel === 'seedance-2' ||
+    normalizedModel === 'seedance-2-fast' ||
+    normalizedModel === 'seedance-2-mini'
+  )
+}
+
 export function isSeedanceVideoModel(model: string): boolean {
-  return isApizSeedanceVideoModel(model) || isVipeakSeedanceVideoModel(model)
+  return (
+    isApizSeedanceVideoModel(model) ||
+    isVipeakSeedanceVideoModel(model) ||
+    isToAPIsSeedanceVideoModel(model)
+  )
 }
 
 export function getSeedanceResolutionOptions(
   model: string
 ): NonNullable<FamilyParam['options']> {
-  void model
-  return FAMILY_PARAMS.seedance[0]?.options ?? []
+  const options = FAMILY_PARAMS.seedance[0]?.options ?? []
+  const normalizedModel = normalizeVideoVariantModel(model).toLowerCase()
+  const isFastOrMini =
+    normalizedModel === 'seedance-2-fast' ||
+    normalizedModel === 'seedance-2-mini' ||
+    normalizedModel === 'seedance_2.0_fast' ||
+    normalizedModel === 'seedance_2.0_mini' ||
+    normalizedModel === 'seedance_2.0_mini_lite' ||
+    normalizedModel === 'ark/seedance-2.0' ||
+    normalizedModel === 'doubao-seedance-2-0-fast-260128' ||
+    normalizedModel === 'dreamina-seedance-2-0-fast-260128' ||
+    normalizedModel === 'seedance-fast' ||
+    normalizedModel === 'seedance2.0_fast_direct' ||
+    normalizedModel === 'seedance2.0_fast_vision' ||
+    normalizedModel === 'seedance2.0_fast_mini'
+  if (isFastOrMini) {
+    return options.filter((option) =>
+      ['480p', '720p'].includes(option.value.toLowerCase())
+    )
+  }
+  return options
 }
 
 export function getSeedanceOutputSize(
@@ -503,6 +538,7 @@ export function getSeedancePricePerMillionCNY({
   const normalizedResolution = resolution.toLowerCase().trim()
   const isHighQuality =
     normalizedModelKey === 'seedance_2.0' ||
+    normalizedModelKey === 'seedance-2' ||
     normalizedModelKey === 'doubao-seedance-2-0-260128' ||
     normalizedModelKey === 'dreamina-seedance-2-0-260128' ||
     normalizedModelKey === 'seedance' ||
@@ -517,12 +553,14 @@ export function getSeedancePricePerMillionCNY({
 
   const isMini =
     normalizedModelKey === 'seedance_2.0_mini' ||
+    normalizedModelKey === 'seedance-2-mini' ||
     normalizedModelKey === 'seedance_2.0_mini_lite'
 
   if (isMini) return hasVideoInput ? 14 : 23
 
   const isFast =
     normalizedModelKey === 'seedance_2.0_fast' ||
+    normalizedModelKey === 'seedance-2-fast' ||
     normalizedModelKey === 'ark/seedance-2.0' ||
     normalizedModelKey === 'doubao-seedance-2-0-fast-260128' ||
     normalizedModelKey === 'dreamina-seedance-2-0-fast-260128' ||
