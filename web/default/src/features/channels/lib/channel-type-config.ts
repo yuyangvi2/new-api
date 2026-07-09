@@ -156,6 +156,17 @@ export const CHANNEL_TYPE_CONFIGS: Record<number, ChannelTypeConfig> = {
         'ark/seedance-2.0, seedance2.0_direct, seedance2.0_vision, Seedance_2.0_mini, Seedance_2.0_mini_lite',
     },
   },
+  9005: {
+    id: 9005,
+    name: CHANNEL_TYPES[9005],
+    icon: 'doubao',
+    defaultBaseUrl: 'https://toapis.com',
+    hints: {
+      baseUrl: 'Default: https://toapis.com',
+      key: 'Bearer API key',
+      models: 'seedance-2, seedance-2-fast, seedance-2-mini',
+    },
+  },
 }
 
 /**

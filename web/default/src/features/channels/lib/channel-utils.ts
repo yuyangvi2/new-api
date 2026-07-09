@@ -106,6 +106,7 @@ export function getChannelTypeIcon(type: number): string {
     9002: 'Tencent', // AIART (Image-GI)
     9003: 'vipeak', // vipeak (Wan2.7/Seedance)
     9004: 'Doubao', // apiz.ai / xskill.ai
+    9005: 'Doubao', // ToAPIs
 
     // Tools & Platforms
     37: 'Dify', // Dify
