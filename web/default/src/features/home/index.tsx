@@ -19,23 +19,22 @@ For commercial licensing, please contact support@quantumnous.com
 import { useTranslation } from 'react-i18next'
 
 import { PublicLayout } from '@/components/layout'
-import { Footer } from '@/components/layout/components/footer'
 import type { TopNavLink } from '@/components/layout/types'
 import { RichContent } from '@/components/rich-content'
 import { isLikelyHtml } from '@/lib/content-format'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { CTA, Features, Hero, HowItWorks, Stats } from './components'
+import { BusinessScenarios, CTA, Hero, HowItWorks } from './components'
 import { useHomePageContent } from './hooks'
 
 const defaultHomeNavLinks: TopNavLink[] = [
-  { title: 'Pricing', href: '/pricing' },
+  { title: 'Model Square', href: '/market' },
   {
     title: 'Docs',
     href: 'https://docs.newapi.pro',
     external: true,
   },
-  { title: 'Model Square', href: '/pricing' },
+  { title: 'Pricing', href: '/pricing' },
 ]
 
 export function Home() {
@@ -46,7 +45,7 @@ export function Home() {
 
   if (!isLoaded) {
     return (
-      <PublicLayout showMainContainer={false}>
+      <PublicLayout showMainContainer={false} showFooter={false}>
         <main className='flex min-h-screen items-center justify-center'>
           <div className='text-muted-foreground'>{t('Loading...')}</div>
         </main>
@@ -57,7 +56,7 @@ export function Home() {
   if (content) {
     if (isUrl) {
       return (
-        <PublicLayout showMainContainer={false}>
+        <PublicLayout showMainContainer={false} showFooter={false}>
           <iframe
             src={content}
             className='h-screen w-full border-none'
@@ -72,7 +71,7 @@ export function Home() {
 
     if (contentIsHtml) {
       return (
-        <PublicLayout showMainContainer={false}>
+        <PublicLayout showMainContainer={false} showFooter={false}>
           <RichContent
             mode='html'
             htmlVariant='isolated'
@@ -84,7 +83,7 @@ export function Home() {
     }
 
     return (
-      <PublicLayout>
+      <PublicLayout showFooter={false}>
         <div className='mx-auto max-w-6xl px-4 py-8'>
           <RichContent
             mode='markdown'
@@ -101,14 +100,12 @@ export function Home() {
       showMainContainer={false}
       navLinks={defaultHomeNavLinks}
       showNotifications={false}
-      headerProps={{ showLanguageSwitcher: false }}
+      showContactButton={false}
     >
       <Hero isAuthenticated={isAuthenticated} />
-      <Stats />
-      <Features />
+      <BusinessScenarios />
       <HowItWorks />
       <CTA isAuthenticated={isAuthenticated} />
-      <Footer />
     </PublicLayout>
   )
 }

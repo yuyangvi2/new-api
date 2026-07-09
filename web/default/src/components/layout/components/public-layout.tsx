@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { TopNavLink } from '../types'
+import { Footer } from './footer'
 import { PublicHeader, type PublicHeaderProps } from './public-header'
 
 type PublicLayoutProps = {
@@ -28,6 +29,8 @@ type PublicLayoutProps = {
   showThemeSwitch?: boolean
   showAuthButtons?: boolean
   showNotifications?: boolean
+  showFooter?: boolean
+  showContactButton?: boolean
   logo?: React.ReactNode
   siteName?: string
 }
@@ -41,6 +44,7 @@ export function PublicLayout(props: PublicLayoutProps) {
         showThemeSwitch={props.showThemeSwitch}
         showAuthButtons={props.showAuthButtons}
         showNotifications={props.showNotifications}
+        showContactButton={props.showContactButton}
         logo={props.logo}
         siteName={props.siteName}
         {...props.headerProps}
@@ -53,6 +57,8 @@ export function PublicLayout(props: PublicLayoutProps) {
       ) : (
         props.children
       )}
+
+      {props.showFooter !== false && <Footer />}
     </div>
   )
 }

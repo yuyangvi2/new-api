@@ -26,6 +26,9 @@ import type { PricingData } from './types'
 
 // Get model pricing data
 export async function getPricing(): Promise<PricingData> {
-  const res = await api.get('/api/pricing')
+  const res = await api.get('/api/pricing', {
+    timeout: 4000,
+    skipErrorHandler: true,
+  })
   return res.data
 }

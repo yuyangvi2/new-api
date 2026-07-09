@@ -32,22 +32,19 @@ export function SignIn() {
 
   return (
     <AuthLayout>
-      <div className='w-full space-y-8'>
-        <div className='space-y-2'>
-          <h2 className='text-center text-2xl font-semibold tracking-tight sm:text-left'>
-            {t('Sign in')}
+      <div className='bg-card/95 rounded-3xl border p-6 shadow-[0_18px_70px_rgb(0_0_0/0.08)] sm:p-8'>
+        <div className='mb-6 space-y-2'>
+          <h2 className='flex items-center gap-2 text-2xl font-bold tracking-tight'>
+            <span className='bg-brand size-2 rounded-full' />
+            {t('Sign in / Register')}
           </h2>
           {!status?.self_use_mode_enabled &&
             status?.register_enabled !== false && (
-              <p className='text-muted-foreground text-left text-sm sm:text-base'>
-                {t("Don't have an account?")}{' '}
-                <Link
-                  to='/sign-up'
-                  className='hover:text-primary font-medium underline underline-offset-4'
-                >
+              <p className='text-muted-foreground text-sm'>
+                {t('New users will automatically create an account.')}
+                <Link to='/sign-up' className='sr-only'>
                   {t('Sign up')}
                 </Link>
-                .
               </p>
             )}
         </div>
@@ -57,7 +54,7 @@ export function SignIn() {
         <TermsFooter
           variant='sign-in'
           status={status}
-          className='text-center'
+          className='mt-4 text-center'
         />
       </div>
     </AuthLayout>

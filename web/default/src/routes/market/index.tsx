@@ -16,22 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { TopNavLink } from '../types'
+import { createFileRoute } from '@tanstack/react-router'
 
-/**
- * Default top navigation links
- *
- * In practice, navigation links are dynamically fetched from backend.
- * Priority: Backend dynamic links > Provided navLinks > defaultTopNavLinks
- *
- * Public fallback links used before backend status configuration is available.
- */
-export const defaultTopNavLinks: TopNavLink[] = [
-  { title: 'Model Square', href: '/market' },
-  {
-    title: 'Docs',
-    href: 'https://docs.newapi.pro',
-    external: true,
-  },
-  { title: 'Pricing', href: '/pricing' },
-]
+import { Market } from '@/features/market'
+
+export const Route = createFileRoute('/market/')({
+  component: Market,
+})

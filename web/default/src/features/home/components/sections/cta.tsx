@@ -36,38 +36,39 @@ export function CTA(props: CTAProps) {
   }
 
   return (
-    <section className='bg-background relative z-10 px-4 py-16 md:px-8'>
+    <section className='dark:bg-background relative z-10 overflow-hidden bg-[#fbf7ef] px-4 py-16 sm:py-20 md:px-8'>
+      <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(251_247_239)_0%,rgb(255_250_243)_46%,rgb(251_247_239)_100%)]' />
+      <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_36%,rgb(255_171_45/0.2),transparent_38%)]' />
       <AnimateInView
-        className='relative mx-auto max-w-7xl overflow-hidden rounded-lg bg-black px-6 py-14 text-center text-white md:px-12 md:py-20'
-        animation='scale-in'
+        className='relative mx-auto max-w-4xl text-center'
+        animation='fade-up'
       >
-        <div className='relative z-10'>
-          <h2 className='text-3xl leading-tight font-extrabold tracking-tight md:text-5xl'>
-            {t('Ready to simplify')}
-            <br />
-            {t('your AI integration?')}
-          </h2>
-          <p className='mx-auto mt-6 max-w-2xl text-sm leading-6 text-white/75 md:text-base'>
-            {t(
-              'Deploy your own gateway and start routing requests through your configured upstream services.'
-            )}
-          </p>
-          <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
-            <Button
-              className='group h-12 rounded-md bg-white px-7 font-semibold text-black hover:bg-white/90'
-              render={<Link to='/sign-up' />}
-            >
-              {t('Get Started')}
-              <ArrowRight className='ml-1 size-3.5 transition-transform duration-200 group-hover:translate-x-0.5' />
-            </Button>
-            <Button
-              variant='outline'
-              className='h-12 rounded-md border-white/30 bg-transparent px-7 font-semibold text-white hover:bg-white/10 hover:text-white'
-              render={<Link to='/pricing' />}
-            >
-              {t('View Pricing')}
-            </Button>
-          </div>
+        <p className='text-brand mb-3 text-xs font-semibold tracking-[0.22em] uppercase'>
+          {t('Ready to start?')}
+        </p>
+        <h2 className='text-3xl leading-tight font-extrabold tracking-tight sm:text-4xl md:text-5xl'>
+          {t('Ready to unify access to AI models?')}
+        </h2>
+        <p className='text-muted-foreground mx-auto mt-5 max-w-2xl text-sm leading-6 md:text-base'>
+          {t(
+            'Use one compatible API to connect models, billing, routing, and operations.'
+          )}
+        </p>
+        <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
+          <Button
+            className='group bg-brand hover:bg-brand-hover h-14 w-full max-w-48 rounded-full px-10 text-lg font-semibold text-white shadow-[0_10px_28px_rgb(234_117_20/0.22)] sm:w-48'
+            render={<Link to='/sign-up' />}
+          >
+            {t('Start now')}
+            <ArrowRight className='ml-1 size-3.5 transition-transform duration-200 group-hover:translate-x-0.5' />
+          </Button>
+          <Button
+            variant='outline'
+            className='border-primary/18 dark:bg-card/80 h-14 w-full max-w-48 rounded-full bg-white/72 px-10 text-lg font-semibold shadow-[0_10px_28px_rgb(234_117_20/0.1)] backdrop-blur hover:bg-white sm:w-48'
+            render={<Link to='/market' />}
+          >
+            {t('View models')}
+          </Button>
         </div>
       </AnimateInView>
     </section>
