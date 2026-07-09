@@ -47,13 +47,16 @@ function FooterLinkItem(props: { link: FooterLink }) {
   const isExternal = props.link.href.startsWith('http')
   const label = t(props.link.text)
 
+  const linkClassName =
+    'group/footer-link text-muted-foreground hover:text-foreground relative inline-flex w-fit text-sm leading-7 transition-colors duration-200 after:absolute after:bottom-0.5 after:left-0 after:h-px after:w-full after:origin-left after:scale-x-0 after:bg-current after:transition-transform after:duration-300 hover:after:scale-x-100'
+
   if (isExternal) {
     return (
       <a
         href={props.link.href}
         target='_blank'
         rel='noopener noreferrer'
-        className='text-muted-foreground hover:text-foreground text-sm leading-7 transition-colors duration-200'
+        className={linkClassName}
       >
         {label}
       </a>
@@ -63,7 +66,7 @@ function FooterLinkItem(props: { link: FooterLink }) {
   return (
     <Link
       to={props.link.href}
-      className='text-muted-foreground hover:text-foreground text-sm leading-7 transition-colors duration-200'
+      className={linkClassName}
     >
       {label}
     </Link>
@@ -102,7 +105,7 @@ function LegalLinks(props: { leadingSeparator?: boolean }) {
           )}
           <Link
             to={item.href}
-            className='hover:text-foreground transition-colors duration-200'
+            className='relative inline-flex hover:text-foreground transition-colors duration-200 after:absolute after:bottom-0 after:left-0 after:h-px after:w-full after:origin-left after:scale-x-0 after:bg-current after:transition-transform after:duration-300 hover:after:scale-x-100'
           >
             {item.label}
           </Link>

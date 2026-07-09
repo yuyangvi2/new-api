@@ -33,7 +33,8 @@ interface ScenarioItem {
   title: string
   description: string
   icon: LucideIcon
-  accent: string
+  textureClassName: string
+  iconClassName: string
 }
 
 const SCENARIOS: ScenarioItem[] = [
@@ -42,42 +43,57 @@ const SCENARIOS: ScenarioItem[] = [
     description:
       'Generate scripts, captions, visuals, and short-form video drafts from one routed model stack.',
     icon: FileText,
-    accent: 'from-orange-500/20 to-amber-300/10 text-orange-600',
+    textureClassName:
+      'bg-[radial-gradient(circle_at_18%_18%,rgb(249_115_22/0.055),transparent_42%),linear-gradient(135deg,rgb(249_115_22/0.035),transparent_62%)]',
+    iconClassName:
+      'bg-orange-500/[0.08] text-orange-700/80 dark:text-orange-300/80',
   },
   {
     title: 'Commerce visual operations',
     description:
       'Create product scenes, try-on concepts, listing images, and localized ad variants without rebuilding pipelines.',
     icon: ShoppingBag,
-    accent: 'from-sky-500/20 to-cyan-300/10 text-sky-600',
+    textureClassName:
+      'bg-[radial-gradient(circle_at_18%_18%,rgb(14_165_233/0.055),transparent_42%),linear-gradient(135deg,rgb(14_165_233/0.035),transparent_62%)]',
+    iconClassName: 'bg-sky-500/[0.08] text-sky-700/80 dark:text-sky-300/80',
   },
   {
     title: 'Customer support copilot',
     description:
       'Route simple questions to fast models and complex cases to stronger reasoning models while keeping cost predictable.',
     icon: Headphones,
-    accent: 'from-emerald-500/20 to-lime-300/10 text-emerald-600',
+    textureClassName:
+      'bg-[radial-gradient(circle_at_18%_18%,rgb(16_185_129/0.055),transparent_42%),linear-gradient(135deg,rgb(16_185_129/0.035),transparent_62%)]',
+    iconClassName:
+      'bg-emerald-500/[0.08] text-emerald-700/80 dark:text-emerald-300/80',
   },
   {
     title: 'Engineering assistant layer',
     description:
       'Give teams access to coding, review, and debugging models through one governed endpoint.',
     icon: Code2,
-    accent: 'from-violet-500/20 to-fuchsia-300/10 text-violet-600',
+    textureClassName:
+      'bg-[radial-gradient(circle_at_18%_18%,rgb(139_92_246/0.05),transparent_42%),linear-gradient(135deg,rgb(139_92_246/0.032),transparent_62%)]',
+    iconClassName:
+      'bg-violet-500/[0.08] text-violet-700/80 dark:text-violet-300/80',
   },
   {
     title: 'Research and reporting',
     description:
       'Summarize filings, calls, documents, and market signals with long-context models and traceable prompts.',
     icon: BarChart3,
-    accent: 'from-rose-500/20 to-orange-300/10 text-rose-600',
+    textureClassName:
+      'bg-[radial-gradient(circle_at_18%_18%,rgb(244_63_94/0.05),transparent_42%),linear-gradient(135deg,rgb(244_63_94/0.032),transparent_62%)]',
+    iconClassName: 'bg-rose-500/[0.08] text-rose-700/80 dark:text-rose-300/80',
   },
   {
     title: 'Workflow automation',
     description:
       'Connect agents, tools, and approvals so recurring business tasks run with observable model usage.',
     icon: Workflow,
-    accent: 'from-slate-700/15 to-teal-300/10 text-teal-600',
+    textureClassName:
+      'bg-[radial-gradient(circle_at_18%_18%,rgb(20_184_166/0.055),transparent_42%),linear-gradient(135deg,rgb(20_184_166/0.035),transparent_62%)]',
+    iconClassName: 'bg-teal-500/[0.08] text-teal-700/80 dark:text-teal-300/80',
   },
 ]
 
@@ -86,7 +102,7 @@ export function BusinessScenarios() {
 
   return (
     <section className='dark:border-border/60 dark:bg-background relative overflow-hidden border-y border-orange-100/70 bg-[#fffaf2] py-16 md:py-20'>
-      <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_18%,rgb(255_171_45/0.16),transparent_32%),radial-gradient(circle_at_88%_42%,rgb(14_165_233/0.12),transparent_28%),linear-gradient(180deg,rgb(255_255_255/0.55),transparent_54%)] dark:opacity-30' />
+      <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_18%,rgb(255_171_45/0.16),transparent_32%),radial-gradient(circle_at_88%_42%,rgb(14_165_233/0.12),transparent_28%),linear-gradient(180deg,rgb(255_255_255/0.55),transparent_54%)] dark:bg-[radial-gradient(circle_at_15%_18%,rgb(234_117_20/0.14),transparent_34%),radial-gradient(circle_at_88%_42%,rgb(14_165_233/0.12),transparent_30%),linear-gradient(180deg,rgb(255_255_255/0.06),transparent_56%)]' />
       <div className='relative mx-auto max-w-7xl px-4 md:px-6'>
         <div className='mx-auto max-w-3xl text-center'>
           <div className='text-brand text-xs font-bold tracking-[0.24em] uppercase'>
@@ -108,19 +124,19 @@ export function BusinessScenarios() {
             return (
               <article
                 key={scenario.title}
-                className='group bg-card/86 relative min-h-48 overflow-hidden rounded-2xl border p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md'
+                className='group bg-card/92 relative min-h-48 overflow-hidden rounded-xl border border-border/80 p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md dark:bg-card/80'
               >
                 <div
                   className={cn(
-                    'absolute inset-x-0 top-0 h-24 bg-gradient-to-br opacity-80',
-                    scenario.accent
+                    'pointer-events-none absolute inset-0 opacity-80 dark:opacity-45',
+                    scenario.textureClassName
                   )}
                 />
                 <div className='relative'>
                   <div
                     className={cn(
-                      'flex size-11 items-center justify-center rounded-2xl bg-white/80 ring-1 ring-black/5 transition-transform duration-300 group-hover:scale-105 dark:bg-white/10 dark:ring-white/10',
-                      scenario.accent
+                      'flex size-11 items-center justify-center rounded-lg ring-1 ring-black/5 transition-transform duration-300 group-hover:scale-105 dark:ring-white/10',
+                      scenario.iconClassName
                     )}
                   >
                     <Icon className='size-5' aria-hidden='true' />

@@ -246,7 +246,7 @@ export function PublicHeader(props: PublicHeaderProps) {
         className={cn(
           'fixed inset-x-0 top-0 z-50 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
           scrolled
-            ? 'border-b border-white/55 bg-[#fbf7ef]/68 shadow-[0_12px_36px_rgb(15_23_42/0.08),inset_0_1px_0_rgb(255_255_255/0.58)] backdrop-blur-2xl supports-[backdrop-filter]:bg-[#fbf7ef]/62 dark:border-white/10 dark:bg-background/70 dark:shadow-[0_12px_36px_rgb(0_0_0/0.24),inset_0_1px_0_rgb(255_255_255/0.08)] dark:supports-[backdrop-filter]:bg-background/58'
+            ? 'border-b border-white/50 bg-background/46 shadow-[0_12px_36px_rgb(15_23_42/0.08),inset_0_1px_0_rgb(255_255_255/0.5)] backdrop-blur-2xl supports-[backdrop-filter]:bg-background/42 dark:border-white/10 dark:bg-background/46 dark:shadow-[0_12px_36px_rgb(0_0_0/0.24),inset_0_1px_0_rgb(255_255_255/0.08)] dark:supports-[backdrop-filter]:bg-background/42'
             : 'border-b border-transparent bg-transparent'
         )}
       >
@@ -263,7 +263,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                 to={homeUrl}
                 className='group flex shrink-0 items-center gap-2.5'
               >
-                <div className='flex size-9 shrink-0 items-center justify-center rounded-xl shadow-[0_10px_26px_rgb(234_117_20/0.18)] transition-all duration-300 group-hover:scale-105 group-hover:shadow-[0_14px_34px_rgb(234_117_20/0.24)]'>
+                <div className='flex size-9 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-105'>
                   {brandLogo}
                 </div>
                 <span className='max-w-[10rem] truncate text-lg font-semibold tracking-tight sm:max-w-none sm:text-xl md:text-[1.6rem]'>
@@ -281,7 +281,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                   const isActive = pathname === link.href
                   const key = `${link.href}:${link.title}`
                   const linkClassName = cn(
-                    'group/link relative flex h-[3.75rem] items-center overflow-visible px-0.5 text-sm font-medium transition-colors duration-300',
+                    'group/link relative flex h-[3.75rem] items-center overflow-visible px-0.5 text-[15px] font-medium transition-colors duration-300',
                     isActive
                       ? 'text-foreground'
                       : 'text-muted-foreground hover:text-foreground',
@@ -429,7 +429,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                   : 'translate-y-4 opacity-0',
                 isActive
                   ? 'border-foreground bg-foreground text-background'
-                  : 'border-orange-100/80 bg-background/72 text-foreground',
+                  : 'border-orange-100/80 bg-background/72 text-foreground dark:border-border/80',
                 link.disabled && 'pointer-events-none opacity-50'
               )
               const transitionStyle = {
@@ -478,7 +478,7 @@ export function PublicHeader(props: PublicHeaderProps) {
             )}
             style={{ transitionDelay: mobileOpen ? '250ms' : '0ms' }}
           >
-            <div className='bg-background/70 flex items-center justify-center gap-3 rounded-2xl border border-orange-100/80 p-3 shadow-sm'>
+            <div className='bg-background/70 flex items-center justify-center gap-3 rounded-2xl border border-orange-100/80 p-3 shadow-sm dark:border-border/80'>
               {showLanguageSwitcher && <LanguageSwitcher />}
               {showThemeSwitch && <ThemeSwitch />}
               {showNotifications && (

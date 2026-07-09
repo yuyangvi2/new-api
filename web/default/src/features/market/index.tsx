@@ -24,8 +24,8 @@ import { toast } from 'sonner'
 
 import { PublicLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
 import { usePricingData } from '../pricing/hooks/use-pricing-data'
@@ -49,14 +49,43 @@ const MODEL_TYPES: Array<{
   { value: 'audio', label: 'Audio', icon: Music2 },
 ]
 
-const TASKS = ['Chat']
+const TASKS = ['Chat', 'Text to Image', 'Image to Video', 'Image edit', 'Audio']
+
+function modelSignals(model: MarketModel): string[] {
+  return [
+    model.model_name,
+    model.description,
+    model.vendor_name,
+    model.tags,
+    ...(model.supported_endpoint_types ?? []),
+    ...(model.input_modalities ?? []),
+    ...(model.output_modalities ?? []),
+    ...(model.capabilities ?? []),
+  ].filter(Boolean) as string[]
+}
+
+function modelMatchesTask(model: MarketModel, task: string): boolean {
+  if (task === 'all') return true
+
+  const normalizedTask = task.toLowerCase()
+  if (inferKind(model) === normalizedTask) return true
+
+  return modelSignals(model).some((signal) =>
+    signal.toLowerCase().includes(normalizedTask)
+  )
+}
 
 function MarketModelCard(props: { model: MarketModel }) {
   const { t } = useTranslation()
   const model = props.model
   const vendor = model.vendor_name || t('Unknown provider')
   const tags = splitTags(model.tags).slice(0, 4)
+  const endpoints = (model.supported_endpoint_types ?? []).slice(0, 2)
+  const groups = (model.enable_groups ?? []).slice(0, 2)
   const detailHref = `/model-guide/${toModelGuideSlug(model.model_name)}`
+  const modelIconKey = model.icon || model.vendor_icon
+  const modelIcon = modelIconKey ? getLobeIcon(modelIconKey, 28) : null
+  const initial = model.model_name?.charAt(0).toUpperCase() || '?'
   const price =
     model.quota_type === 1
       ? t('{{amount}} credits', {
@@ -88,8 +117,15 @@ function MarketModelCard(props: { model: MarketModel }) {
           )}
         >
           <div className='absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgb(255_255_255/0.22)_48%,transparent_100%)] opacity-60' />
-          <div className='relative px-5 text-center text-xl font-bold tracking-tight break-all text-white drop-shadow-sm sm:px-6 sm:text-2xl'>
-            {model.model_name}
+          <div className='relative flex flex-col items-center gap-3 px-5 text-center text-white drop-shadow-sm sm:px-6'>
+            <div className='flex size-12 items-center justify-center rounded-2xl bg-white/14 ring-1 ring-white/20 backdrop-blur'>
+              {modelIcon || (
+                <span className='text-lg font-black'>{initial}</span>
+              )}
+            </div>
+            <div className='text-xl font-bold tracking-tight break-all sm:text-2xl'>
+              {model.model_name}
+            </div>
           </div>
         </div>
       </Link>
@@ -117,23 +153,36 @@ function MarketModelCard(props: { model: MarketModel }) {
             {price}
           </Badge>
         </div>
+        <p className='text-muted-foreground line-clamp-2 min-h-10 text-xs leading-5'>
+          {model.description || t('No description available.')}
+        </p>
         <div className='flex flex-wrap gap-2'>
           {tags.map((tag) => (
             <Badge
               key={tag}
               variant='outline'
-              className='bg-background/70 text-[11px] text-emerald-700'
+              className='bg-background/70 text-[11px] text-foreground/80'
             >
               {t(tag)}
             </Badge>
           ))}
+          {endpoints.map((endpoint) => (
+            <Badge key={endpoint} variant='secondary' className='text-[11px]'>
+              {endpoint}
+            </Badge>
+          ))}
         </div>
-        <Link
-          to={detailHref}
-          className='text-muted-foreground hover:text-foreground inline-flex text-xs font-semibold'
-        >
-          {t('View model guide')}
-        </Link>
+        <div className='flex items-center justify-between gap-3'>
+          <div className='text-muted-foreground truncate text-xs'>
+            {groups.length > 0 ? groups.join(', ') : t('Default group')}
+          </div>
+          <Link
+            to={detailHref}
+            className='text-muted-foreground hover:text-foreground shrink-0 text-xs font-semibold'
+          >
+            {t('View model guide')}
+          </Link>
+        </div>
       </div>
     </article>
   )
@@ -141,7 +190,10 @@ function MarketModelCard(props: { model: MarketModel }) {
 
 function MarketSidebar(props: {
   vendors: Array<{ name: string; count: number }>
+  tasks: Array<{ name: string; count: number }>
+  activeTask: string
   activeVendor: string
+  onTaskChange: (task: string) => void
   onVendorChange: (vendor: string) => void
 }) {
   const { t } = useTranslation()
@@ -151,19 +203,33 @@ function MarketSidebar(props: {
       <div className='space-y-5'>
         <div>
           <div className='text-sm font-semibold'>{t('Tasks')}</div>
-          <div className='text-muted-foreground mt-2 text-xs font-semibold uppercase'>
-            {t('Chat')}
-          </div>
           <div className='mt-2 flex flex-wrap gap-2'>
-            {TASKS.map((task) => (
-              <Button
-                key={task}
-                variant='outline'
-                size='sm'
-                className='bg-background h-8 rounded-xl px-3 text-xs'
+            <button
+              type='button'
+              onClick={() => props.onTaskChange('all')}
+              className={cn(
+                'rounded-xl border px-3 py-1.5 text-xs transition-colors',
+                props.activeTask === 'all'
+                  ? 'bg-foreground text-background'
+                  : 'bg-background text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {t('All')}
+            </button>
+            {props.tasks.map((task) => (
+              <button
+                key={task.name}
+                type='button'
+                onClick={() => props.onTaskChange(task.name)}
+                className={cn(
+                  'rounded-xl border px-3 py-1.5 text-xs transition-colors',
+                  props.activeTask === task.name
+                    ? 'bg-foreground text-background'
+                    : 'bg-background text-muted-foreground hover:text-foreground'
+                )}
               >
-                {t(task)}
-              </Button>
+                {t(task.name)} ({task.count})
+              </button>
             ))}
           </div>
         </div>
@@ -209,6 +275,7 @@ export function Market() {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [activeKind, setActiveKind] = useState<MarketKind>('text')
+  const [activeTask, setActiveTask] = useState('all')
   const [activeVendor, setActiveVendor] = useState('all')
   const pricing = usePricingData()
 
@@ -233,21 +300,41 @@ export function Market() {
     return [...counts.entries()].map(([name, count]) => ({ name, count }))
   }, [models])
 
+  const tasks = useMemo(
+    () =>
+      TASKS.map((task) => ({
+        name: task,
+        count: models.filter((model) => modelMatchesTask(model, task)).length,
+      })),
+    [models]
+  )
+
+  const kindCounts = useMemo(() => {
+    const counts = new Map<MarketKind, number>(
+      MODEL_TYPES.map((item) => [item.value, 0])
+    )
+    for (const model of models) {
+      const kind = model.marketKind ?? inferKind(model)
+      counts.set(kind, (counts.get(kind) ?? 0) + 1)
+    }
+    return counts
+  }, [models])
+
   const filteredModels = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
     return models.filter((model) => {
       if ((model.marketKind ?? inferKind(model)) !== activeKind) return false
+      if (!modelMatchesTask(model, activeTask)) return false
       if (activeVendor !== 'all' && model.vendor_name !== activeVendor) {
         return false
       }
       if (!normalizedQuery) return true
-      return [model.model_name, model.vendor_name, model.tags]
-        .filter(Boolean)
+      return modelSignals(model)
         .join(' ')
         .toLowerCase()
         .includes(normalizedQuery)
     })
-  }, [activeKind, activeVendor, models, query])
+  }, [activeKind, activeTask, activeVendor, models, query])
 
   return (
     <PublicLayout showMainContainer={false} showNotifications={false}>
@@ -269,12 +356,15 @@ export function Market() {
         <section className='mt-5 grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]'>
           <MarketSidebar
             vendors={vendors}
+            tasks={tasks}
+            activeTask={activeTask}
             activeVendor={activeVendor}
+            onTaskChange={setActiveTask}
             onVendorChange={setActiveVendor}
           />
 
           <div className='bg-card/92 rounded-2xl border p-3 shadow-sm sm:rounded-3xl sm:p-4 md:p-5'>
-            <div className='bg-background/65 grid gap-4 rounded-2xl border p-3 sm:p-4 md:grid-cols-[1fr_360px] md:items-center'>
+            <div className='bg-background/65 space-y-4 rounded-2xl border p-3 sm:p-4'>
               <div>
                 <h2 className='text-lg font-bold'>{t('Available models')}</h2>
                 <p className='text-muted-foreground mt-1 text-sm'>
@@ -293,7 +383,55 @@ export function Market() {
                 </div>
               </div>
 
-              <div className='space-y-3'>
+              <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-4'>
+                {MODEL_TYPES.map((item) => {
+                  const Icon = item.icon
+                  const active = activeKind === item.value
+                  return (
+                    <button
+                      key={item.value}
+                      type='button'
+                      onClick={() => setActiveKind(item.value)}
+                      className={cn(
+                        'group flex min-h-20 items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all',
+                        active
+                          ? 'border-brand/60 bg-brand text-white shadow-[0_12px_28px_rgb(242_107_47/0.22)]'
+                          : 'bg-card text-foreground hover:border-brand/35 hover:bg-muted/40'
+                      )}
+                    >
+                      <span className='flex min-w-0 items-center gap-3'>
+                        <span
+                          className={cn(
+                            'flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors',
+                            active
+                              ? 'bg-white/18 text-white'
+                              : 'bg-muted text-muted-foreground group-hover:text-foreground'
+                          )}
+                        >
+                          <Icon className='size-5' />
+                        </span>
+                        <span className='min-w-0'>
+                          <span className='block text-sm font-bold'>
+                            {t(item.label)}
+                          </span>
+                          <span
+                            className={cn(
+                              'mt-0.5 block text-xs',
+                              active ? 'text-white/72' : 'text-muted-foreground'
+                            )}
+                          >
+                            {t('{{count}} models', {
+                              count: kindCounts.get(item.value) ?? 0,
+                            })}
+                          </span>
+                        </span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className='relative'>
                 <div className='relative'>
                   <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2' />
                   <Input
@@ -302,28 +440,6 @@ export function Market() {
                     placeholder={t('Search model, task, or provider')}
                     className='bg-card h-11 rounded-full pr-4 pl-9'
                   />
-                </div>
-                <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
-                  {MODEL_TYPES.map((item) => {
-                    const Icon = item.icon
-                    const active = activeKind === item.value
-                    return (
-                      <button
-                        key={item.value}
-                        type='button'
-                        onClick={() => setActiveKind(item.value)}
-                        className={cn(
-                          'flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 text-sm font-semibold transition-colors',
-                          active
-                            ? 'bg-foreground text-background'
-                            : 'bg-card text-muted-foreground hover:text-foreground'
-                        )}
-                      >
-                        <Icon className='size-4' />
-                        {t(item.label)}
-                      </button>
-                    )
-                  })}
                 </div>
               </div>
             </div>

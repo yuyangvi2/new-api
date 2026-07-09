@@ -29,6 +29,7 @@ type AuthLayoutProps = {
 export function AuthLayout({ children }: AuthLayoutProps) {
   const { t } = useTranslation()
   const { systemName, logo, loading } = useSystemConfig()
+  const currentYear = new Date().getFullYear()
 
   return (
     <div className='relative flex min-h-svh flex-col items-center justify-center px-4 py-10'>
@@ -60,7 +61,10 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       </Link>
       <div className='w-full max-w-[440px]'>{children}</div>
       <div className='text-muted-foreground mt-7 text-center text-xs'>
-        {t('All rights reserved.')}
+        {t('© {{year}} {{name}}. All rights reserved.', {
+          year: currentYear,
+          name: systemName || 'Tokone',
+        })}
       </div>
     </div>
   )

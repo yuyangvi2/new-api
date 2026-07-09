@@ -37,8 +37,8 @@ export function CTA(props: CTAProps) {
 
   return (
     <section className='dark:bg-background relative z-10 overflow-hidden bg-[#fbf7ef] px-4 py-16 sm:py-20 md:px-8'>
-      <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(251_247_239)_0%,rgb(255_250_243)_46%,rgb(251_247_239)_100%)]' />
-      <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_36%,rgb(255_171_45/0.2),transparent_38%)]' />
+      <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(251_247_239)_0%,rgb(255_250_243)_46%,rgb(251_247_239)_100%)] dark:bg-[linear-gradient(180deg,rgb(9_9_11)_0%,rgb(20_20_22)_48%,rgb(9_9_11)_100%)]' />
+      <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_36%,rgb(255_171_45/0.2),transparent_38%)] dark:bg-[radial-gradient(circle_at_50%_36%,rgb(234_117_20/0.18),transparent_40%)]' />
       <AnimateInView
         className='relative mx-auto max-w-4xl text-center'
         animation='fade-up'
@@ -64,7 +64,7 @@ export function CTA(props: CTAProps) {
           </Button>
           <Button
             variant='outline'
-            className='border-primary/18 dark:bg-card/80 h-14 w-full max-w-48 rounded-full bg-white/72 px-10 text-lg font-semibold shadow-[0_10px_28px_rgb(234_117_20/0.1)] backdrop-blur hover:bg-white sm:w-48'
+            className='border-primary/18 dark:bg-card/80 h-14 w-full max-w-48 rounded-full bg-white/72 px-10 text-lg font-semibold shadow-[0_10px_28px_rgb(234_117_20/0.1)] backdrop-blur hover:bg-white dark:hover:bg-card sm:w-48'
             render={<Link to='/market' />}
           >
             {t('View models')}

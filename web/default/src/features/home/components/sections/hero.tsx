@@ -180,8 +180,8 @@ export function Hero(props: HeroProps) {
         props.className
       )}
     >
-      <div className='relative overflow-hidden border-b border-orange-100/80 bg-[#fbf7ef] transition-colors duration-500'>
-        <div className='pointer-events-none absolute inset-0 bg-[#fbf7ef]' />
+      <div className='relative overflow-hidden border-b border-orange-100/80 bg-[#fbf7ef] transition-colors duration-500 dark:border-border/70 dark:bg-background'>
+        <div className='pointer-events-none absolute inset-0 bg-[#fbf7ef] dark:bg-background' />
         {HERO_BACKGROUND_IMAGES.map((image, index) => (
           <img
             key={image}
@@ -196,9 +196,9 @@ export function Hero(props: HeroProps) {
             )}
           />
         ))}
-        <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(251_247_239/0.82)_0%,rgb(251_247_239/0.64)_42%,rgb(251_247_239/0.9)_100%)]' />
-        <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgb(255_171_45/0.18),transparent_42%),linear-gradient(90deg,rgb(251_247_239/0.72)_0%,rgb(251_247_239/0.16)_30%,rgb(251_247_239/0.12)_70%,rgb(251_247_239/0.62)_100%)]' />
-        <div className='absolute inset-x-0 bottom-0 h-1.5 bg-gradient-to-r from-orange-500 via-orange-400 to-amber-300' />
+        <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(251_247_239/0.82)_0%,rgb(251_247_239/0.64)_42%,rgb(251_247_239/0.9)_100%)] dark:bg-[linear-gradient(180deg,rgb(9_9_11/0.84)_0%,rgb(9_9_11/0.72)_42%,rgb(9_9_11/0.94)_100%)]' />
+        <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgb(255_171_45/0.18),transparent_42%),linear-gradient(90deg,rgb(251_247_239/0.72)_0%,rgb(251_247_239/0.16)_30%,rgb(251_247_239/0.12)_70%,rgb(251_247_239/0.62)_100%)] dark:bg-[radial-gradient(circle_at_50%_38%,rgb(234_117_20/0.22),transparent_42%),linear-gradient(90deg,rgb(9_9_11/0.84)_0%,rgb(9_9_11/0.34)_32%,rgb(9_9_11/0.3)_68%,rgb(9_9_11/0.82)_100%)]' />
+        <div className='absolute inset-x-0 bottom-0 h-1.5 bg-gradient-to-r from-orange-500 via-orange-400 to-amber-300 dark:from-orange-500/70 dark:via-amber-400/55 dark:to-cyan-300/45' />
 
         <button
           type='button'

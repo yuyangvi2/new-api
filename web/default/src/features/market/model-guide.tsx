@@ -498,7 +498,7 @@ export function ModelGuide() {
     [allModels, modelSlug]
   )
 
-  if (isLoading && models.length === 0) {
+  if (isLoading && models.length === 0 && !model) {
     return (
       <PublicLayout showMainContainer={false} showNotifications={false}>
         <main className='mx-auto max-w-6xl px-4 pt-28 pb-16 md:px-6'>
