@@ -23,7 +23,7 @@
       "file": "ko.json",
       "missingCount": 0,
       "extrasCount": 0,
-      "untranslatedCount": 4676
+      "untranslatedCount": 4808
     },
     "ru": {
       "file": "ru.json",
@@ -41,7 +41,7 @@
       "file": "zh-TW.json",
       "missingCount": 0,
       "extrasCount": 0,
-      "untranslatedCount": 10
+      "untranslatedCount": 11
     },
     "zh": {
       "file": "zh.json",

@@ -45,7 +45,7 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
 import { LoadingSkeleton, ModelDetailsDrawer } from './components'
-import { EXCLUDED_GROUPS, getEndpointTypeLabels } from './constants'
+import { EXCLUDED_GROUPS, FILTER_ALL, getEndpointTypeLabels } from './constants'
 import {
   getDynamicDisplayGroupRatio,
   getDynamicPricingSummary,
@@ -273,6 +273,7 @@ function PriceSummary(props: {
   model: PricingModel
   priceRate: number
   usdExchangeRate: number
+  selectedGroup: string
 }) {
   const { t } = useTranslation()
   const isDynamicPricing =
@@ -284,7 +285,10 @@ function PriceSummary(props: {
         showRechargePrice: false,
         priceRate: props.priceRate,
         usdExchangeRate: props.usdExchangeRate,
-        groupRatioMultiplier: getDynamicDisplayGroupRatio(props.model),
+        groupRatioMultiplier: getDynamicDisplayGroupRatio(
+          props.model,
+          props.selectedGroup
+        ),
       })
     : null
 
@@ -337,7 +341,8 @@ function PriceSummary(props: {
               TOKEN_UNIT,
               false,
               props.priceRate,
-              props.usdExchangeRate
+              props.usdExchangeRate,
+              props.selectedGroup
             )}
           </span>
           /1M
@@ -351,7 +356,8 @@ function PriceSummary(props: {
               TOKEN_UNIT,
               false,
               props.priceRate,
-              props.usdExchangeRate
+              props.usdExchangeRate,
+              props.selectedGroup
             )}
           </span>
           /1M
@@ -367,7 +373,8 @@ function PriceSummary(props: {
           props.model,
           false,
           props.priceRate,
-          props.usdExchangeRate
+          props.usdExchangeRate,
+          props.selectedGroup
         )}
       </span>{' '}
       / {t('request')}
@@ -380,6 +387,7 @@ function PricingGroupCard(props: {
   endpointLabels: Record<string, string>
   priceRate: number
   usdExchangeRate: number
+  selectedGroup: string
   onModelClick: (modelName: string) => void
 }) {
   const { t } = useTranslation()
@@ -444,6 +452,7 @@ function PricingGroupCard(props: {
                 model={model}
                 priceRate={props.priceRate}
                 usdExchangeRate={props.usdExchangeRate}
+                selectedGroup={props.selectedGroup}
               />
 
               <span className='flex flex-wrap items-center gap-1.5'>
@@ -498,6 +507,7 @@ export function Pricing() {
   )
   const [searchInput, setSearchInput] = useState(routeSearch.search || '')
   const [activeModality, setActiveModality] = useState<PricingModality>('all')
+  const [selectedGroup, setSelectedGroup] = useState(FILTER_ALL)
   const [currentPage, setCurrentPage] = useState(1)
 
   const {
@@ -532,14 +542,22 @@ export function Pricing() {
     return counts
   }, [models])
 
+  const availableGroups = useMemo(
+    () => getAvailableGroups(usableGroup),
+    [usableGroup]
+  )
+
   const filteredModels = useMemo(
     () =>
       models.filter((model) => {
         const matchesModality =
           activeModality === 'all' || getModelModality(model) === activeModality
-        return matchesModality && matchesSearch(model, query)
+        const matchesGroup =
+          selectedGroup === FILTER_ALL ||
+          (model.enable_groups || []).includes(selectedGroup)
+        return matchesModality && matchesGroup && matchesSearch(model, query)
       }),
-    [activeModality, models, query]
+    [activeModality, models, query, selectedGroup]
   )
 
   const pricingGroups = useMemo(
@@ -547,7 +565,10 @@ export function Pricing() {
     [filteredModels]
   )
 
-  const totalPages = Math.max(1, Math.ceil(pricingGroups.length / GROUPS_PER_PAGE))
+  const totalPages = Math.max(
+    1,
+    Math.ceil(pricingGroups.length / GROUPS_PER_PAGE)
+  )
   const visibleGroups = pricingGroups.slice(
     (currentPage - 1) * GROUPS_PER_PAGE,
     currentPage * GROUPS_PER_PAGE
@@ -557,11 +578,6 @@ export function Pricing() {
     if (!selectedModelName) return null
     return models.find((model) => model.model_name === selectedModelName) || null
   }, [models, selectedModelName])
-
-  const availableGroups = useMemo(
-    () => getAvailableGroups(usableGroup),
-    [usableGroup]
-  )
 
   const heroFeatures: PricingFeature[] = [
     {
@@ -599,7 +615,16 @@ export function Pricing() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [activeModality, query])
+  }, [activeModality, query, selectedGroup])
+
+  useEffect(() => {
+    if (
+      selectedGroup !== FILTER_ALL &&
+      !availableGroups.includes(selectedGroup)
+    ) {
+      setSelectedGroup(FILTER_ALL)
+    }
+  }, [availableGroups, selectedGroup])
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -750,6 +775,31 @@ export function Pricing() {
                 />
               </div>
             </div>
+
+            {availableGroups.length > 0 && (
+              <div className='mt-3 flex flex-col gap-2 sm:flex-row sm:items-center'>
+                <span className='text-muted-foreground text-xs font-medium'>
+                  {t('Groups')}
+                </span>
+                <div className='hover-scrollbar flex gap-2 overflow-x-auto pb-1'>
+                  {[FILTER_ALL, ...availableGroups].map((group) => (
+                    <button
+                      key={group}
+                      type='button'
+                      onClick={() => setSelectedGroup(group)}
+                      className={cn(
+                        'inline-flex shrink-0 items-center rounded-full border px-3 py-1.5 text-xs transition-colors',
+                        selectedGroup === group
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      {group === FILTER_ALL ? t('All') : group}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
 
           <main className='mt-4 space-y-4'>
@@ -761,6 +811,7 @@ export function Pricing() {
                   endpointLabels={endpointLabels}
                   priceRate={priceRate}
                   usdExchangeRate={usdExchangeRate}
+                  selectedGroup={selectedGroup}
                   onModelClick={handleModelClick}
                 />
               ))

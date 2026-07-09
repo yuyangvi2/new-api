@@ -51,3 +51,26 @@ export function normalizeInterfaceLanguage(value?: string | null): string {
   )
   return language?.code ?? 'en'
 }
+
+export function convertDetectedLanguage(value: string): string {
+  return normalizeInterfaceLanguage(value)
+}
+
+export function toIntlLocale(value?: string | null): string | undefined {
+  if (!value) return undefined
+
+  switch (normalizeInterfaceLanguage(value)) {
+    case 'zh':
+      return 'zh-CN'
+    case 'zh-TW':
+      return 'zh-TW'
+    default:
+      break
+  }
+
+  try {
+    return Intl.getCanonicalLocales(value)[0]
+  } catch {
+    return undefined
+  }
+}

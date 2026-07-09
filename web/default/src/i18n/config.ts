@@ -24,6 +24,8 @@ import i18n, {
 import LanguageDetector from 'i18next-browser-languagedetector'
 import { initReactI18next } from 'react-i18next'
 
+import { convertDetectedLanguage } from './languages'
+
 const localeLoaders = {
   en: () => import('./locales/en.json'),
   zh: () => import('./locales/zh.json'),
@@ -107,6 +109,7 @@ export function initI18n() {
       detection: {
         order: ['localStorage', 'navigator'],
         caches: ['localStorage'],
+        convertDetectedLanguage,
       },
       react: {
         useSuspense: false,
