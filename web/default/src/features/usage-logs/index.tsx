@@ -31,7 +31,6 @@ import {
   UsageLogsProvider,
   useUsageLogsContext,
 } from './components/usage-logs-provider'
-import { CommonLogsHeaderActions } from './components/common-logs-header-actions'
 import { UsageLogsTable } from './components/usage-logs-table'
 import {
   isUsageLogsSectionId,
@@ -126,11 +125,6 @@ function UsageLogsContent() {
                 'Track asynchronous drawing and task execution with status, progress, timing, and cost detail.'
               )}
         </SectionPageLayout.Description>
-        {activeCategory === 'common' && (
-          <SectionPageLayout.Actions>
-            <CommonLogsHeaderActions />
-          </SectionPageLayout.Actions>
-        )}
         <SectionPageLayout.Content>
           <div className='flex h-full min-h-0 flex-col gap-4'>
             {showTaskSwitcher && (

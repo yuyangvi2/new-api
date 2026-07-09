@@ -18,6 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
+import { Gauge, GaugeCircle, WalletCards } from 'lucide-react'
+import type { ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Skeleton } from '@/components/ui/skeleton'
@@ -36,15 +38,29 @@ function StatBadge(props: {
   label: string
   value: string | number
   accent: string
+  icon: ComponentType<{ className?: string }>
 }) {
+  const Icon = props.icon
+
   return (
-    <span className='border-border/60 bg-muted/25 inline-flex h-7 items-center gap-2 rounded-md border px-2.5 text-xs shadow-xs'>
-      <span className={cn('h-3.5 w-0.5 rounded-full', props.accent)} />
-      <span className='text-muted-foreground'>{props.label}</span>
-      <span className='text-foreground/85 font-mono font-semibold tabular-nums'>
-        {props.value}
-      </span>
-    </span>
+    <div className='border-border/70 bg-background/70 flex min-h-20 min-w-0 items-center gap-3 rounded-xl border px-4 py-3 shadow-xs dark:bg-muted/20'>
+      <div
+        className={cn(
+          'flex size-10 shrink-0 items-center justify-center rounded-xl text-white shadow-sm',
+          props.accent
+        )}
+      >
+        <Icon className='size-4.5' />
+      </div>
+      <div className='min-w-0'>
+        <p className='text-muted-foreground text-xs font-medium'>
+          {props.label}
+        </p>
+        <p className='text-foreground mt-1 truncate font-mono text-xl font-bold tabular-nums'>
+          {props.value}
+        </p>
+      </div>
+    </div>
   )
 }
 
@@ -78,30 +94,33 @@ export function CommonLogsStats() {
 
   if (isLoading) {
     return (
-      <div className='flex items-center gap-2'>
-        <Skeleton className='h-7 w-[150px] rounded-md' />
-        <Skeleton className='h-7 w-[100px] rounded-md' />
-        <Skeleton className='h-7 w-[120px] rounded-md' />
+      <div className='grid gap-3 sm:grid-cols-3'>
+        <Skeleton className='h-20 rounded-xl' />
+        <Skeleton className='h-20 rounded-xl' />
+        <Skeleton className='h-20 rounded-xl' />
       </div>
     )
   }
 
   return (
-    <div className='flex flex-wrap items-center gap-2'>
+    <div className='grid gap-3 sm:grid-cols-3'>
       <StatBadge
         label={t('Usage')}
         value={sensitiveVisible ? formatLogQuota(stats?.quota || 0) : '••••'}
-        accent='bg-sky-500/70'
+        accent='bg-sky-600'
+        icon={WalletCards}
       />
       <StatBadge
         label={t('RPM')}
         value={stats?.rpm || 0}
-        accent='bg-rose-500/65'
+        accent='bg-rose-600'
+        icon={Gauge}
       />
       <StatBadge
         label={t('TPM')}
         value={stats?.tpm || 0}
-        accent='bg-slate-400/70'
+        accent='bg-teal-700'
+        icon={GaugeCircle}
       />
     </div>
   )

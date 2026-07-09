@@ -108,7 +108,7 @@ export function BusinessScenarios() {
           <div className='text-brand text-xs font-bold tracking-[0.24em] uppercase'>
             {t('Business scenarios')}
           </div>
-          <h2 className='mt-3 text-3xl leading-tight font-bold sm:text-4xl'>
+          <h2 className='mt-3 text-3xl leading-[1.08] font-semibold tracking-normal sm:text-4xl [font-family:var(--font-playfair-display),Georgia,serif]'>
             {t('From creative production to enterprise automation')}
           </h2>
           <p className='text-muted-foreground mt-4 text-sm leading-7 md:text-base'>

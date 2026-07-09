@@ -37,6 +37,7 @@ export type PricingModel = {
   vendor_icon?: string
   vendor_description?: string
   quota_type: number
+  model_type?: number
   model_ratio: number
   completion_ratio: number
   model_price?: number
@@ -68,6 +69,8 @@ export type PricingModel = {
   input_modalities?: Modality[]
   output_modalities?: Modality[]
   capabilities?: ModelCapability[]
+  cover_thumb_url?: string
+  yesterday_request_count?: number
 }
 
 /** Input/output modalities supported by a model. */

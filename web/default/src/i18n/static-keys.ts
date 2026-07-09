@@ -212,7 +212,7 @@ export const STATIC_I18N_KEYS = [
   '5 models',
   '3 models',
   'More access',
-  'More providers are ready to connect: Claude, Gemini, Qwen, Doubao, Moonshot, MiniMax, Mistral, Grok, Sora, VEO and Kling.',
+  'More providers are ready to connect: Moonshot, MiniMax, Kling, Vidu, Grok, Doubao and Qwen.',
   'Business scenarios',
   'From creative production to enterprise automation',
   'Use the same model gateway for content, operations, engineering, and research teams, with routing and billing managed in one place.',

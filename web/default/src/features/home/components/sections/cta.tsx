@@ -46,7 +46,7 @@ export function CTA(props: CTAProps) {
         <p className='text-brand mb-3 text-xs font-semibold tracking-[0.22em] uppercase'>
           {t('Ready to start?')}
         </p>
-        <h2 className='text-3xl leading-tight font-extrabold tracking-tight sm:text-4xl md:text-5xl'>
+        <h2 className='text-3xl leading-[1.08] font-semibold tracking-normal sm:text-4xl md:text-5xl [font-family:var(--font-playfair-display),Georgia,serif]'>
           {t('Ready to unify access to AI models?')}
         </h2>
         <p className='text-muted-foreground mx-auto mt-5 max-w-2xl text-sm leading-6 md:text-base'>

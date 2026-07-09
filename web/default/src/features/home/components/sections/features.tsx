@@ -119,7 +119,7 @@ export function Features(props: FeaturesProps) {
           <p className='text-brand mb-3 text-xs font-semibold tracking-[0.22em] uppercase'>
             {t('Features')}
           </p>
-          <h2 className='text-2xl leading-tight font-bold tracking-tight md:text-3xl'>
+          <h2 className='text-2xl leading-[1.08] font-semibold tracking-normal md:text-3xl [font-family:var(--font-playfair-display),Georgia,serif]'>
             {t('Built for developers, designed for scale')}
           </h2>
         </AnimateInView>

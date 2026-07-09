@@ -223,7 +223,7 @@ export function Hero(props: HeroProps) {
             {t(activeSlide.eyebrow)}
           </div>
 
-          <h1 className='text-foreground mt-5 max-w-4xl text-4xl leading-tight font-extrabold tracking-tight sm:text-5xl md:text-6xl'>
+          <h1 className='text-foreground mt-5 max-w-4xl text-4xl leading-[1.05] font-semibold tracking-normal sm:text-5xl lg:text-6xl [font-family:var(--font-playfair-display),Georgia,serif]'>
             {t(activeSlide.title)}
           </h1>
           <p className='text-muted-foreground mt-4 max-w-3xl text-base leading-7 md:text-lg'>
@@ -284,7 +284,7 @@ export function Hero(props: HeroProps) {
           <div className='text-muted-foreground text-xs font-bold tracking-[0.24em] uppercase'>
             {t('Authorized Partners')}
           </div>
-          <h2 className='mt-3 text-2xl font-bold tracking-tight sm:text-3xl'>
+          <h2 className='mt-3 text-2xl leading-[1.08] font-semibold tracking-normal sm:text-3xl [font-family:var(--font-playfair-display),Georgia,serif]'>
             {t('Official model authorization')}
           </h2>
           <p className='text-muted-foreground mt-2 text-sm'>
@@ -326,7 +326,7 @@ export function Hero(props: HeroProps) {
           </div>
           <p className='text-muted-foreground mx-auto mt-3 max-w-3xl text-xs leading-6'>
             {t(
-              'More providers are ready to connect: Claude, Gemini, Qwen, Doubao, Moonshot, MiniMax, Mistral, Grok, Sora, VEO and Kling.'
+              'More providers are ready to connect: Moonshot, MiniMax, Kling, Vidu, Grok, Doubao and Qwen.'
             )}
           </p>
         </div>
