@@ -104,7 +104,13 @@ export function mapStatusDataToConfig(
 
 // Fetch system config from API
 async function fetchSystemConfig(): Promise<Partial<SystemConfig>> {
-  const response = await fetch('/api/status')
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), 2500)
+
+  const response = await fetch('/api/status', {
+    signal: controller.signal,
+  }).finally(() => window.clearTimeout(timeoutId))
+
   if (!response.ok) throw new Error('Failed to fetch status')
 
   const data: StatusApiResponse = await response.json()
@@ -120,13 +126,13 @@ function preloadImage(
   onError: () => void
 ): () => void {
   const img = new Image()
-  img.onload = onLoad
-  img.onerror = onError
+  img.addEventListener('load', onLoad)
+  img.addEventListener('error', onError)
   img.src = src
 
   return () => {
-    img.onload = null
-    img.onerror = null
+    img.removeEventListener('load', onLoad)
+    img.removeEventListener('error', onError)
   }
 }
 
@@ -159,6 +165,12 @@ export function useSystemConfig(options: UseSystemConfigOptions = {}) {
       const newConfig = await fetchSystemConfig()
       setConfig(newConfig)
     } catch (error) {
+      if (
+        (error instanceof Error || error instanceof DOMException) &&
+        error.name === 'AbortError'
+      ) {
+        return
+      }
       // eslint-disable-next-line no-console
       console.error('Failed to load system config:', error)
     } finally {

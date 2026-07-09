@@ -16,37 +16,61 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { PublicLayout } from '@/components/layout'
-import { Footer } from '@/components/layout/components/footer'
 import type { TopNavLink } from '@/components/layout/types'
 import { RichContent } from '@/components/rich-content'
+import { useTheme } from '@/context/theme-provider'
 import { isLikelyHtml } from '@/lib/content-format'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { CTA, Features, Hero, HowItWorks, Stats } from './components'
+import { BusinessScenarios, CTA, Hero, HowItWorks } from './components'
 import { useHomePageContent } from './hooks'
 
 const defaultHomeNavLinks: TopNavLink[] = [
-  { title: 'Pricing', href: '/pricing' },
+  { title: 'Model Square', href: '/market' },
   {
     title: 'Docs',
     href: 'https://docs.newapi.pro',
     external: true,
   },
-  { title: 'Model Square', href: '/pricing' },
+  { title: 'Pricing', href: '/pricing' },
 ]
 
 export function Home() {
-  const { t } = useTranslation()
+  const { i18n, t } = useTranslation()
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const { resolvedTheme } = useTheme()
   const { auth } = useAuthStore()
   const isAuthenticated = !!auth.user
   const { content, isLoaded, isUrl } = useHomePageContent()
 
+  const syncIframePreferences = useCallback(() => {
+    try {
+      iframeRef.current?.contentWindow?.postMessage(
+        { themeMode: resolvedTheme },
+        '*'
+      )
+      iframeRef.current?.contentWindow?.postMessage(
+        { lang: i18n.language },
+        '*'
+      )
+    } catch {
+      // Cross-origin frames may reject access while navigating.
+    }
+  }, [i18n.language, resolvedTheme])
+
+  useEffect(() => {
+    if (isUrl) {
+      syncIframePreferences()
+    }
+  }, [isUrl, syncIframePreferences])
+
   if (!isLoaded) {
     return (
-      <PublicLayout showMainContainer={false}>
+      <PublicLayout showMainContainer={false} showFooter={false}>
         <main className='flex min-h-screen items-center justify-center'>
           <div className='text-muted-foreground'>{t('Loading...')}</div>
         </main>
@@ -57,12 +81,14 @@ export function Home() {
   if (content) {
     if (isUrl) {
       return (
-        <PublicLayout showMainContainer={false}>
+        <PublicLayout showMainContainer={false} showFooter={false}>
           <iframe
+            ref={iframeRef}
             src={content}
             className='h-screen w-full border-none'
             title={t('Custom Home Page')}
             sandbox='allow-forms allow-popups allow-popups-to-escape-sandbox allow-scripts'
+            onLoad={syncIframePreferences}
           />
         </PublicLayout>
       )
@@ -72,7 +98,7 @@ export function Home() {
 
     if (contentIsHtml) {
       return (
-        <PublicLayout showMainContainer={false}>
+        <PublicLayout showMainContainer={false} showFooter={false}>
           <RichContent
             mode='html'
             htmlVariant='isolated'
@@ -84,7 +110,7 @@ export function Home() {
     }
 
     return (
-      <PublicLayout>
+      <PublicLayout showFooter={false}>
         <div className='mx-auto max-w-6xl px-4 py-8'>
           <RichContent
             mode='markdown'
@@ -101,14 +127,12 @@ export function Home() {
       showMainContainer={false}
       navLinks={defaultHomeNavLinks}
       showNotifications={false}
-      headerProps={{ showLanguageSwitcher: false }}
+      showContactButton={false}
     >
       <Hero isAuthenticated={isAuthenticated} />
-      <Stats />
-      <Features />
+      <BusinessScenarios />
       <HowItWorks />
       <CTA isAuthenticated={isAuthenticated} />
-      <Footer />
     </PublicLayout>
   )
 }

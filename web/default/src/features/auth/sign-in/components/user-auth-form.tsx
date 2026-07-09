@@ -168,7 +168,7 @@ export function UserAuthForm({
         await handleLoginSuccess(res.data as { id?: number } | null, redirectTo)
         toast.success(t('Welcome back!'))
       }
-    } catch (_error) {
+    } catch {
       // Errors are handled by global interceptor
     } finally {
       setIsLoading(false)
@@ -208,7 +208,7 @@ export function UserAuthForm({
       } else {
         toast.error(res?.message || loginFailedMessage)
       }
-    } catch (_error) {
+    } catch {
       toast.error(loginFailedMessage)
     } finally {
       setIsWeChatSubmitting(false)
@@ -326,8 +326,6 @@ export function UserAuthForm({
         className={cn('grid gap-4', className)}
         {...props}
       >
-        {hasAlternativeLogin && alternativeLoginMethods}
-
         {passwordLoginEnabled && (
           <>
             {/* Username Field */}
@@ -339,7 +337,8 @@ export function UserAuthForm({
                   <FormLabel>{t('Username or Email')}</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder={t('Enter your username or email')}
+                      placeholder='your@email.com'
+                      className='bg-background h-10 rounded-xl'
                       {...field}
                     />
                   </FormControl>
@@ -358,6 +357,7 @@ export function UserAuthForm({
                   <FormControl>
                     <PasswordInput
                       placeholder={t('Enter password')}
+                      className='bg-background rounded-xl [&_[data-slot=input]]:h-10 [&_[data-slot=input]]:rounded-xl'
                       {...field}
                     />
                   </FormControl>
@@ -372,36 +372,54 @@ export function UserAuthForm({
               )}
             />
 
-            {/* Submit Button */}
-            <Button
-              type='submit'
-              className='mt-2 w-full justify-center gap-2'
-              disabled={isLoading || (requiresLegalConsent && !agreedToLegal)}
-            >
-              {isLoading ? <Loader2 className='animate-spin' /> : <LogIn />}
-              {t('Sign in')}
-            </Button>
+            <LegalConsent
+              status={status}
+              checked={agreedToLegal}
+              onCheckedChange={setAgreedToLegal}
+              className='mt-0'
+            />
 
             {/* Turnstile */}
             {isTurnstileEnabled && (
-              <div className='mt-2'>
+              <div className='mt-1'>
                 <Turnstile
                   siteKey={turnstileSiteKey}
                   onVerify={setTurnstileToken}
                 />
               </div>
             )}
+
+            {/* Submit Button */}
+            <Button
+              type='submit'
+              className='bg-foreground text-background hover:bg-foreground/85 mt-1 h-11 w-full justify-center gap-2 rounded-full'
+              disabled={isLoading || (requiresLegalConsent && !agreedToLegal)}
+            >
+              {isLoading ? <Loader2 className='animate-spin' /> : <LogIn />}
+              {t('Continue')}
+            </Button>
           </>
         )}
 
-        <LegalConsent
-          status={status}
-          checked={agreedToLegal}
-          onCheckedChange={setAgreedToLegal}
-          className='mt-1'
-        />
+        {!passwordLoginEnabled && (
+          <LegalConsent
+            status={status}
+            checked={agreedToLegal}
+            onCheckedChange={setAgreedToLegal}
+            className='mt-0'
+          />
+        )}
 
-        {!hasAlternativeLogin && alternativeLoginMethods}
+        {hasAlternativeLogin && (
+          <>
+            <div className='my-2 flex items-center gap-4'>
+              <div className='bg-border h-px flex-1' />
+              <span className='text-muted-foreground text-xs'>{t('or')}</span>
+              <div className='bg-border h-px flex-1' />
+            </div>
+            {alternativeLoginMethods}
+          </>
+        )}
       </form>
 
       {hasWeChatLogin && (

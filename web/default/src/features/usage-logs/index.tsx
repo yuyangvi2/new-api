@@ -116,6 +116,15 @@ function UsageLogsContent() {
         <SectionPageLayout.Title>
           {t(pageMeta.titleKey)}
         </SectionPageLayout.Title>
+        <SectionPageLayout.Description>
+          {activeCategory === 'common'
+            ? t(
+                'Trace requests, tokens, cache hits, latency, and spend with export-ready filters.'
+              )
+            : t(
+                'Track asynchronous drawing and task execution with status, progress, timing, and cost detail.'
+              )}
+        </SectionPageLayout.Description>
         <SectionPageLayout.Content>
           <div className='flex h-full min-h-0 flex-col gap-4'>
             {showTaskSwitcher && (

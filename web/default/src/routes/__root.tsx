@@ -93,6 +93,15 @@ function setSetupStatusCache(value: boolean): void {
 // 内存中的标记，避免同一会话中重复检查
 let setupStatusChecked = getSetupStatusFromCache()
 
+function getSetupStatusWithTimeout(timeoutMs = 1200) {
+  return Promise.race([
+    getSetupStatus(),
+    new Promise<null>((resolve) => {
+      window.setTimeout(() => resolve(null), timeoutMs)
+    }),
+  ])
+}
+
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient
 }>()({
@@ -109,7 +118,7 @@ export const Route = createRootRouteWithContext<{
 
     // 只检查 setup 状态（如果需要）
     if (needsSetupCheck) {
-      const status = await getSetupStatus().catch((error) => {
+      const status = await getSetupStatusWithTimeout().catch((error) => {
         if (import.meta.env.DEV) {
           // eslint-disable-next-line no-console
           console.warn('[root.beforeLoad] setup status check failed', error)

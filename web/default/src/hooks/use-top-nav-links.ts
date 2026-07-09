@@ -62,6 +62,8 @@ export function useTopNavLinks(): TopNavLink[] {
 
   const links: TopNavLink[] = []
 
+  if (!status) return links
+
   // Home
   if (modules?.home !== false) {
     links.push({ title: t('Home'), href: '/' })
@@ -76,7 +78,7 @@ export function useTopNavLinks(): TopNavLink[] {
   const pricing = modules?.pricing
   if (pricing && typeof pricing === 'object' && pricing.enabled) {
     const requiresAuth = pricing.requireAuth && !isAuthed
-    links.push({ title: t('Model Square'), href: '/pricing', requiresAuth })
+    links.push({ title: t('Model Square'), href: '/market', requiresAuth })
   }
 
   // Rankings

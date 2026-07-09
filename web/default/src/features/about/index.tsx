@@ -17,11 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
-import { Construction } from 'lucide-react'
+import { AlertCircle, Construction } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { PublicLayout } from '@/components/layout'
 import { RichContent } from '@/components/rich-content'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { isHttpUrl, isLikelyHtml } from '@/lib/content-format'
 
@@ -112,11 +113,39 @@ function EmptyAboutState() {
   )
 }
 
+function AboutErrorState(props: { onRetry: () => void }) {
+  const { t } = useTranslation()
+
+  return (
+    <div className='flex min-h-[60vh] items-center justify-center p-8'>
+      <div className='max-w-lg space-y-5 text-center'>
+        <div className='flex justify-center'>
+          <AlertCircle className='text-muted-foreground h-16 w-16' />
+        </div>
+        <div className='space-y-2'>
+          <h2 className='text-2xl font-bold'>
+            {t('About content could not be loaded')}
+          </h2>
+          <p className='text-muted-foreground'>
+            {t(
+              'Please check whether the backend service is running or retry later.'
+            )}
+          </p>
+        </div>
+        <Button variant='outline' onClick={props.onRetry}>
+          {t('Retry')}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export function About() {
   const { t } = useTranslation()
-  const { data, isLoading } = useQuery({
+  const { data, isError, isLoading, refetch } = useQuery({
     queryKey: ['about-content'],
     queryFn: getAboutContent,
+    retry: false,
   })
 
   const rawContent = data?.data?.trim() ?? ''
@@ -133,6 +162,14 @@ export function About() {
           <Skeleton className='h-4 w-[90%]' />
           <Skeleton className='h-4 w-[80%]' />
         </div>
+      </PublicLayout>
+    )
+  }
+
+  if (isError) {
+    return (
+      <PublicLayout>
+        <AboutErrorState onRetry={() => void refetch()} />
       </PublicLayout>
     )
   }

@@ -117,6 +117,7 @@ declare module '@tanstack/react-router' {
 
 // Render the app
 const rootElement = document.getElementById('root')!
+let appRendered = false
 // Set document.title and favicon from cached status, then refresh from network
 ;(function initSystemBranding() {
   try {
@@ -160,7 +161,8 @@ const rootElement = document.getElementById('root')!
   }
 })()
 function renderApp() {
-  if (rootElement.innerHTML) return
+  if (appRendered) return
+  appRendered = true
 
   const root = ReactDOM.createRoot(rootElement)
   root.render(
@@ -186,3 +188,5 @@ initI18n()
     }
   })
   .finally(renderApp)
+
+window.setTimeout(renderApp, 1500)

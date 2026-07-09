@@ -65,7 +65,8 @@ api.get = ((url: string, config: ApiRequestConfig = {}) => {
   const key = `${url}?${params}`
 
   // Return existing in-flight request if available
-  if (inFlightGet.has(key)) return inFlightGet.get(key)!
+  const existingRequest = inFlightGet.get(key)
+  if (existingRequest) return existingRequest
 
   // Create new request and clean up after completion
   const req = originalGet(url, config).finally(() => inFlightGet.delete(key))
@@ -212,7 +213,10 @@ export async function getUserGroups(): Promise<{
 
 // Get system status
 export async function getStatus() {
-  const res = await api.get('/api/status')
+  const res = await api.get('/api/status', {
+    timeout: 2500,
+    skipErrorHandler: true,
+  })
   return res.data?.data as Record<string, unknown>
 }
 

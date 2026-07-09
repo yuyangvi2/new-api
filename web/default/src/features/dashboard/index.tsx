@@ -290,8 +290,17 @@ export function Dashboard() {
   const sectionActions = modelActions ?? flowActions
 
   return (
-    <SectionPageLayout>
+      <SectionPageLayout>
       <SectionPageLayout.Title>{t(meta.titleKey)}</SectionPageLayout.Title>
+      <SectionPageLayout.Description>
+        {activeSection === 'overview'
+          ? t(
+              'Monitor balance, request health, onboarding progress, and the next best actions from one focused workspace.'
+            )
+          : t(
+              'Analyze traffic, spend, latency, and model behavior across your Tokone gateway.'
+            )}
+      </SectionPageLayout.Description>
       <SectionPageLayout.Content>
         <div className='space-y-3 sm:space-y-4'>
           {activeSection !== 'overview' && (

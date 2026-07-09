@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { type TopNavLink } from '../types'
+import type { TopNavLink } from '../types'
 
 /**
  * Default top navigation links
@@ -24,7 +24,14 @@ import { type TopNavLink } from '../types'
  * In practice, navigation links are dynamically fetched from backend.
  * Priority: Backend dynamic links > Provided navLinks > defaultTopNavLinks
  *
- * This is intentionally empty to encourage backend configuration.
- * If you need fallback links, add them here.
+ * Public fallback links used before backend status configuration is available.
  */
-export const defaultTopNavLinks: TopNavLink[] = []
+export const defaultTopNavLinks: TopNavLink[] = [
+  { title: 'Model Square', href: '/market' },
+  {
+    title: 'Docs',
+    href: 'https://docs.newapi.pro',
+    external: true,
+  },
+  { title: 'Pricing', href: '/pricing' },
+]

@@ -17,137 +17,318 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, FileText } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+  type SVGProps,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
-import { useStatus } from '@/hooks/use-status'
+import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
+import { cn } from '@/lib/utils'
 
-import { HeroTerminalDemo } from '../hero-terminal-demo'
+import {
+  IconAlibabaCloud,
+  IconAnthropic,
+  IconByteDance,
+  IconDeepSeek,
+  IconGemini,
+  IconOpenAI,
+} from '../model-brand-icons'
 
 interface HeroProps {
   className?: string
   isAuthenticated?: boolean
 }
 
+const HERO_SLIDES = [
+  {
+    eyebrow: 'Video',
+    title: 'Seedance 2.5',
+    description:
+      'A long-form video generation model for cinematic stories and product shots.',
+    primary: 'View model',
+    secondary: 'Coming soon',
+    href: '/market',
+    tone: 'from-orange-100 via-amber-50 to-stone-100',
+    backgroundImage: '/images/hero/tokone-hero-slide-1.webp',
+    tags: ['Seedance 2.5', '99.9% SLA', '50+ AI models', '5min migration'],
+  },
+  {
+    eyebrow: 'Reasoning',
+    title: 'Gemini 3.5 Flash',
+    description:
+      'Low-latency multimodal reasoning for chat, vision, and agent workflows.',
+    primary: 'View model',
+    secondary: 'API docs',
+    href: '/market',
+    tone: 'from-blue-100 via-cyan-50 to-stone-100',
+    backgroundImage: '/images/hero/tokone-hero-slide-2.webp',
+    tags: ['Fast response', 'Vision', 'Function calling', 'OpenAI compatible'],
+  },
+  {
+    eyebrow: 'Creative',
+    title: 'GPT Image Studio',
+    description:
+      'High quality image generation and editing through one unified API.',
+    primary: 'View model',
+    secondary: 'Pricing',
+    href: '/market',
+    tone: 'from-fuchsia-100 via-rose-50 to-stone-100',
+    backgroundImage: '/images/hero/tokone-hero-slide-3.webp',
+    tags: ['Text to Image', 'Image edit', 'Batch tasks', 'Stable routing'],
+  },
+  {
+    eyebrow: 'Model Access',
+    title: 'Ready to unify access to AI models?',
+    description:
+      'Use one compatible API to connect models, billing, routing, and operations.',
+    primary: 'View models',
+    secondary: 'API docs',
+    href: '/market',
+    tone: 'from-emerald-100 via-cyan-50 to-stone-100',
+    backgroundImage: '/images/hero/tokone-hero-slide-4.webp',
+    tags: [
+      'OpenAI compatible',
+      'Transparent Billing',
+      'Stable routing',
+      'Model Access',
+    ],
+  },
+]
+
+const HERO_BACKGROUND_IMAGES = HERO_SLIDES.map((slide) => slide.backgroundImage)
+
+const PARTNERS: Array<{
+  name: string
+  logo: ComponentType<SVGProps<SVGSVGElement>>
+  aliases: string[]
+}> = [
+  { name: 'OpenAI', logo: IconOpenAI, aliases: ['openai'] },
+  { name: 'Anthropic', logo: IconAnthropic, aliases: ['anthropic'] },
+  {
+    name: 'Google',
+    logo: IconGemini,
+    aliases: ['google', 'gemini'],
+  },
+  {
+    name: 'ByteDance',
+    logo: IconByteDance,
+    aliases: ['bytedance', 'byte dance', 'doubao', 'volcengine'],
+  },
+  {
+    name: 'Alibaba',
+    logo: IconAlibabaCloud,
+    aliases: ['alibaba', 'qwen', 'tongyi'],
+  },
+  { name: 'DeepSeek', logo: IconDeepSeek, aliases: ['deepseek'] },
+]
+
 export function Hero(props: HeroProps) {
   const { t } = useTranslation()
-  const { status } = useStatus()
-  const docsUrl =
-    (status?.docs_link as string | undefined) || 'https://docs.newapi.pro'
+  const [activeIndex, setActiveIndex] = useState(0)
+  const activeSlide = HERO_SLIDES[activeIndex]
+  const pricing = usePricingData()
 
-  const renderDocsButton = () => {
-    const isExternal = docsUrl.startsWith('http')
-    if (isExternal) {
-      return (
-        <Button
-          variant='outline'
-          className='border-border hover:bg-muted/50 inline-flex h-11 items-center gap-2 rounded-md px-5 text-sm font-medium'
-          render={
-            <a href={docsUrl} target='_blank' rel='noopener noreferrer' />
-          }
-        >
-          <FileText className='size-4' />
-          <span>{t('Docs')}</span>
-        </Button>
-      )
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setActiveIndex((index) => (index + 1) % HERO_SLIDES.length)
+    }, 6000)
+
+    return () => window.clearInterval(interval)
+  }, [])
+
+  const heroAction = useMemo(
+    () => (props.isAuthenticated ? '/dashboard' : activeSlide.href),
+    [activeSlide.href, props.isAuthenticated]
+  )
+
+  const partnerCounts = useMemo(() => {
+    const counts = new Map(PARTNERS.map((partner) => [partner.name, 0]))
+    for (const model of pricing.models) {
+      const vendorName = (model.vendor_name ?? '').toLowerCase()
+      for (const partner of PARTNERS) {
+        if (partner.aliases.some((alias) => vendorName.includes(alias))) {
+          counts.set(partner.name, (counts.get(partner.name) ?? 0) + 1)
+          break
+        }
+      }
     }
-    return (
-      <Button
-        variant='outline'
-        className='border-border hover:bg-muted/50 inline-flex h-11 items-center gap-2 rounded-md px-5 text-sm font-medium'
-        render={<Link to={docsUrl} />}
-      >
-        <FileText className='size-4' />
-        <span>{t('Docs')}</span>
-      </Button>
+    return counts
+  }, [pricing.models])
+
+  const hasPricingModels = pricing.models.length > 0
+
+  const goToPrevious = () => {
+    setActiveIndex(
+      (index) => (index - 1 + HERO_SLIDES.length) % HERO_SLIDES.length
     )
   }
 
+  const goToNext = () => {
+    setActiveIndex((index) => (index + 1) % HERO_SLIDES.length)
+  }
+
   return (
-    <section className='border-border/50 bg-background relative z-10 border-b px-4 pt-24 pb-12 md:px-8 md:pt-28 md:pb-16'>
-      <div className='mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 lg:grid-cols-[1fr_0.92fr] lg:gap-16'>
-        <div className='flex flex-col items-start text-left'>
-          <div
-            className='landing-animate-fade-up border-border bg-muted/40 text-muted-foreground mb-6 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs opacity-0'
-            style={{ animationDelay: '0ms' }}
-          >
-            <span className='bg-brand size-1.5 rounded-full' />
-            <span>{t('AI application infrastructure layer')}</span>
+    <section
+      className={cn(
+        'relative overflow-hidden bg-[#fbf7ef] dark:bg-background',
+        props.className
+      )}
+    >
+      <div className='relative overflow-hidden border-b border-orange-100/80 bg-[#fbf7ef] transition-colors duration-500 dark:border-border/70 dark:bg-background'>
+        <div className='pointer-events-none absolute inset-0 bg-[#fbf7ef] dark:bg-background' />
+        {HERO_BACKGROUND_IMAGES.map((image, index) => (
+          <img
+            key={image}
+            src={image}
+            alt=''
+            aria-hidden='true'
+            fetchPriority={index === 0 ? 'high' : 'auto'}
+            decoding='async'
+            className={cn(
+              'pointer-events-none absolute inset-0 size-full object-cover object-center saturate-[0.94] transition-opacity duration-700',
+              index === activeIndex ? 'opacity-[0.74]' : 'opacity-0'
+            )}
+          />
+        ))}
+        <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(251_247_239/0.82)_0%,rgb(251_247_239/0.64)_42%,rgb(251_247_239/0.9)_100%)] dark:bg-[linear-gradient(180deg,rgb(9_9_11/0.84)_0%,rgb(9_9_11/0.72)_42%,rgb(9_9_11/0.94)_100%)]' />
+        <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgb(255_171_45/0.18),transparent_42%),linear-gradient(90deg,rgb(251_247_239/0.72)_0%,rgb(251_247_239/0.16)_30%,rgb(251_247_239/0.12)_70%,rgb(251_247_239/0.62)_100%)] dark:bg-[radial-gradient(circle_at_50%_38%,rgb(234_117_20/0.22),transparent_42%),linear-gradient(90deg,rgb(9_9_11/0.84)_0%,rgb(9_9_11/0.34)_32%,rgb(9_9_11/0.3)_68%,rgb(9_9_11/0.82)_100%)]' />
+        <div className='absolute inset-x-0 bottom-0 h-1.5 bg-gradient-to-r from-orange-500 via-orange-400 to-amber-300 dark:from-orange-500/70 dark:via-amber-400/55 dark:to-cyan-300/45' />
+
+        <button
+          type='button'
+          onClick={goToPrevious}
+          className='bg-card/80 text-muted-foreground hover:text-foreground absolute top-1/2 left-4 z-10 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full border shadow-sm transition-colors md:flex'
+          aria-label={t('Previous')}
+        >
+          <ChevronLeft className='size-5' />
+        </button>
+        <button
+          type='button'
+          onClick={goToNext}
+          className='bg-card/80 text-muted-foreground hover:text-foreground absolute top-1/2 right-4 z-10 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full border shadow-sm transition-colors md:flex'
+          aria-label={t('Next')}
+        >
+          <ChevronRight className='size-5' />
+        </button>
+
+        <div className='relative z-10 mx-auto flex min-h-[540px] max-w-7xl flex-col items-center justify-center px-4 pt-20 text-center sm:min-h-[560px] md:min-h-[620px] md:px-6'>
+          <div className='bg-card/80 text-brand inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm'>
+            <Sparkles className='size-3.5' />
+            {t(activeSlide.eyebrow)}
           </div>
 
-          <h1
-            className='landing-animate-fade-up max-w-3xl text-[clamp(2.625rem,7vw,4.25rem)] leading-[1.08] font-extrabold tracking-tight opacity-0'
-            style={{ animationDelay: '60ms' }}
-          >
-            {t('A unified API for')}
-            <br />
-            <span className='text-brand'>{t('massive AI models')}</span>
+          <h1 className='text-foreground mt-5 max-w-4xl text-4xl leading-[1.05] font-semibold tracking-normal sm:text-5xl lg:text-6xl [font-family:var(--font-playfair-display),Georgia,serif]'>
+            {t(activeSlide.title)}
           </h1>
-          <p
-            className='landing-animate-fade-up text-muted-foreground mt-7 max-w-2xl text-sm leading-7 opacity-0 md:text-base'
-            style={{ animationDelay: '120ms' }}
-          >
-            {t(
-              'Access OpenAI, Claude, Gemini, DeepSeek and 40+ providers through one standardized protocol.'
-            )}
+          <p className='text-muted-foreground mt-4 max-w-3xl text-base leading-7 md:text-lg'>
+            {t(activeSlide.description)}
           </p>
 
-          <div
-            className='landing-animate-fade-up mt-8 flex flex-wrap items-center gap-3 opacity-0'
-            style={{ animationDelay: '180ms' }}
-          >
-            {props.isAuthenticated ? (
-              <>
-                <Button
-                  className='group h-11 rounded-md px-5 text-sm font-semibold'
-                  render={<Link to='/dashboard' />}
-                >
-                  {t('Go to Dashboard')}
-                  <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
-                </Button>
-                {renderDocsButton()}
-              </>
-            ) : (
-              <>
-                <Button
-                  className='group h-11 rounded-md px-5 text-sm font-semibold'
-                  render={<Link to='/sign-up' />}
-                >
-                  {t('Get Started')}
-                  <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
-                </Button>
-                <Button
-                  variant='outline'
-                  className='border-border hover:bg-muted/50 h-11 rounded-md px-5 text-sm font-medium'
-                  render={<Link to='/pricing' />}
-                >
-                  {t('View Pricing')}
-                </Button>
-                {renderDocsButton()}
-              </>
-            )}
+          <div className='mt-7 flex flex-wrap items-center justify-center gap-3'>
+            <Button
+              className='bg-brand hover:bg-brand-hover h-11 min-w-40 rounded-full px-6 text-sm font-semibold text-white'
+              render={<Link to={heroAction} />}
+            >
+              {props.isAuthenticated
+                ? t('Go to Dashboard')
+                : t(activeSlide.primary)}
+              <ArrowRight className='size-4' />
+            </Button>
+            <Button
+              variant='outline'
+              className='bg-card/55 h-11 min-w-40 rounded-full px-6 text-sm font-semibold'
+              render={<Link to='/pricing' />}
+            >
+              {t(activeSlide.secondary)}
+            </Button>
           </div>
 
-          <div
-            className='landing-animate-fade-up mt-10 flex flex-wrap items-center gap-x-5 gap-y-2 opacity-0'
-            style={{ animationDelay: '210ms' }}
-          >
-            <span className='text-muted-foreground text-[11px] font-semibold tracking-[0.2em] uppercase'>
-              {t('Powered by')}
-            </span>
-            <div className='text-foreground/70 flex items-center gap-4 text-sm font-semibold'>
-              <span>Tokone</span>
-              <span>QuantumNous</span>
-            </div>
+          <div className='mt-6 flex flex-wrap justify-center gap-2'>
+            {activeSlide.tags.map((tag) => (
+              <span
+                key={tag}
+                className='bg-card/75 text-muted-foreground rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm'
+              >
+                {t(tag)}
+              </span>
+            ))}
+          </div>
+
+          <div className='mt-10 flex items-center justify-center gap-2 sm:mt-16'>
+            {HERO_SLIDES.map((slide, index) => (
+              <button
+                key={slide.title}
+                type='button'
+                onClick={() => setActiveIndex(index)}
+                className={cn(
+                  'h-2 rounded-full transition-all',
+                  index === activeIndex
+                    ? 'w-8 bg-brand'
+                    : 'w-2 bg-foreground/20 hover:bg-foreground/35'
+                )}
+                aria-label={t('Go to slide {{index}}', { index: index + 1 })}
+              />
+            ))}
           </div>
         </div>
+      </div>
 
-        <div
-          className='landing-animate-fade-up flex w-full justify-center opacity-0 lg:justify-end'
-          style={{ animationDelay: '260ms' }}
-        >
-          <HeroTerminalDemo />
+      <div className='mx-auto max-w-7xl px-4 py-12 md:px-6'>
+        <div className='text-center'>
+          <div className='text-muted-foreground text-xs font-bold tracking-[0.24em] uppercase'>
+            {t('Authorized Partners')}
+          </div>
+          <h2 className='mt-3 text-2xl leading-[1.08] font-semibold tracking-normal sm:text-3xl [font-family:var(--font-playfair-display),Georgia,serif]'>
+            {t('Official model authorization')}
+          </h2>
+          <p className='text-muted-foreground mt-2 text-sm'>
+            {t('Direct source access, real-time sync, stable and reliable')}
+          </p>
+        </div>
+
+        <div className='mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-6'>
+          {PARTNERS.map((partner) => {
+            const Logo = partner.logo
+            return (
+              <div
+                key={partner.name}
+                className='bg-card/90 rounded-2xl border p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:p-5'
+              >
+                <div className='mx-auto flex h-12 w-full max-w-24 items-center justify-center rounded-xl bg-white/70 px-3 ring-1 ring-black/5 dark:bg-white/10 dark:ring-white/10'>
+                  <Logo className='max-h-8 w-auto' aria-hidden />
+                </div>
+                <div className='mt-4 text-sm font-bold'>{partner.name}</div>
+                <div className='text-muted-foreground mt-1 text-xs'>
+                  {hasPricingModels
+                    ? t('{{count}} models', {
+                        count: partnerCounts.get(partner.name) ?? 0,
+                      })
+                    : t('No model data')}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className='mt-8 text-center'>
+          <div className='text-muted-foreground flex items-center justify-center gap-4 text-xs'>
+            <div className='bg-border h-px flex-1' />
+            <Link to='/market' className='hover:text-foreground font-medium'>
+              {t('More access')}
+            </Link>
+            <div className='bg-border h-px flex-1' />
+          </div>
+          <p className='text-muted-foreground mx-auto mt-3 max-w-3xl text-xs leading-6'>
+            {t(
+              'More providers are ready to connect: Moonshot, MiniMax, Kling, Vidu, Grok, Doubao and Qwen.'
+            )}
+          </p>
         </div>
       </div>
     </section>

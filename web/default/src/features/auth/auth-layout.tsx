@@ -29,34 +29,42 @@ type AuthLayoutProps = {
 export function AuthLayout({ children }: AuthLayoutProps) {
   const { t } = useTranslation()
   const { systemName, logo, loading } = useSystemConfig()
+  const currentYear = new Date().getFullYear()
 
   return (
-    <div className='relative grid h-svh max-w-none'>
+    <div className='relative flex min-h-svh flex-col items-center justify-center px-4 py-10'>
       <Link
         to='/'
-        className='absolute top-4 left-4 z-10 flex items-center gap-2 transition-opacity hover:opacity-80 sm:top-8 sm:left-8'
+        className='mb-7 flex flex-col items-center gap-2 transition-opacity hover:opacity-80'
       >
-        <div className='relative h-8 w-8'>
+        <div className='relative h-10 w-10'>
           {loading ? (
-            <Skeleton className='absolute inset-0 rounded-full' />
+            <Skeleton className='absolute inset-0 rounded-xl' />
           ) : (
             <img
               src={logo}
               alt={t('Logo')}
-              className='h-8 w-8 rounded-full object-cover'
+              className='h-10 w-10 rounded-xl object-cover shadow-sm'
             />
           )}
         </div>
         {loading ? (
           <Skeleton className='h-6 w-24' />
         ) : (
-          <h1 className='text-xl font-medium'>{systemName}</h1>
+          <div className='text-center'>
+            <h1 className='text-xl font-bold tracking-tight'>{systemName}</h1>
+            <p className='text-muted-foreground mt-1 text-sm'>
+              {t('Intelligent API gateway console')}
+            </p>
+          </div>
         )}
       </Link>
-      <div className='container flex items-center pt-16 sm:pt-0'>
-        <div className='mx-auto flex w-full flex-col justify-center space-y-2 px-4 py-8 sm:w-[480px] sm:p-8'>
-          {children}
-        </div>
+      <div className='w-full max-w-[440px]'>{children}</div>
+      <div className='text-muted-foreground mt-7 text-center text-xs'>
+        {t('© {{year}} {{name}}. All rights reserved.', {
+          year: currentYear,
+          name: systemName || 'Tokone',
+        })}
       </div>
     </div>
   )

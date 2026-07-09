@@ -21,6 +21,9 @@ import { api } from '@/lib/api'
 import type { AboutResponse } from './types'
 
 export async function getAboutContent() {
-  const res = await api.get<AboutResponse>('/api/about')
+  const res = await api.get<AboutResponse>('/api/about', {
+    timeout: 3000,
+    skipErrorHandler: true,
+  })
   return res.data
 }

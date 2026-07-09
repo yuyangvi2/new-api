@@ -39,7 +39,10 @@ export function AuthenticatedLayout(props: AuthenticatedLayoutProps) {
     <LayoutProvider>
       <SearchProvider>
         <SidebarPortalProvider>
-          <SidebarProvider defaultOpen={defaultOpen} className='flex-col'>
+          <SidebarProvider
+            defaultOpen={defaultOpen}
+            className='tokone-shell flex-col'
+          >
             <SkipToMain />
             <AppHeader />
             <div className='flex min-h-0 w-full flex-1'>
@@ -48,7 +51,7 @@ export function AuthenticatedLayout(props: AuthenticatedLayoutProps) {
                 className={cn(
                   '@container/content',
                   'h-[calc(100svh-var(--app-header-height,0px))]',
-                  'min-h-0 overflow-hidden',
+                  'min-h-0 overflow-hidden bg-transparent',
                   'peer-data-[variant=inset]:h-[calc(100svh-var(--app-header-height,0px)-(var(--spacing)*4))]'
                 )}
               >

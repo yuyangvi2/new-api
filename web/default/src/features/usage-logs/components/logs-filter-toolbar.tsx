@@ -65,7 +65,7 @@ export function LogsFilterField(props: LogsFilterFieldProps) {
   return (
     <div
       className={cn(
-        'min-w-0 [&_[data-slot=select-trigger]]:w-full [&_[data-slot=select-trigger]]:text-sm [&_[data-slot=select-value]]:leading-5',
+        'min-w-0 [&_[data-slot=select-trigger]]:h-10 [&_[data-slot=select-trigger]]:w-full [&_[data-slot=select-trigger]]:rounded-xl [&_[data-slot=select-trigger]]:bg-background [&_[data-slot=select-trigger]]:text-sm [&_[data-slot=select-value]]:leading-5',
         props.wide && 'sm:col-span-2',
         props.className
       )}
@@ -79,7 +79,10 @@ export function LogsFilterInput(props: ComponentProps<typeof Input>) {
   return (
     <Input
       {...props}
-      className={cn('h-8 min-w-0 text-sm leading-5', props.className)}
+      className={cn(
+        'h-10 min-w-0 rounded-xl bg-background text-sm leading-5',
+        props.className
+      )}
     />
   )
 }
@@ -139,10 +142,10 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
         <div
           className={cn('bg-card/50 rounded-lg border p-2.5', props.className)}
         >
+          {props.stats && <div className='mb-2'>{props.stats}</div>}
           <div className='grid gap-2'>{props.mobilePinnedFilters}</div>
 
           <div className='mt-2 flex flex-col gap-2'>
-            {props.stats}
             <div className='flex items-center justify-end gap-1.5'>
               {props.actionStart}
               <DrawerTrigger asChild>
@@ -218,11 +221,9 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
 
   return (
     <div
-      className={cn(
-        'bg-card/50 rounded-lg border p-2.5 sm:p-3',
-        props.className
-      )}
+      className={cn('rounded-2xl border bg-card p-3 shadow-sm', props.className)}
     >
+      {props.stats && <div className='mb-3'>{props.stats}</div>}
       <div className='flex flex-wrap items-start gap-2'>
         <div className='grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-[repeat(auto-fit,minmax(10rem,1fr))]'>
           {props.primaryFilters}
@@ -249,6 +250,7 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
             variant='outline'
             onClick={props.onReset}
             disabled={!props.hasActiveFilters}
+            className='h-10 rounded-full px-4'
           >
             {t('Reset')}
           </Button>
@@ -256,6 +258,7 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
             type='button'
             onClick={props.onSearch}
             disabled={props.searchLoading}
+            className='h-10 rounded-full px-5'
           >
             {props.searchLoading && <Loader2 className='animate-spin' />}
             {t('Search')}
