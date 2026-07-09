@@ -33,6 +33,15 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/home_page_content", controller.GetHomePageContent)
 		apiRouter.GET("/pricing", middleware.HeaderNavModuleAuth("pricing"), controller.GetPricing)
 		apiRouter.POST("/media/upload", middleware.UserAuth(), middleware.UploadRateLimit(), controller.UploadMedia)
+		toapisPrivateAvatarRoute := apiRouter.Group("/toapis/private-avatar")
+		toapisPrivateAvatarRoute.Use(middleware.UserAuth())
+		{
+			toapisPrivateAvatarRoute.GET("/groups", controller.ListToAPIsAvatarGroups)
+			toapisPrivateAvatarRoute.POST("/groups", controller.CreateToAPIsAvatarGroup)
+			toapisPrivateAvatarRoute.GET("/assets", controller.ListToAPIsAvatarAssets)
+			toapisPrivateAvatarRoute.POST("/assets", controller.CreateToAPIsAvatarAsset)
+			toapisPrivateAvatarRoute.POST("/assets/refresh", controller.RefreshToAPIsAvatarAssets)
+		}
 		perfMetricsRoute := apiRouter.Group("/perf-metrics")
 		perfMetricsRoute.Use(middleware.HeaderNavModulePublicOrUserAuth("pricing"))
 		{

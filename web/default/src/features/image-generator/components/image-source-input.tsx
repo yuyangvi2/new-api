@@ -17,10 +17,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect, useRef, useState } from 'react'
-import { UploadIcon, XIcon } from 'lucide-react'
+import { Loader2Icon, UploadIcon, XIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
+import { uploadReferenceMedia } from '../api'
 import { isExternalImageUri, MAX_IMAGE_UPLOAD_BYTES } from '../constants'
 import type { ImageSourceType } from '../types'
 
@@ -33,6 +34,7 @@ interface ImageSourceInputProps {
   disabled?: boolean
   placeholder?: string
   allowUpload?: boolean
+  uploadMode?: 'data-uri' | 'server-url'
 }
 
 /**
@@ -47,9 +49,11 @@ export function ImageSourceInput({
   disabled,
   placeholder,
   allowUpload = true,
+  uploadMode = 'data-uri',
 }: ImageSourceInputProps) {
   const { t } = useTranslation()
   const fileRef = useRef<HTMLInputElement>(null)
+  const [isUploading, setIsUploading] = useState(false)
 
   // The text shown in the input: either the URL or a short label for uploads.
   const [inputText, setInputText] = useState(() => displayText(value, sourceType))
@@ -61,7 +65,7 @@ export function ImageSourceInput({
 
   // ---- handlers ----
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
@@ -73,12 +77,29 @@ export function ImageSourceInput({
       toast.error(t('Image is too large (max 10MB)'))
       return
     }
+    if (uploadMode === 'server-url') {
+      setIsUploading(true)
+      try {
+        const uploadedUrl = await uploadReferenceMedia(file, 'image')
+        onChange(uploadedUrl, 'url')
+        toast.success(t('Upload complete'))
+      } catch (uploadError: unknown) {
+        const message =
+          uploadError instanceof Error ? uploadError.message : t('Upload failed')
+        toast.error(message)
+      } finally {
+        setIsUploading(false)
+      }
+      return
+    }
     const reader = new FileReader()
-    reader.onload = () => {
+    reader.addEventListener('load', () => {
       const dataUri = String(reader.result)
       onChange(dataUri, 'upload')
-    }
-    reader.onerror = () => toast.error(t('Failed to read the image'))
+    })
+    reader.addEventListener('error', () =>
+      toast.error(t('Failed to read the image'))
+    )
     reader.readAsDataURL(file)
   }
 
@@ -121,12 +142,16 @@ export function ImageSourceInput({
         {allowUpload && (
           <button
             type='button'
-            disabled={disabled}
+            disabled={disabled || isUploading}
             onClick={() => fileRef.current?.click()}
             className='text-muted-foreground hover:text-foreground absolute right-1.5 rounded-md p-1 transition-colors disabled:opacity-50'
             aria-label={t('Upload image')}
           >
-            <UploadIcon size={16} />
+            {isUploading ? (
+              <Loader2Icon className='animate-spin' size={16} />
+            ) : (
+              <UploadIcon size={16} />
+            )}
           </button>
         )}
       </div>

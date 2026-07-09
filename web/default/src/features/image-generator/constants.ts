@@ -38,6 +38,9 @@ export const API_ENDPOINTS = {
   VIDEO_SUBMIT: '/pg/video/generations',
   VIDEO_TASK: (taskId: string) => `/pg/video/generations/${taskId}`,
   MEDIA_UPLOAD: '/api/media/upload',
+  TOAPIS_AVATAR_GROUPS: '/api/toapis/private-avatar/groups',
+  TOAPIS_AVATAR_ASSETS: '/api/toapis/private-avatar/assets',
+  TOAPIS_AVATAR_ASSETS_REFRESH: '/api/toapis/private-avatar/assets/refresh',
   USER_MODELS: '/api/user/models',
   USER_GROUPS: '/api/user/self/groups',
 } as const

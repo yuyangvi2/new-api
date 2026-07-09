@@ -210,6 +210,33 @@ export interface VideoModelVariantState {
   axes: VideoModelVariantAxisState[]
 }
 
+export interface ToAPIsAvatarGroup {
+  id: number
+  user_id: number
+  channel_id: number
+  group_id: string
+  name: string
+  description: string
+  created_time: number
+  updated_time: number
+}
+
+export type ToAPIsAvatarAssetStatus = 'processing' | 'active' | 'failed'
+
+export interface ToAPIsAvatarAsset {
+  id: number
+  user_id: number
+  channel_id: number
+  group_id: string
+  asset_id: string
+  asset_type: string
+  name: string
+  source_url: string
+  status: ToAPIsAvatarAssetStatus | string
+  created_time: number
+  updated_time: number
+}
+
 // ---------------------------------------------------------------------------
 // Model-family dynamic parameters
 // ---------------------------------------------------------------------------

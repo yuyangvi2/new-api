@@ -28,6 +28,7 @@ import {
   SquareIcon,
   Trash2Icon,
   UploadIcon,
+  UserRoundIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -63,6 +64,7 @@ import {
   getUsableVideoImage,
   getVideoModelVariantState,
   isSeedanceVideoModel,
+  isToAPIsSeedanceVideoModel,
   MAX_PROMPT_LENGTH,
   MAX_REFERENCE_AUDIO_UPLOAD_BYTES,
   MAX_REFERENCE_VIDEO_UPLOAD_BYTES,
@@ -88,6 +90,7 @@ import type {
   VideoModelVariantAxisState,
 } from '../types'
 import { ImageSourceInput } from './image-source-input'
+import { ToAPIsAvatarAssetsDialog } from './toapis-avatar-assets-dialog'
 
 type ReferenceMediaKind = 'image' | 'video' | 'audio'
 
@@ -136,6 +139,7 @@ export function VideoPanel({
   const displayModel = variantState?.set.defaultModel ?? config.model
 
   const isSeedanceVideo = isSeedanceVideoModel(config.model)
+  const isToAPIsSeedanceVideo = isToAPIsSeedanceVideoModel(config.model)
   const requiresImage = videoModelRequiresImage(config.model)
   const showImageInput = videoModelSupportsImageInput(config.model)
   const allowImageUpload = videoModelAllowsImageUpload(config.model)
@@ -395,6 +399,7 @@ export function VideoPanel({
               availableImages={availableImages}
               disabled={isGenerating}
               allowUpload={allowImageUpload}
+              uploadMode={isToAPIsSeedanceVideo ? 'server-url' : 'data-uri'}
             />
           </div>
         )}
@@ -412,6 +417,7 @@ export function VideoPanel({
               maxItems={SEEDANCE_REFERENCE_IMAGE_LIMIT}
               maxBytes={MAX_IMAGE_UPLOAD_BYTES}
               error={referenceImageError}
+              enableAvatarAssets={isToAPIsSeedanceVideo}
               hint={t(
                 'Image URL array (up to 9). Supports png/jpg/jpeg/gif/bmp/webp, minimum 300px width and height. Use 【@图片N】 in the prompt to reference the image at that position.'
               )}
@@ -727,6 +733,7 @@ function ReferenceMediaField({
   videoDurations,
   maxTotalVideoDuration,
   onVideoDurationChange,
+  enableAvatarAssets,
   hint,
   error,
 }: {
@@ -742,6 +749,7 @@ function ReferenceMediaField({
   videoDurations?: Record<string, number>
   maxTotalVideoDuration?: number
   onVideoDurationChange?: (url: string, duration: number) => void
+  enableAvatarAssets?: boolean
   hint: string
   error?: string
 }) {
@@ -749,6 +757,7 @@ function ReferenceMediaField({
   const fileRef = useRef<HTMLInputElement>(null)
   const [urlText, setUrlText] = useState('')
   const [isUploading, setIsUploading] = useState(false)
+  const [avatarAssetsOpen, setAvatarAssetsOpen] = useState(false)
   const urls = parseURLList(value)
   const canAdd = urls.length < maxItems && !disabled && !isUploading
   let uploadLabel = t('Upload audio')
@@ -783,6 +792,17 @@ function ReferenceMediaField({
 
   const removeUrl = (urlToRemove: string) => {
     updateUrls(urls.filter((url) => url !== urlToRemove))
+  }
+
+  const addAvatarAsset = (assetUrl: string) => {
+    if (urls.length >= maxItems) {
+      toast.error(t('Maximum {{count}} URLs', { count: maxItems }))
+      return
+    }
+    if (!urls.includes(assetUrl)) {
+      updateUrls([...urls, assetUrl])
+    }
+    setAvatarAssetsOpen(false)
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -952,6 +972,20 @@ function ReferenceMediaField({
               <UploadIcon size={16} />
             )}
           </Button>
+          {enableAvatarAssets && kind === 'image' && (
+            <Button
+              type='button'
+              variant='outline'
+              size='icon'
+              className='shrink-0'
+              disabled={disabled || urls.length >= maxItems}
+              onClick={() => setAvatarAssetsOpen(true)}
+              aria-label={t('Select avatar asset')}
+              title={t('Select avatar asset')}
+            >
+              <UserRoundIcon size={16} />
+            </Button>
+          )}
           <input
             ref={fileRef}
             type='file'
@@ -960,6 +994,15 @@ function ReferenceMediaField({
             onChange={handleFile}
           />
         </div>
+      )}
+      {enableAvatarAssets && kind === 'image' && (
+        <ToAPIsAvatarAssetsDialog
+          open={avatarAssetsOpen}
+          onOpenChange={setAvatarAssetsOpen}
+          selectedValues={urls}
+          maxItems={maxItems}
+          onSelect={addAvatarAsset}
+        />
       )}
       {!error && (
         <p className='text-muted-foreground text-xs'>

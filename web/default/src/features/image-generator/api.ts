@@ -25,12 +25,14 @@ import type {
   ImageGenerationResponse,
   ImageTaskRequest,
   ModelOption,
+  ToAPIsAvatarAsset,
+  ToAPIsAvatarGroup,
   VideoGenerationRequest,
   VideoSubmitResponse,
   VideoTaskResponse,
 } from './types'
 
-type MediaUploadKind = 'image' | 'video' | 'audio'
+export type MediaUploadKind = 'image' | 'video' | 'audio'
 
 type RawUserModel =
   | string
@@ -261,4 +263,52 @@ export async function uploadReferenceMedia(
     throw new Error(data.message || 'Upload failed')
   }
   return data.data.url
+}
+
+function unwrapData<T>(res: { data?: { data?: T } | T }): T {
+  const raw = res.data as { data?: T } | T
+  if (raw && typeof raw === 'object' && 'data' in raw) {
+    return (raw as { data?: T }).data as T
+  }
+  return raw as T
+}
+
+export async function listToAPIsAvatarGroups(): Promise<ToAPIsAvatarGroup[]> {
+  const res = await api.get(API_ENDPOINTS.TOAPIS_AVATAR_GROUPS)
+  return unwrapData<ToAPIsAvatarGroup[]>(res) ?? []
+}
+
+export async function createToAPIsAvatarGroup(input: {
+  name: string
+  description?: string
+}): Promise<ToAPIsAvatarGroup> {
+  const res = await api.post(API_ENDPOINTS.TOAPIS_AVATAR_GROUPS, input)
+  return unwrapData<ToAPIsAvatarGroup>(res)
+}
+
+export async function listToAPIsAvatarAssets(
+  groupId?: string
+): Promise<ToAPIsAvatarAsset[]> {
+  const res = await api.get(API_ENDPOINTS.TOAPIS_AVATAR_ASSETS, {
+    params: groupId ? { group_id: groupId } : undefined,
+  })
+  return unwrapData<ToAPIsAvatarAsset[]>(res) ?? []
+}
+
+export async function createToAPIsAvatarAsset(input: {
+  group_id: string
+  source_url: string
+  name?: string
+}): Promise<ToAPIsAvatarAsset> {
+  const res = await api.post(API_ENDPOINTS.TOAPIS_AVATAR_ASSETS, input)
+  return unwrapData<ToAPIsAvatarAsset>(res)
+}
+
+export async function refreshToAPIsAvatarAssets(
+  groupId?: string
+): Promise<ToAPIsAvatarAsset[]> {
+  const res = await api.post(API_ENDPOINTS.TOAPIS_AVATAR_ASSETS_REFRESH, {
+    group_id: groupId,
+  })
+  return unwrapData<ToAPIsAvatarAsset[]>(res) ?? []
 }
