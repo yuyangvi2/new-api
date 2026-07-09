@@ -74,6 +74,7 @@ export function ToAPIsAvatarAssetsDialog(
   const [groupDescription, setGroupDescription] = useState('')
   const [assetName, setAssetName] = useState('')
   const [sourceUrl, setSourceUrl] = useState('')
+  const [showCreateGroupForm, setShowCreateGroupForm] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isCreatingGroup, setIsCreatingGroup] = useState(false)
   const [isCreatingAsset, setIsCreatingAsset] = useState(false)
@@ -127,6 +128,13 @@ export function ToAPIsAvatarAssetsDialog(
   }, [loadGroups, props.open])
 
   useEffect(() => {
+    if (props.open) return
+    setShowCreateGroupForm(false)
+    setGroupName('')
+    setGroupDescription('')
+  }, [props.open])
+
+  useEffect(() => {
     if (!props.open) return
     void loadAssets(selectedGroupId)
   }, [loadAssets, props.open, selectedGroupId])
@@ -147,6 +155,7 @@ export function ToAPIsAvatarAssetsDialog(
       setSelectedGroupId(group.group_id)
       setGroupName('')
       setGroupDescription('')
+      setShowCreateGroupForm(false)
       toast.success(t('Created'))
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : t('Create failed'))
@@ -284,22 +293,36 @@ export function ToAPIsAvatarAssetsDialog(
 
         <div className='space-y-4 overflow-y-auto pr-1'>
           <div className='space-y-2 rounded-md border p-3'>
-            <div className='flex items-center justify-between gap-2'>
+            <div className='flex flex-wrap items-center justify-between gap-2'>
               <Label>{t('Avatar asset group')}</Label>
-              <Button
-                type='button'
-                variant='outline'
-                size='sm'
-                disabled={!selectedGroupId || isRefreshing || isLoading}
-                onClick={handleRefresh}
-              >
-                {isRefreshing ? (
-                  <Loader2Icon className='animate-spin' size={14} />
-                ) : (
-                  <RefreshCwIcon size={14} />
+              <div className='flex flex-wrap items-center gap-2'>
+                {!showCreateGroupForm && (
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    disabled={isCreatingGroup}
+                    onClick={() => setShowCreateGroupForm(true)}
+                  >
+                    <PlusIcon size={14} />
+                    {t('Create asset group')}
+                  </Button>
                 )}
-                {t('Refresh')}
-              </Button>
+                <Button
+                  type='button'
+                  variant='outline'
+                  size='sm'
+                  disabled={!selectedGroupId || isRefreshing || isLoading}
+                  onClick={handleRefresh}
+                >
+                  {isRefreshing ? (
+                    <Loader2Icon className='animate-spin' size={14} />
+                  ) : (
+                    <RefreshCwIcon size={14} />
+                  )}
+                  {t('Refresh')}
+                </Button>
+              </div>
             </div>
             <Select
               value={selectedGroupId}
@@ -319,65 +342,67 @@ export function ToAPIsAvatarAssetsDialog(
                 </SelectGroup>
               </SelectContent>
             </Select>
-            <div className='grid gap-2 sm:grid-cols-[1fr_1fr_auto]'>
-              <Input
-                value={groupName}
-                onChange={(event) => setGroupName(event.target.value)}
-                placeholder={t('Group name')}
-                disabled={isCreatingGroup}
-              />
-              <Input
-                value={groupDescription}
-                onChange={(event) => setGroupDescription(event.target.value)}
-                placeholder={t('Group description (optional)')}
-                disabled={isCreatingGroup}
-              />
-              <Button
-                type='button'
-                disabled={isCreatingGroup || !groupName.trim()}
-                onClick={handleCreateGroup}
-              >
-                {isCreatingGroup ? (
-                  <Loader2Icon className='animate-spin' size={14} />
-                ) : (
-                  <PlusIcon size={14} />
-                )}
-                {t('New group')}
-              </Button>
-            </div>
+            {showCreateGroupForm && (
+              <div className='grid gap-2 sm:grid-cols-[1fr_1fr_auto]'>
+                <Input
+                  value={groupName}
+                  onChange={(event) => setGroupName(event.target.value)}
+                  placeholder={t('Group name')}
+                  disabled={isCreatingGroup}
+                />
+                <Input
+                  value={groupDescription}
+                  onChange={(event) => setGroupDescription(event.target.value)}
+                  placeholder={t('Group description (optional)')}
+                  disabled={isCreatingGroup}
+                />
+                <Button
+                  type='button'
+                  disabled={isCreatingGroup || !groupName.trim()}
+                  onClick={handleCreateGroup}
+                >
+                  {isCreatingGroup ? (
+                    <Loader2Icon className='animate-spin' size={14} />
+                  ) : (
+                    <PlusIcon size={14} />
+                  )}
+                  {t('Add avatar asset group')}
+                </Button>
+              </div>
+            )}
           </div>
 
-          <div className='space-y-2 rounded-md border p-3'>
-            <Label>{t('New avatar asset')}</Label>
-            <div className='grid gap-2 sm:grid-cols-[0.8fr_1fr_auto]'>
-              <Input
-                value={assetName}
-                onChange={(event) => setAssetName(event.target.value)}
-                placeholder={t('Asset name (optional)')}
-                disabled={isCreatingAsset}
-              />
-              <Input
-                value={sourceUrl}
-                onChange={(event) => setSourceUrl(event.target.value)}
-                placeholder={t('Public image URL')}
-                disabled={isCreatingAsset}
-              />
-              <Button
-                type='button'
-                disabled={
-                  isCreatingAsset || !selectedGroupId || !sourceUrl.trim()
-                }
-                onClick={handleCreateAsset}
-              >
-                {isCreatingAsset ? (
-                  <Loader2Icon className='animate-spin' size={14} />
-                ) : (
-                  <PlusIcon size={14} />
-                )}
-                {t('Add asset')}
-              </Button>
+          {selectedGroupId && (
+            <div className='space-y-2 rounded-md border p-3'>
+              <Label>{t('New avatar asset')}</Label>
+              <div className='grid gap-2 sm:grid-cols-[0.8fr_1fr_auto]'>
+                <Input
+                  value={assetName}
+                  onChange={(event) => setAssetName(event.target.value)}
+                  placeholder={t('Asset name (optional)')}
+                  disabled={isCreatingAsset}
+                />
+                <Input
+                  value={sourceUrl}
+                  onChange={(event) => setSourceUrl(event.target.value)}
+                  placeholder={t('Public image URL')}
+                  disabled={isCreatingAsset}
+                />
+                <Button
+                  type='button'
+                  disabled={isCreatingAsset || !sourceUrl.trim()}
+                  onClick={handleCreateAsset}
+                >
+                  {isCreatingAsset ? (
+                    <Loader2Icon className='animate-spin' size={14} />
+                  ) : (
+                    <PlusIcon size={14} />
+                  )}
+                  {t('Add asset')}
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className='space-y-2'>
             <div className='flex items-center justify-between gap-2'>
