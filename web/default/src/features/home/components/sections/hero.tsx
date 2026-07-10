@@ -158,8 +158,8 @@ export function Hero(props: HeroProps) {
         props.className
       )}
     >
-      <div className='relative overflow-hidden border-b border-orange-100/80 bg-[#fbf7ef] transition-colors duration-500 dark:border-border/70 dark:bg-background'>
-        <div className='pointer-events-none absolute inset-0 bg-[#fbf7ef] dark:bg-background' />
+      <div className='dark:border-border/70 dark:bg-background relative overflow-hidden border-b border-orange-100/80 bg-[#fbf7ef] transition-colors duration-500'>
+        <div className='dark:bg-background pointer-events-none absolute inset-0 bg-[#fbf7ef]' />
         {HERO_BACKGROUND_IMAGES.map((image, index) => (
           <img
             key={image}
@@ -168,14 +168,12 @@ export function Hero(props: HeroProps) {
             aria-hidden='true'
             fetchPriority={index === 0 ? 'high' : 'auto'}
             decoding='async'
-            className={cn(
-              'pointer-events-none absolute inset-0 size-full object-cover object-center saturate-[0.94] transition-opacity duration-700',
-              index === activeIndex ? 'opacity-[0.74]' : 'opacity-0'
-            )}
+            style={{ opacity: index === activeIndex ? 1 : 0 }}
+            className='pointer-events-none absolute inset-0 size-full object-cover object-center contrast-[1.08] saturate-[1.08] transition-opacity duration-700'
           />
         ))}
-        <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(251_247_239/0.82)_0%,rgb(251_247_239/0.64)_42%,rgb(251_247_239/0.9)_100%)] dark:bg-[linear-gradient(180deg,rgb(9_9_11/0.84)_0%,rgb(9_9_11/0.72)_42%,rgb(9_9_11/0.94)_100%)]' />
-        <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgb(255_171_45/0.18),transparent_42%),linear-gradient(90deg,rgb(251_247_239/0.72)_0%,rgb(251_247_239/0.16)_30%,rgb(251_247_239/0.12)_70%,rgb(251_247_239/0.62)_100%)] dark:bg-[radial-gradient(circle_at_50%_38%,rgb(234_117_20/0.22),transparent_42%),linear-gradient(90deg,rgb(9_9_11/0.84)_0%,rgb(9_9_11/0.34)_32%,rgb(9_9_11/0.3)_68%,rgb(9_9_11/0.82)_100%)]' />
+        <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(251_247_239/0.5)_0%,rgb(251_247_239/0.28)_42%,rgb(251_247_239/0.74)_100%)] dark:bg-[linear-gradient(180deg,rgb(9_9_11/0.66)_0%,rgb(9_9_11/0.44)_42%,rgb(9_9_11/0.86)_100%)]' />
+        <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgb(255_171_45/0.24),transparent_42%),linear-gradient(90deg,rgb(251_247_239/0.42)_0%,rgb(251_247_239/0.06)_30%,rgb(251_247_239/0.04)_70%,rgb(251_247_239/0.36)_100%)] dark:bg-[radial-gradient(circle_at_50%_38%,rgb(234_117_20/0.28),transparent_42%),linear-gradient(90deg,rgb(9_9_11/0.64)_0%,rgb(9_9_11/0.18)_32%,rgb(9_9_11/0.16)_68%,rgb(9_9_11/0.58)_100%)]' />
         <div className='absolute inset-x-0 bottom-0 h-1.5 bg-gradient-to-r from-orange-500 via-orange-400 to-amber-300 dark:from-orange-500/70 dark:via-amber-400/55 dark:to-cyan-300/45' />
 
         <button
@@ -201,7 +199,7 @@ export function Hero(props: HeroProps) {
             {t(activeSlide.eyebrow)}
           </div>
 
-          <h1 className='text-foreground mt-5 max-w-4xl text-4xl leading-[1.05] font-semibold tracking-normal sm:text-5xl lg:text-6xl [font-family:var(--font-playfair-display),Georgia,serif]'>
+          <h1 className='text-foreground mt-5 max-w-4xl [font-family:var(--font-playfair-display),Georgia,serif] text-4xl leading-[1.05] font-semibold tracking-normal sm:text-5xl lg:text-6xl'>
             {t(activeSlide.title)}
           </h1>
           <p className='text-muted-foreground mt-4 max-w-3xl text-base leading-7 md:text-lg'>
@@ -262,7 +260,7 @@ export function Hero(props: HeroProps) {
           <div className='text-muted-foreground text-xs font-bold tracking-[0.24em] uppercase'>
             {t('Authorized Partners')}
           </div>
-          <h2 className='mt-3 text-2xl leading-[1.08] font-semibold tracking-normal sm:text-3xl [font-family:var(--font-playfair-display),Georgia,serif]'>
+          <h2 className='mt-3 [font-family:var(--font-playfair-display),Georgia,serif] text-2xl leading-[1.08] font-semibold tracking-normal sm:text-3xl'>
             {t('Official model authorization')}
           </h2>
           <p className='text-muted-foreground mt-2 text-sm'>
@@ -296,9 +294,7 @@ export function Hero(props: HeroProps) {
             <div className='bg-border h-px flex-1' />
           </div>
           <p className='text-muted-foreground mx-auto mt-3 max-w-3xl text-xs leading-6'>
-            {t(
-              'More providers are ready to connect: Moonshot, MiniMax, Kling, Vidu, Grok, Doubao and Qwen.'
-            )}
+            {t('Moonshot, MiniMax, Kling, Vidu, Grok, Doubao and Qwen.')}
           </p>
         </div>
       </div>
