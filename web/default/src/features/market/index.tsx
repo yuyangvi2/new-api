@@ -18,7 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
 import { Copy, FileText, ImageIcon, Music2, Search, Video } from 'lucide-react'
-import { useMemo, useState, type ComponentType, type MouseEvent } from 'react'
+import {
+  useDeferredValue,
+  useMemo,
+  useState,
+  type ComponentType,
+  type MouseEvent,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -51,6 +57,11 @@ const MODEL_TYPES: Array<{
 
 const TASKS = ['Chat', 'Text to Image', 'Image to Video', 'Image edit', 'Audio']
 
+type IndexedMarketModel = MarketModel & {
+  marketKind: MarketKind
+  searchText: string
+}
+
 function modelSignals(model: MarketModel): string[] {
   return [
     model.model_name,
@@ -64,15 +75,13 @@ function modelSignals(model: MarketModel): string[] {
   ].filter(Boolean) as string[]
 }
 
-function modelMatchesTask(model: MarketModel, task: string): boolean {
+function modelMatchesTask(model: IndexedMarketModel, task: string): boolean {
   if (task === 'all') return true
 
   const normalizedTask = task.toLowerCase()
-  if (inferKind(model) === normalizedTask) return true
+  if (model.marketKind === normalizedTask) return true
 
-  return modelSignals(model).some((signal) =>
-    signal.toLowerCase().includes(normalizedTask)
-  )
+  return model.searchText.includes(normalizedTask)
 }
 
 function MarketModelCard(props: { model: MarketModel }) {
@@ -161,7 +170,7 @@ function MarketModelCard(props: { model: MarketModel }) {
             <Badge
               key={tag}
               variant='outline'
-              className='bg-background/70 text-[11px] text-foreground/80'
+              className='bg-background/70 text-foreground/80 text-[11px]'
             >
               {t(tag)}
             </Badge>
@@ -274,67 +283,69 @@ function MarketSidebar(props: {
 export function Market() {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
+  const deferredQuery = useDeferredValue(query)
   const [activeKind, setActiveKind] = useState<MarketKind>('text')
   const [activeTask, setActiveTask] = useState('all')
   const [activeVendor, setActiveVendor] = useState('all')
   const pricing = usePricingData()
 
-  const models = useMemo<MarketModel[]>(() => {
-    const source =
-      pricing.models.length > 0
-        ? pricing.models.map((model) => ({
-            ...model,
-            marketKind: inferKind(model),
-          }))
-        : FALLBACK_MODELS
+  const models = useMemo<IndexedMarketModel[]>(() => {
+    const source = pricing.models.length > 0 ? pricing.models : FALLBACK_MODELS
 
-    return source
+    return source.map((model) => {
+      const marketKind = inferKind(model)
+      return {
+        ...model,
+        marketKind,
+        searchText: modelSignals(model).join(' ').toLowerCase(),
+      }
+    })
   }, [pricing.models])
 
-  const vendors = useMemo(() => {
+  const marketSummary = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const model of models) {
-      if (!model.vendor_name) continue
-      counts.set(model.vendor_name, (counts.get(model.vendor_name) ?? 0) + 1)
-    }
-    return [...counts.entries()].map(([name, count]) => ({ name, count }))
-  }, [models])
-
-  const tasks = useMemo(
-    () =>
-      TASKS.map((task) => ({
-        name: task,
-        count: models.filter((model) => modelMatchesTask(model, task)).length,
-      })),
-    [models]
-  )
-
-  const kindCounts = useMemo(() => {
-    const counts = new Map<MarketKind, number>(
+    const taskCounts = new Map<string, number>(TASKS.map((task) => [task, 0]))
+    const kindCounts = new Map<MarketKind, number>(
       MODEL_TYPES.map((item) => [item.value, 0])
     )
+
     for (const model of models) {
-      const kind = model.marketKind ?? inferKind(model)
-      counts.set(kind, (counts.get(kind) ?? 0) + 1)
+      if (model.vendor_name) {
+        counts.set(model.vendor_name, (counts.get(model.vendor_name) ?? 0) + 1)
+      }
+      kindCounts.set(
+        model.marketKind,
+        (kindCounts.get(model.marketKind) ?? 0) + 1
+      )
+      for (const task of TASKS) {
+        if (modelMatchesTask(model, task)) {
+          taskCounts.set(task, (taskCounts.get(task) ?? 0) + 1)
+        }
+      }
     }
-    return counts
+
+    return {
+      vendors: [...counts.entries()].map(([name, count]) => ({ name, count })),
+      tasks: TASKS.map((task) => ({
+        name: task,
+        count: taskCounts.get(task) ?? 0,
+      })),
+      kindCounts,
+    }
   }, [models])
 
   const filteredModels = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
+    const normalizedQuery = deferredQuery.trim().toLowerCase()
     return models.filter((model) => {
-      if ((model.marketKind ?? inferKind(model)) !== activeKind) return false
+      if (model.marketKind !== activeKind) return false
       if (!modelMatchesTask(model, activeTask)) return false
       if (activeVendor !== 'all' && model.vendor_name !== activeVendor) {
         return false
       }
       if (!normalizedQuery) return true
-      return modelSignals(model)
-        .join(' ')
-        .toLowerCase()
-        .includes(normalizedQuery)
+      return model.searchText.includes(normalizedQuery)
     })
-  }, [activeKind, activeTask, activeVendor, models, query])
+  }, [activeKind, activeTask, activeVendor, deferredQuery, models])
 
   return (
     <PublicLayout showMainContainer={false} showNotifications={false}>
@@ -355,8 +366,8 @@ export function Market() {
 
         <section className='mt-5 grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]'>
           <MarketSidebar
-            vendors={vendors}
-            tasks={tasks}
+            vendors={marketSummary.vendors}
+            tasks={marketSummary.tasks}
             activeTask={activeTask}
             activeVendor={activeVendor}
             onTaskChange={setActiveTask}
@@ -378,7 +389,7 @@ export function Market() {
                     {t('Showing')}: {filteredModels.length}
                   </Badge>
                   <Badge variant='outline'>
-                    {t('Providers')}: {vendors.length}
+                    {t('Providers')}: {marketSummary.vendors.length}
                   </Badge>
                 </div>
               </div>
@@ -421,7 +432,8 @@ export function Market() {
                             )}
                           >
                             {t('{{count}} models', {
-                              count: kindCounts.get(item.value) ?? 0,
+                              count:
+                                marketSummary.kindCounts.get(item.value) ?? 0,
                             })}
                           </span>
                         </span>

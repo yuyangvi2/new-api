@@ -48,15 +48,15 @@ export function Profile() {
 
   return (
     <Main>
-      <div className='min-h-0 flex-1 overflow-auto px-3 py-3 sm:px-4 sm:py-6'>
-        <CardStaggerContainer className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-6'>
+      <div className='bg-muted/20 min-h-0 flex-1 overflow-auto px-3 py-3 sm:px-4 sm:py-6'>
+        <CardStaggerContainer className='mx-auto flex w-full max-w-[88rem] flex-col gap-4 sm:gap-5'>
           <CardStaggerItem>
             <ProfileHeader profile={profile} loading={loading} />
           </CardStaggerItem>
 
           <CardStaggerItem>
-            <div className='grid gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.46fr)] xl:items-start'>
-              <div className='space-y-4 sm:space-y-6'>
+            <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem] xl:grid-cols-[minmax(0,1fr)_26rem] xl:items-start'>
+              <div className='space-y-4'>
                 <ProfileSettingsCard
                   profile={profile}
                   loading={loading}
@@ -66,10 +66,9 @@ export function Profile() {
                   profile={profile}
                   onProfileUpdate={refreshProfile}
                 />
-                <ProfileSecurityCard profile={profile} loading={loading} />
               </div>
 
-              <div className='space-y-4 sm:space-y-6 xl:sticky xl:top-6'>
+              <div className='space-y-4 xl:sticky xl:top-6'>
                 {checkinEnabled && (
                   <CheckinCalendarCard
                     checkinEnabled={checkinEnabled}
@@ -77,6 +76,7 @@ export function Profile() {
                     turnstileSiteKey={turnstileSiteKey}
                   />
                 )}
+                <ProfileSecurityCard profile={profile} loading={loading} />
                 {canConfigureSidebar && <SidebarModulesCard />}
                 <PasskeyCard loading={loading} />
                 <TwoFACard loading={loading} />

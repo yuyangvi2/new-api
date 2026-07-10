@@ -60,14 +60,12 @@ export function LanguageSwitcher() {
         render={
           <Button
             variant='ghost'
-            className='text-muted-foreground hover:bg-secondary hover:text-foreground h-9 gap-1.5 rounded-full px-3 text-xs'
+            className='text-foreground hover:bg-background/70 h-9 gap-1.5 rounded-full px-3 text-xs'
           />
         }
       >
         <Globe className='size-4' />
-        <span className='text-xs font-medium uppercase'>
-          {currentLanguage}
-        </span>
+        <span className='text-xs font-medium uppercase'>{currentLanguage}</span>
         <span className='sr-only'>{t('Change language')}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end'>

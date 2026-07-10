@@ -67,28 +67,32 @@ function modelDescription(
 function modelTone(kind: MarketKind) {
   if (kind === 'image') {
     return {
-      glow: 'from-cyan-400/28 via-emerald-300/18 to-orange-300/24',
-      orb: 'bg-cyan-300/24',
+      accent: 'text-cyan-700 bg-cyan-500/10 dark:text-cyan-300',
+      surface:
+        'from-cyan-50 via-white to-emerald-50 dark:from-cyan-950/35 dark:via-background dark:to-emerald-950/25',
       line: 'from-cyan-400 via-emerald-300 to-orange-300',
     }
   }
   if (kind === 'video') {
     return {
-      glow: 'from-orange-400/28 via-rose-300/18 to-violet-400/24',
-      orb: 'bg-orange-300/24',
+      accent: 'text-orange-700 bg-orange-500/10 dark:text-orange-300',
+      surface:
+        'from-orange-50 via-white to-rose-50 dark:from-orange-950/35 dark:via-background dark:to-rose-950/25',
       line: 'from-orange-400 via-rose-300 to-violet-400',
     }
   }
   if (kind === 'audio') {
     return {
-      glow: 'from-emerald-400/26 via-teal-300/18 to-sky-300/24',
-      orb: 'bg-emerald-300/24',
+      accent: 'text-emerald-700 bg-emerald-500/10 dark:text-emerald-300',
+      surface:
+        'from-emerald-50 via-white to-sky-50 dark:from-emerald-950/35 dark:via-background dark:to-sky-950/25',
       line: 'from-emerald-400 via-teal-300 to-sky-300',
     }
   }
   return {
-    glow: 'from-orange-400/26 via-amber-200/18 to-sky-300/22',
-    orb: 'bg-orange-300/22',
+    accent: 'text-orange-700 bg-orange-500/10 dark:text-orange-300',
+    surface:
+      'from-slate-50 via-white to-orange-50 dark:from-slate-950/35 dark:via-background dark:to-orange-950/25',
     line: 'from-orange-400 via-amber-300 to-sky-300',
   }
 }
@@ -108,14 +112,14 @@ function ModelStat(props: {
 }) {
   const Icon = props.icon
   return (
-    <div className='min-w-0 border-t border-white/12 px-4 py-4 sm:border-t-0 sm:border-l'>
-      <div className='flex items-center gap-2 text-white/58'>
+    <div className='border-border/70 bg-card/80 min-w-0 rounded-2xl border px-4 py-4 shadow-sm'>
+      <div className='text-muted-foreground flex items-center gap-2'>
         <Icon className='size-3.5 shrink-0' />
         <span className='truncate text-[11px] font-semibold tracking-[0.16em] uppercase'>
           {props.label}
         </span>
       </div>
-      <div className='mt-2 truncate text-sm font-semibold text-white'>
+      <div className='text-foreground mt-2 truncate text-sm font-semibold'>
         {props.value}
       </div>
     </div>
@@ -134,20 +138,20 @@ function ModelHero(props: {
   const groups = model.enable_groups ?? []
 
   return (
-    <section className='relative overflow-hidden bg-[#17110d] text-white'>
-      <div
-        className={cn(
-          'pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,var(--tw-gradient-from),transparent_30%),radial-gradient(circle_at_75%_20%,var(--tw-gradient-via),transparent_28%),linear-gradient(135deg,rgb(23_17_13),rgb(35_30_25)_58%,rgb(12_16_20))]',
-          tone.glow
-        )}
-      />
-      <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:44px_44px] opacity-25' />
+    <section
+      className={cn(
+        'relative overflow-hidden border-b bg-gradient-to-br',
+        tone.surface
+      )}
+    >
+      <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgb(255_255_255/0.72)_0%,rgb(255_255_255/0.28)_45%,transparent_100%)] dark:bg-[linear-gradient(120deg,rgb(255_255_255/0.06)_0%,transparent_56%)]' />
+      <div className='via-border pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent to-transparent' />
 
       <div className='relative mx-auto max-w-7xl px-4 pt-24 pb-10 md:px-6 md:pt-28 md:pb-14'>
         <div className='mb-6 flex flex-wrap items-center justify-between gap-3'>
           <Button
             variant='outline'
-            className='h-9 rounded-full border-white/18 bg-white/10 text-white shadow-none backdrop-blur hover:bg-white/16 hover:text-white'
+            className='bg-background/72 h-9 rounded-full shadow-sm backdrop-blur'
             render={<Link to='/market' />}
           >
             <ArrowLeft className='size-4' />
@@ -158,7 +162,7 @@ function ModelHero(props: {
               value={model.model_name}
               variant='outline'
               size='sm'
-              className='h-9 rounded-full border-white/18 bg-white/10 text-white shadow-none hover:bg-white/16 hover:text-white'
+              className='bg-background/72 h-9 rounded-full shadow-sm backdrop-blur'
               iconClassName='size-3.5'
               tooltip={t('Copy model name')}
               successTooltip={t('Copied!')}
@@ -168,7 +172,7 @@ function ModelHero(props: {
             </CopyButton>
             <Button
               variant='outline'
-              className='hidden h-9 rounded-full border-white/18 bg-white/10 text-white shadow-none backdrop-blur hover:bg-white/16 hover:text-white sm:inline-flex'
+              className='bg-background/72 hidden h-9 rounded-full shadow-sm backdrop-blur sm:inline-flex'
               render={<Link to='/pricing' />}
             >
               <BookOpen className='size-4' />
@@ -178,29 +182,43 @@ function ModelHero(props: {
         </div>
 
         <div className='min-w-0'>
-          <div className='inline-flex rounded-full border border-white/14 bg-white/10 px-3 py-1 font-mono text-[11px] font-black tracking-[0.22em] text-white/72 uppercase'>
+          <div
+            className={cn(
+              'inline-flex rounded-full border px-3 py-1 font-mono text-[11px] font-black tracking-[0.22em] uppercase',
+              tone.accent
+            )}
+          >
             {t('Production model guide')}
           </div>
-          <h1 className='mt-5 max-w-5xl text-4xl leading-[1.05] font-black tracking-tight break-words text-white sm:text-5xl lg:text-6xl'>
+          <h1 className='text-foreground mt-5 max-w-5xl text-4xl leading-[1.05] font-black tracking-tight break-words sm:text-5xl lg:text-6xl'>
             {model.model_name}
           </h1>
-          <p className='mt-5 max-w-3xl text-base leading-8 text-white/72 md:text-lg'>
+          <p className='text-muted-foreground mt-5 max-w-3xl text-base leading-8 md:text-lg'>
             {props.description}
           </p>
           <div className='mt-7 flex flex-wrap gap-2'>
-            <Badge className='rounded-full border-white/12 bg-white/12 px-3 py-1 text-white hover:bg-white/12'>
+            <Badge
+              variant='secondary'
+              className='rounded-full px-3 py-1 shadow-sm'
+            >
               {model.vendor_name || t('Unknown provider')}
             </Badge>
-            <Badge className='rounded-full border-white/12 bg-white/12 px-3 py-1 text-white hover:bg-white/12'>
+            <Badge
+              variant='secondary'
+              className='rounded-full px-3 py-1 shadow-sm'
+            >
               {t(kindLabel)}
             </Badge>
-            <Badge className='rounded-full border-white/12 bg-white/12 px-3 py-1 text-white hover:bg-white/12'>
+            <Badge
+              variant='secondary'
+              className='rounded-full px-3 py-1 shadow-sm'
+            >
               {model.quota_type === 0 ? t('Token-based') : t('Per Request')}
             </Badge>
           </div>
         </div>
 
-        <div className='mt-8 grid overflow-hidden rounded-[22px] border border-white/12 bg-white/[0.06] backdrop-blur md:grid-cols-4'>
+        <div className='mt-8 grid gap-3 md:grid-cols-4'>
           <ModelStat
             icon={Sparkles}
             label={t('Provider')}
@@ -295,10 +313,10 @@ export function ModelGuide() {
 
   return (
     <PublicLayout showMainContainer={false} showNotifications={false}>
-      <main className='dark:bg-background bg-[#fbf7ef] pb-16'>
+      <main className='bg-muted/20 pb-16'>
         <ModelHero model={model} description={description} kind={kind} />
 
-        <div className='relative -mt-5 space-y-6'>
+        <div className='relative mt-6 space-y-6'>
           <section className='mx-auto max-w-7xl px-4 md:px-6'>
             <div className='mb-4 flex flex-wrap items-end justify-between gap-3'>
               <div>

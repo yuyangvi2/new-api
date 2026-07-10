@@ -129,7 +129,7 @@ export function Home() {
       showNotifications={false}
       showContactButton={false}
     >
-      <Hero isAuthenticated={isAuthenticated} />
+      <Hero />
       <BusinessScenarios />
       <HowItWorks />
       <CTA isAuthenticated={isAuthenticated} />

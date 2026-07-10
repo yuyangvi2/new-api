@@ -17,14 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type ComponentType,
-  type SVGProps,
-} from 'react'
+import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useState, type ComponentType, type SVGProps } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -41,7 +35,6 @@ import {
 
 interface HeroProps {
   className?: string
-  isAuthenticated?: boolean
 }
 
 const HERO_SLIDES = [
@@ -126,6 +119,9 @@ const PARTNERS: Array<{
 export function Hero(props: HeroProps) {
   const { t } = useTranslation()
   const [activeIndex, setActiveIndex] = useState(0)
+  const [loadedImageIndexes, setLoadedImageIndexes] = useState<Set<number>>(
+    () => new Set([0])
+  )
   const activeSlide = HERO_SLIDES[activeIndex]
 
   useEffect(() => {
@@ -136,10 +132,24 @@ export function Hero(props: HeroProps) {
     return () => window.clearInterval(interval)
   }, [])
 
-  const heroAction = useMemo(
-    () => (props.isAuthenticated ? '/dashboard' : activeSlide.href),
-    [activeSlide.href, props.isAuthenticated]
-  )
+  useEffect(() => {
+    const nextIndex = (activeIndex + 1) % HERO_BACKGROUND_IMAGES.length
+    if (loadedImageIndexes.has(nextIndex)) return
+
+    const image = new Image()
+    image.decoding = 'async'
+    const handleLoad = () => {
+      setLoadedImageIndexes((current) => {
+        if (current.has(nextIndex)) return current
+        const next = new Set(current)
+        next.add(nextIndex)
+        return next
+      })
+    }
+    image.addEventListener('load', handleLoad, { once: true })
+    image.src = HERO_BACKGROUND_IMAGES[nextIndex]
+    return () => image.removeEventListener('load', handleLoad)
+  }, [activeIndex, loadedImageIndexes])
 
   const goToPrevious = () => {
     setActiveIndex(
@@ -160,18 +170,21 @@ export function Hero(props: HeroProps) {
     >
       <div className='dark:border-border/70 dark:bg-background relative overflow-hidden border-b border-orange-100/80 bg-[#fbf7ef] transition-colors duration-500'>
         <div className='dark:bg-background pointer-events-none absolute inset-0 bg-[#fbf7ef]' />
-        {HERO_BACKGROUND_IMAGES.map((image, index) => (
-          <img
-            key={image}
-            src={image}
-            alt=''
-            aria-hidden='true'
-            fetchPriority={index === 0 ? 'high' : 'auto'}
-            decoding='async'
-            style={{ opacity: index === activeIndex ? 1 : 0 }}
-            className='pointer-events-none absolute inset-0 size-full object-cover object-center contrast-[1.08] saturate-[1.08] transition-opacity duration-700'
-          />
-        ))}
+        {HERO_BACKGROUND_IMAGES.map((image, index) =>
+          index === activeIndex || loadedImageIndexes.has(index) ? (
+            <img
+              key={image}
+              src={image}
+              alt=''
+              aria-hidden='true'
+              fetchPriority={index === 0 ? 'high' : 'auto'}
+              loading={index === 0 ? 'eager' : 'lazy'}
+              decoding='async'
+              style={{ opacity: index === activeIndex ? 1 : 0 }}
+              className='pointer-events-none absolute inset-0 size-full object-cover object-center contrast-[1.08] saturate-[1.08] transition-opacity duration-700'
+            />
+          ) : null
+        )}
         <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(251_247_239/0.5)_0%,rgb(251_247_239/0.28)_42%,rgb(251_247_239/0.74)_100%)] dark:bg-[linear-gradient(180deg,rgb(9_9_11/0.66)_0%,rgb(9_9_11/0.44)_42%,rgb(9_9_11/0.86)_100%)]' />
         <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgb(255_171_45/0.24),transparent_42%),linear-gradient(90deg,rgb(251_247_239/0.42)_0%,rgb(251_247_239/0.06)_30%,rgb(251_247_239/0.04)_70%,rgb(251_247_239/0.36)_100%)] dark:bg-[radial-gradient(circle_at_50%_38%,rgb(234_117_20/0.28),transparent_42%),linear-gradient(90deg,rgb(9_9_11/0.64)_0%,rgb(9_9_11/0.18)_32%,rgb(9_9_11/0.16)_68%,rgb(9_9_11/0.58)_100%)]' />
         <div className='absolute inset-x-0 bottom-0 h-1.5 bg-gradient-to-r from-orange-500 via-orange-400 to-amber-300 dark:from-orange-500/70 dark:via-amber-400/55 dark:to-cyan-300/45' />
@@ -194,12 +207,7 @@ export function Hero(props: HeroProps) {
         </button>
 
         <div className='relative z-10 mx-auto flex min-h-[540px] max-w-7xl flex-col items-center justify-center px-4 pt-20 text-center sm:min-h-[560px] md:min-h-[620px] md:px-6'>
-          <div className='bg-card/80 text-brand inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm'>
-            <Sparkles className='size-3.5' />
-            {t(activeSlide.eyebrow)}
-          </div>
-
-          <h1 className='text-foreground mt-5 max-w-4xl [font-family:var(--font-playfair-display),Georgia,serif] text-4xl leading-[1.05] font-semibold tracking-normal sm:text-5xl lg:text-6xl'>
+          <h1 className='text-foreground max-w-4xl [font-family:var(--font-playfair-display),Georgia,serif] text-4xl leading-[1.05] font-semibold tracking-normal sm:text-5xl lg:text-6xl'>
             {t(activeSlide.title)}
           </h1>
           <p className='text-muted-foreground mt-4 max-w-3xl text-base leading-7 md:text-lg'>
@@ -209,11 +217,9 @@ export function Hero(props: HeroProps) {
           <div className='mt-7 flex flex-wrap items-center justify-center gap-3'>
             <Button
               className='bg-brand hover:bg-brand-hover h-11 min-w-40 rounded-full px-6 text-sm font-semibold text-white'
-              render={<Link to={heroAction} />}
+              render={<Link to={activeSlide.href} />}
             >
-              {props.isAuthenticated
-                ? t('Go to Dashboard')
-                : t(activeSlide.primary)}
+              {t(activeSlide.primary)}
               <ArrowRight className='size-4' />
             </Button>
             <Button

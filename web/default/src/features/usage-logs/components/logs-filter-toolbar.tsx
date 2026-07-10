@@ -221,7 +221,10 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
 
   return (
     <div
-      className={cn('rounded-2xl border bg-card p-3 shadow-sm', props.className)}
+      className={cn(
+        'rounded-2xl border bg-card p-3 shadow-sm',
+        props.className
+      )}
     >
       {props.stats && <div className='mb-3'>{props.stats}</div>}
       <div className='flex flex-wrap items-start gap-2'>
@@ -242,7 +245,6 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
       )}
 
       <div className='mt-2 flex flex-wrap items-center gap-2'>
-        {props.stats}
         <div className='ms-auto flex flex-wrap items-center justify-end gap-1.5 sm:gap-2'>
           {props.actionStart}
           <Button

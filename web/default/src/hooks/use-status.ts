@@ -24,16 +24,24 @@ import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { mapStatusDataToConfig } from './use-system-config'
 
+let initialStatusCache: SystemStatus | null | undefined
+
 // Get initial cache from localStorage
 function getInitialStatus(): SystemStatus | undefined {
+  if (initialStatusCache !== undefined) {
+    return initialStatusCache ?? undefined
+  }
+
   try {
     if (typeof window !== 'undefined') {
       const saved = window.localStorage.getItem('status')
-      return saved ? (JSON.parse(saved) as SystemStatus) : undefined
+      initialStatusCache = saved ? (JSON.parse(saved) as SystemStatus) : null
+      return initialStatusCache ?? undefined
     }
   } catch {
     /* empty */
   }
+  initialStatusCache = null
   return undefined
 }
 
@@ -60,6 +68,7 @@ export function useStatus() {
       try {
         if (typeof window !== 'undefined' && status) {
           window.localStorage.setItem('status', JSON.stringify(status))
+          initialStatusCache = status as SystemStatus
         }
       } catch {
         /* empty */
