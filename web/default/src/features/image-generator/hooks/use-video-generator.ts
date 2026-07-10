@@ -128,7 +128,7 @@ function applyVideoTaskResult(
     patchBatch(batchId, {
       ...progressPatch,
       status: 'complete',
-      videoUrl: videoContentUrl(task.task_id),
+      videoUrl: task.url || videoContentUrl(task.task_id),
     })
     return true
   }
