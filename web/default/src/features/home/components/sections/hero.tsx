@@ -28,7 +28,6 @@ import {
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
-import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 import { cn } from '@/lib/utils'
 
 import {
@@ -106,33 +105,28 @@ const HERO_BACKGROUND_IMAGES = HERO_SLIDES.map((slide) => slide.backgroundImage)
 const PARTNERS: Array<{
   name: string
   logo: ComponentType<SVGProps<SVGSVGElement>>
-  aliases: string[]
 }> = [
-  { name: 'OpenAI', logo: IconOpenAI, aliases: ['openai'] },
-  { name: 'Anthropic', logo: IconAnthropic, aliases: ['anthropic'] },
+  { name: 'OpenAI', logo: IconOpenAI },
+  { name: 'Anthropic', logo: IconAnthropic },
   {
     name: 'Google',
     logo: IconGemini,
-    aliases: ['google', 'gemini'],
   },
   {
     name: 'ByteDance',
     logo: IconByteDance,
-    aliases: ['bytedance', 'byte dance', 'doubao', 'volcengine'],
   },
   {
     name: 'Alibaba',
     logo: IconAlibabaCloud,
-    aliases: ['alibaba', 'qwen', 'tongyi'],
   },
-  { name: 'DeepSeek', logo: IconDeepSeek, aliases: ['deepseek'] },
+  { name: 'DeepSeek', logo: IconDeepSeek },
 ]
 
 export function Hero(props: HeroProps) {
   const { t } = useTranslation()
   const [activeIndex, setActiveIndex] = useState(0)
   const activeSlide = HERO_SLIDES[activeIndex]
-  const pricing = usePricingData()
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -146,22 +140,6 @@ export function Hero(props: HeroProps) {
     () => (props.isAuthenticated ? '/dashboard' : activeSlide.href),
     [activeSlide.href, props.isAuthenticated]
   )
-
-  const partnerCounts = useMemo(() => {
-    const counts = new Map(PARTNERS.map((partner) => [partner.name, 0]))
-    for (const model of pricing.models) {
-      const vendorName = (model.vendor_name ?? '').toLowerCase()
-      for (const partner of PARTNERS) {
-        if (partner.aliases.some((alias) => vendorName.includes(alias))) {
-          counts.set(partner.name, (counts.get(partner.name) ?? 0) + 1)
-          break
-        }
-      }
-    }
-    return counts
-  }, [pricing.models])
-
-  const hasPricingModels = pricing.models.length > 0
 
   const goToPrevious = () => {
     setActiveIndex(
@@ -304,13 +282,6 @@ export function Hero(props: HeroProps) {
                   <Logo className='max-h-8 w-auto' aria-hidden />
                 </div>
                 <div className='mt-4 text-sm font-bold'>{partner.name}</div>
-                <div className='text-muted-foreground mt-1 text-xs'>
-                  {hasPricingModels
-                    ? t('{{count}} models', {
-                        count: partnerCounts.get(partner.name) ?? 0,
-                      })
-                    : t('No model data')}
-                </div>
               </div>
             )
           })}
