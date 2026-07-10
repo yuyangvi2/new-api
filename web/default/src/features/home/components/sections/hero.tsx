@@ -294,7 +294,7 @@ export function Hero(props: HeroProps) {
             <div className='bg-border h-px flex-1' />
           </div>
           <p className='text-muted-foreground mx-auto mt-3 max-w-3xl text-xs leading-6'>
-            {t('Moonshot, MiniMax, Kling, Vidu, Grok, Doubao and Qwen.')}
+            {t('Moonshot, MiniMax, Kling, Vidu, Grok, Doubao and Qwen')}
           </p>
         </div>
       </div>
