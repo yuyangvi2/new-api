@@ -125,7 +125,11 @@ func CreateToAPIsAvatarGroup(c *gin.Context) {
 }
 
 func ListToAPIsAvatarAssets(c *gin.Context) {
-	assets, err := model.ListToAPIsAvatarAssets(c.GetInt("id"), strings.TrimSpace(c.Query("group_id")))
+	userID := c.GetInt("id")
+	groupID := strings.TrimSpace(c.Query("group_id"))
+	_ = refreshToAPIsAvatarAssetStatuses(userID, groupID)
+
+	assets, err := model.ListToAPIsAvatarAssets(userID, groupID)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -200,15 +204,30 @@ func RefreshToAPIsAvatarAssets(c *gin.Context) {
 	_ = common.DecodeJson(c.Request.Body, &req)
 	req.GroupID = strings.TrimSpace(req.GroupID)
 
-	assets, err := model.ListRefreshableToAPIsAvatarAssets(c.GetInt("id"), req.GroupID)
+	if err := refreshToAPIsAvatarAssetStatuses(c.GetInt("id"), req.GroupID); err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+	nextAssets, err := model.ListToAPIsAvatarAssets(c.GetInt("id"), req.GroupID)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
+	common.ApiSuccess(c, nextAssets)
+}
+
+func refreshToAPIsAvatarAssetStatuses(userID int, groupID string) error {
+	assets, err := model.ListRefreshableToAPIsAvatarAssets(userID, groupID)
+	if err != nil {
+		return err
+	}
+	if len(assets) == 0 {
+		return nil
+	}
+
 	channel, apiKey, err := getToAPIsAvatarChannel()
 	if err != nil {
-		common.ApiErrorMsg(c, err.Error())
-		return
+		return err
 	}
 	for _, asset := range assets {
 		var upstream toapisAvatarResponse[toapisAvatarAssetData]
@@ -228,12 +247,7 @@ func RefreshToAPIsAvatarAssets(c *gin.Context) {
 		asset.UpdatedTime = common.GetTimestamp()
 		_ = model.SaveToAPIsAvatarAsset(&asset)
 	}
-	nextAssets, err := model.ListToAPIsAvatarAssets(c.GetInt("id"), req.GroupID)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	common.ApiSuccess(c, nextAssets)
+	return nil
 }
 
 func toLocalToAPIsAvatarAsset(userID int, channelID int, req toapisAvatarAssetRequest, upstream toapisAvatarAssetData) *model.ToAPIsAvatarAsset {
