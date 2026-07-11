@@ -212,7 +212,7 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 	case isSuccessStatus(status):
 		info.Status = model.TaskStatusSuccess
 		info.Progress = taskcommon.ProgressComplete
-		info.Url = extractResultURL(data)
+		info.Url = maybeTransferToTOS(extractResultURL(data))
 	case isFailureStatus(status):
 		info.Status = model.TaskStatusFailure
 		info.Progress = taskcommon.ProgressComplete

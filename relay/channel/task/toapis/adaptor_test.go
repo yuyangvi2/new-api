@@ -1,7 +1,10 @@
 package toapis
 
 import (
+	"net/url"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -79,6 +82,8 @@ func TestBuildSubmitPayloadRejectsAudioOnly(t *testing.T) {
 }
 
 func TestParseTaskResultCompleted(t *testing.T) {
+	disableToapisTOSTransfer(t)
+
 	body, err := common.Marshal(map[string]any{
 		"id":         "tsk_vid_123",
 		"object":     "generation.task",
@@ -108,6 +113,51 @@ func TestParseTaskResultCompleted(t *testing.T) {
 	assert.Equal(t, "https://files.example.com/video.mp4", info.Url)
 }
 
+func TestTOSPresignGetBuildsVolcengineURL(t *testing.T) {
+	cfg := tosConfig{
+		Bucket:       "ark-acg-ap-southeast-1",
+		Region:       "ap-southeast-1",
+		Endpoint:     "tos-ap-southeast-1.volces.com",
+		AccessKey:    "AKLTexample",
+		SecretKey:    "secret",
+		PresignHours: 24,
+	}
+	now := time.Date(2026, 7, 3, 1, 9, 59, 0, time.UTC)
+
+	rawURL := tosPresignGet(cfg, "dreamina-seedance-2-0/video file.mp4", now)
+	parsed, err := url.Parse(rawURL)
+	require.NoError(t, err)
+
+	assert.Equal(t, "ark-acg-ap-southeast-1.tos-ap-southeast-1.volces.com", parsed.Host)
+	assert.Equal(t, "/dreamina-seedance-2-0/video%20file.mp4", parsed.EscapedPath())
+	values := parsed.Query()
+	assert.Equal(t, "TOS4-HMAC-SHA256", values.Get("X-Tos-Algorithm"))
+	assert.Equal(t, "AKLTexample/20260703/ap-southeast-1/tos/request", values.Get("X-Tos-Credential"))
+	assert.Equal(t, "20260703T010959Z", values.Get("X-Tos-Date"))
+	assert.Equal(t, "86400", values.Get("X-Tos-Expires"))
+	assert.Equal(t, "host", values.Get("X-Tos-SignedHeaders"))
+	assert.Len(t, values.Get("X-Tos-Signature"), 64)
+}
+
+func TestToapisTOSConfigFromEnv(t *testing.T) {
+	t.Setenv("TOAPIS_TOS_BUCKET", "newapi-video-ap-southeast-1")
+	t.Setenv("TOAPIS_TOS_REGION", "ap-southeast-1")
+	t.Setenv("TOAPIS_TOS_ENDPOINT", "")
+	t.Setenv("TOAPIS_TOS_ACCESS_KEY", "ak")
+	t.Setenv("TOAPIS_TOS_SECRET_KEY", "sk")
+	t.Setenv("TOAPIS_TOS_PREFIX", "dreamina-seedance-2-0/")
+	t.Setenv("TOAPIS_TOS_PRESIGN_HOURS", "48")
+
+	cfg, ok := toapisTOSConfig()
+	require.True(t, ok)
+
+	assert.Equal(t, "newapi-video-ap-southeast-1", cfg.Bucket)
+	assert.Equal(t, "ap-southeast-1", cfg.Region)
+	assert.Equal(t, "tos-ap-southeast-1.volces.com", cfg.Endpoint)
+	assert.Equal(t, "dreamina-seedance-2-0", cfg.Prefix)
+	assert.EqualValues(t, 48, cfg.PresignHours)
+}
+
 func TestToAPISModelAliases(t *testing.T) {
 	assert.True(t, isSupportedModel("seedance-2"))
 	assert.True(t, isSupportedModel("seedance-2-fast"))
@@ -118,4 +168,29 @@ func TestToAPISModelAliases(t *testing.T) {
 	billingModel, ok := seedanceBillingModel("seedance-2-fast")
 	require.True(t, ok)
 	assert.Equal(t, "seedance2.0_fast_direct", billingModel)
+}
+
+func disableToapisTOSTransfer(t *testing.T) {
+	for _, key := range []string{
+		"TOAPIS_TOS_BUCKET",
+		"TOAPIS_TOS_REGION",
+		"TOAPIS_TOS_ENDPOINT",
+		"TOAPIS_TOS_ACCESS_KEY",
+		"TOAPIS_TOS_SECRET_KEY",
+		"TOAPIS_TOS_SECURITY_TOKEN",
+		"TOAPIS_TOS_PREFIX",
+		"TOAPIS_TOS_PRESIGN_HOURS",
+	} {
+		t.Setenv(key, "")
+	}
+}
+
+func TestTOSCanonicalQueryUsesPercentEscaping(t *testing.T) {
+	query := tosCanonicalQuery(map[string]string{
+		"X-Tos-Credential": "AK/20260703/ap-southeast-1/tos/request",
+		"X-Tos-Date":       "20260703T010959Z",
+	})
+
+	assert.True(t, strings.Contains(query, "X-Tos-Credential=AK%2F20260703%2Fap-southeast-1%2Ftos%2Frequest"))
+	assert.True(t, strings.Contains(query, "X-Tos-Date=20260703T010959Z"))
 }
