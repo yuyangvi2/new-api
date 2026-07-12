@@ -5383,6 +5383,7 @@
     "When enabled, MjProxy callbacks are accepted (reveals server IP).": "啟用時，接受 MjProxy 回調 (會泄露服務器 IP)。",
     "When enabled, newly created tokens start in the first auto group.": "啟用後，新创建的令牌将从第一个自動分組開始。",
     "When enabled, prompts are scanned before reaching upstream models.": "啟用後，提示将在到达上游模型之前被掃描。",
+    "When enabled, Seedance requests for 720p, 1080p, and 4K generate one tier lower first, then enhance to the requested output with AI MediaKit.": "啟用後，Seedance 請求 720p、1080p 和 4K 時會先低一檔生成，再透過 AI MediaKit 增強到使用者請求的輸出。",
     "When enabled, the store field will be blocked": "開啟後将阻止 store 字段透傳",
     "When enabled, users can pick this group when creating tokens.": "啟用後，用戶创建令牌時可以選擇该分組。",
     "When enabled, violation requests will incur additional charges.": "開啟後，违規請求将額外扣费。",

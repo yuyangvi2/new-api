@@ -5383,6 +5383,7 @@
     "When enabled, MjProxy callbacks are accepted (reveals server IP).": "有効にすると、MjProxy のコールバックを受け入れます (サーバーの IP を公開します)。",
     "When enabled, newly created tokens start in the first auto group.": "有効にすると、新しく作成されたトークンは最初の自動グループで開始されます。",
     "When enabled, prompts are scanned before reaching upstream models.": "有効にすると、プロンプトはアップストリームモデルに到達する前にスキャンされます。",
+    "When enabled, Seedance requests for 720p, 1080p, and 4K generate one tier lower first, then enhance to the requested output with AI MediaKit.": "有効にすると、Seedance の 720p、1080p、4K リクエストはまず1段階低い解像度で生成され、その後 AI MediaKit で要求された出力まで強化されます。",
     "When enabled, the store field will be blocked": "有効にすると、ストアフィールドはブロックされます",
     "When enabled, users can pick this group when creating tokens.": "有効にすると、ユーザーはトークン作成時にこのグループを選択できます。",
     "When enabled, violation requests will incur additional charges.": "有効にすると、違反リクエストに追加料金が発生します。",

@@ -26,7 +26,9 @@ const (
 	mediaKitTaskPathPrefix   = "/api/v1/tasks/"
 	mediaKitStatusCompleted  = "completed"
 	mediaKitStatusFailed     = "failed"
-	videoSRSourceResolution  = "480p"
+	videoSR480p              = "480p"
+	videoSR720p              = "720p"
+	videoSR1080p             = "1080p"
 )
 
 type mediaKitSubmitResponse struct {
@@ -58,14 +60,18 @@ func applyVideoSuperResolutionRewrite(req *relaycommon.TaskSubmitReq, payload ma
 	if videoSR == nil {
 		return nil
 	}
-	videoSR.SourceResolution = videoSRSourceResolution
-	payload["resolution"] = videoSRSourceResolution
+	sourceResolution := sourceResolutionForVideoSR(videoSR)
+	if sourceResolution == "" {
+		return nil
+	}
+	videoSR.SourceResolution = sourceResolution
+	payload["resolution"] = sourceResolution
 	delete(payload, "resolution_limit")
 	return videoSR
 }
 
 func requestedVideoSuperResolution(req *relaycommon.TaskSubmitReq, payload map[string]any) *relaycommon.TaskVideoSuperResolution {
-	if limit, ok := positiveInt(req.Metadata["resolution_limit"]); ok && limit > 1080 {
+	if limit, ok := positiveInt(req.Metadata["resolution_limit"]); ok && limit > 480 {
 		return &relaycommon.TaskVideoSuperResolution{ResolutionLimit: clampResolutionLimit(limit)}
 	}
 	if sr := videoSRFromResolutionString(asString(payload["resolution"])); sr != nil {
@@ -92,7 +98,7 @@ func videoSRFromResolutionString(value string) *relaycommon.TaskVideoSuperResolu
 	}
 	if strings.HasSuffix(normalized, "p") {
 		n, err := strconv.Atoi(strings.TrimSuffix(normalized, "p"))
-		if err != nil || n <= 1080 {
+		if err != nil || n <= 480 {
 			return nil
 		}
 		if n >= 2160 {
@@ -112,7 +118,7 @@ func videoSRFromResolutionString(value string) *relaycommon.TaskVideoSuperResolu
 		if shortSide > 2160 || longSide >= 3840 {
 			return &relaycommon.TaskVideoSuperResolution{TargetResolution: "4k"}
 		}
-		if shortSide > 1080 {
+		if shortSide > 480 {
 			return &relaycommon.TaskVideoSuperResolution{ResolutionLimit: clampResolutionLimit(shortSide)}
 		}
 		if longSide > 1920 {
@@ -120,6 +126,26 @@ func videoSRFromResolutionString(value string) *relaycommon.TaskVideoSuperResolu
 		}
 	}
 	return nil
+}
+
+func sourceResolutionForVideoSR(videoSR *relaycommon.TaskVideoSuperResolution) string {
+	if videoSR == nil {
+		return ""
+	}
+	switch strings.ToLower(strings.TrimSpace(videoSR.TargetResolution)) {
+	case "4k", "uhd", "2k":
+		return videoSR1080p
+	}
+	switch {
+	case videoSR.ResolutionLimit > 1080:
+		return videoSR1080p
+	case videoSR.ResolutionLimit > 720:
+		return videoSR720p
+	case videoSR.ResolutionLimit > 480:
+		return videoSR480p
+	default:
+		return ""
+	}
 }
 
 func parseResolutionDimensions(value string) (int, int, bool) {

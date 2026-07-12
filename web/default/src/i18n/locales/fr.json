@@ -5383,6 +5383,7 @@
     "When enabled, MjProxy callbacks are accepted (reveals server IP).": "Lorsque activé, les callbacks MjProxy sont acceptés (révèle l'IP du serveur).",
     "When enabled, newly created tokens start in the first auto group.": "Lorsqu'elle est activée, les jetons nouvellement créés commencent dans le premier groupe automatique.",
     "When enabled, prompts are scanned before reaching upstream models.": "Lorsqu'elle est activée, les invites sont scannées avant d'atteindre les modèles en amont.",
+    "When enabled, Seedance requests for 720p, 1080p, and 4K generate one tier lower first, then enhance to the requested output with AI MediaKit.": "Une fois activées, les requêtes Seedance en 720p, 1080p et 4K sont d'abord générées au palier inférieur, puis améliorées avec AI MediaKit jusqu'à la sortie demandée.",
     "When enabled, the store field will be blocked": "Lorsqu'il est activé, le champ de la boutique sera bloqué",
     "When enabled, users can pick this group when creating tokens.": "Une fois activé, les utilisateurs peuvent choisir ce groupe lors de la création de jetons.",
     "When enabled, violation requests will incur additional charges.": "Lorsqu'activé, les requêtes en violation entraîneront des frais supplémentaires.",

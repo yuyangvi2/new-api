@@ -98,9 +98,9 @@ func TestBuildSubmitPayloadVideoSuperResolutionRewrite(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, videoSR)
 
-	assert.Equal(t, "480p", payload["resolution"])
+	assert.Equal(t, "1080p", payload["resolution"])
 	assert.Equal(t, "4k", videoSR.TargetResolution)
-	assert.Equal(t, "480p", videoSR.SourceResolution)
+	assert.Equal(t, "1080p", videoSR.SourceResolution)
 }
 
 func TestBuildSubmitPayloadVideoSuperResolutionUsesResolutionLimit(t *testing.T) {
@@ -116,9 +116,80 @@ func TestBuildSubmitPayloadVideoSuperResolutionUsesResolutionLimit(t *testing.T)
 	require.NoError(t, err)
 	require.NotNil(t, videoSR)
 
-	assert.Equal(t, "480p", payload["resolution"])
+	assert.Equal(t, "1080p", payload["resolution"])
 	assert.Equal(t, 1440, videoSR.ResolutionLimit)
+	assert.Equal(t, "1080p", videoSR.SourceResolution)
 	assert.Equal(t, "16:9", payload["aspect_ratio"])
+}
+
+func TestBuildSubmitPayloadVideoSuperResolutionTiers(t *testing.T) {
+	tests := []struct {
+		name             string
+		requested        string
+		sourceResolution string
+		targetLimit      int
+		targetResolution string
+	}{
+		{
+			name:             "720p",
+			requested:        "720p",
+			sourceResolution: "480p",
+			targetLimit:      720,
+		},
+		{
+			name:             "1080p",
+			requested:        "1080p",
+			sourceResolution: "720p",
+			targetLimit:      1080,
+		},
+		{
+			name:             "4k",
+			requested:        "4k",
+			sourceResolution: "1080p",
+			targetResolution: "4k",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &relaycommon.TaskSubmitReq{
+				Model:    "seedance-2",
+				Prompt:   "cinematic city",
+				Duration: 5,
+				Size:     "16:9",
+				Metadata: map[string]interface{}{
+					"resolution": tt.requested,
+				},
+			}
+
+			payload, videoSR, err := buildSubmitPayload(req, "seedance-2", "seedance-2", true)
+			require.NoError(t, err)
+			require.NotNil(t, videoSR)
+
+			assert.Equal(t, tt.sourceResolution, payload["resolution"])
+			assert.Equal(t, tt.sourceResolution, videoSR.SourceResolution)
+			assert.Equal(t, tt.targetLimit, videoSR.ResolutionLimit)
+			assert.Equal(t, tt.targetResolution, videoSR.TargetResolution)
+		})
+	}
+}
+
+func TestBuildSubmitPayloadVideoSuperResolutionSkips480p(t *testing.T) {
+	req := &relaycommon.TaskSubmitReq{
+		Model:    "seedance-2",
+		Prompt:   "cinematic city",
+		Duration: 5,
+		Size:     "16:9",
+		Metadata: map[string]interface{}{
+			"resolution": "480p",
+		},
+	}
+
+	payload, videoSR, err := buildSubmitPayload(req, "seedance-2", "seedance-2", true)
+	require.NoError(t, err)
+
+	require.Nil(t, videoSR)
+	assert.Equal(t, "480p", payload["resolution"])
 }
 
 func TestParseTaskResultCompleted(t *testing.T) {

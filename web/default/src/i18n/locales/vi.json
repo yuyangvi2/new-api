@@ -5383,6 +5383,7 @@
     "When enabled, MjProxy callbacks are accepted (reveals server IP).": "Khi được bật, các callback của MjProxy được chấp nhận (lộ IP máy chủ).",
     "When enabled, newly created tokens start in the first auto group.": "Khi được bật, các token mới được tạo sẽ bắt đầu trong nhóm tự động đầu tiên.",
     "When enabled, prompts are scanned before reaching upstream models.": "Khi được bật,",
+    "When enabled, Seedance requests for 720p, 1080p, and 4K generate one tier lower first, then enhance to the requested output with AI MediaKit.": "Khi bật, các yêu cầu Seedance ở 720p, 1080p và 4K sẽ được tạo thấp hơn một cấp trước, rồi nâng cấp bằng AI MediaKit lên đầu ra đã yêu cầu.",
     "When enabled, the store field will be blocked": "Khi được bật, trường store sẽ bị chặn",
     "When enabled, users can pick this group when creating tokens.": "Khi bật, người dùng có thể chọn nhóm này khi tạo token.",
     "When enabled, violation requests will incur additional charges.": "Khi bật, các yêu cầu vi phạm sẽ phải chịu phí bổ sung.",

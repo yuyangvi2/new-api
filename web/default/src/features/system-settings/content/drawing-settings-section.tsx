@@ -113,7 +113,7 @@ export function DrawingSettingsSection({
       name: 'VideoSuperResolutionEnabled',
       label: t('Enable Seedance video super resolution'),
       description: t(
-        'When users request output above 1080p, generate at 480p first and enhance it with AI MediaKit.'
+        'When enabled, Seedance requests for 720p, 1080p, and 4K generate one tier lower first, then enhance to the requested output with AI MediaKit.'
       ),
     },
     {
