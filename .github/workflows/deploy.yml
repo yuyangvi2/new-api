@@ -90,6 +90,14 @@ jobs:
           IMAGE_FULL: ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/${{ env.ACR_REPO }}:${{ steps.vars.outputs.tag }}
           ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
           ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          TOAPIS_TOS_BUCKET: ${{ secrets.TOAPIS_TOS_BUCKET || vars.TOAPIS_TOS_BUCKET }}
+          TOAPIS_TOS_REGION: ${{ secrets.TOAPIS_TOS_REGION || vars.TOAPIS_TOS_REGION }}
+          TOAPIS_TOS_ENDPOINT: ${{ secrets.TOAPIS_TOS_ENDPOINT || vars.TOAPIS_TOS_ENDPOINT }}
+          TOAPIS_TOS_ACCESS_KEY: ${{ secrets.TOAPIS_TOS_ACCESS_KEY || vars.TOAPIS_TOS_ACCESS_KEY }}
+          TOAPIS_TOS_SECRET_KEY: ${{ secrets.TOAPIS_TOS_SECRET_KEY || vars.TOAPIS_TOS_SECRET_KEY }}
+          TOAPIS_TOS_SECURITY_TOKEN: ${{ secrets.TOAPIS_TOS_SECURITY_TOKEN || vars.TOAPIS_TOS_SECURITY_TOKEN }}
+          TOAPIS_TOS_PREFIX: ${{ secrets.TOAPIS_TOS_PREFIX || vars.TOAPIS_TOS_PREFIX }}
+          TOAPIS_TOS_PRESIGN_HOURS: ${{ secrets.TOAPIS_TOS_PRESIGN_HOURS || vars.TOAPIS_TOS_PRESIGN_HOURS }}
         run: |
           set -euo pipefail
 
@@ -107,6 +115,23 @@ jobs:
             echo "CADDY_NETWORK='${CADDY_NETWORK}'"
             echo "APP_CTR='${APP_CONTAINER}'"
             echo "DOMAIN='${PUBLIC_DOMAIN}'"
+            for key in \
+              TOAPIS_TOS_BUCKET \
+              TOAPIS_TOS_REGION \
+              TOAPIS_TOS_ENDPOINT \
+              TOAPIS_TOS_ACCESS_KEY \
+              TOAPIS_TOS_SECRET_KEY \
+              TOAPIS_TOS_SECURITY_TOKEN \
+              TOAPIS_TOS_PREFIX \
+              TOAPIS_TOS_PRESIGN_HOURS; do
+              value="${!key:-}"
+              if [ -n "$value" ]; then
+                echo "::add-mask::$value"
+                encoded="$(printf '%s' "$value" | base64 -w0)"
+                echo "::add-mask::$encoded"
+                echo "${key}_B64='${encoded}'"
+              fi
+            done
             cat custom/deploy/newapi-remote-deploy.sh
           } > /tmp/remote_deploy.sh
 

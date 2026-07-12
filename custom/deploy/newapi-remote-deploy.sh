@@ -43,6 +43,15 @@ ensure_secret() {
   fi
 }
 
+upsert_env_from_b64() {
+  local key="$1"
+  local encoded_var="${key}_B64"
+  local encoded="${!encoded_var:-}"
+  if [ -n "$encoded" ]; then
+    upsert_env "$key" "$(printf '%s' "$encoded" | base64 -d)"
+  fi
+}
+
 echo ">>> Preflight checks"
 docker network inspect "$CADDY_NETWORK" >/dev/null
 docker inspect "$CADDY_CTR" >/dev/null
@@ -70,6 +79,17 @@ ensure_secret REDIS_PASSWORD
 ensure_secret SESSION_SECRET
 upsert_env NEWAPI_IMAGE "$IMAGE"
 upsert_env CADDY_NETWORK "$CADDY_NETWORK"
+for key in \
+  TOAPIS_TOS_BUCKET \
+  TOAPIS_TOS_REGION \
+  TOAPIS_TOS_ENDPOINT \
+  TOAPIS_TOS_ACCESS_KEY \
+  TOAPIS_TOS_SECRET_KEY \
+  TOAPIS_TOS_SECURITY_TOKEN \
+  TOAPIS_TOS_PREFIX \
+  TOAPIS_TOS_PRESIGN_HOURS; do
+  upsert_env_from_b64 "$key"
+done
 chmod 600 .env
 
 cat > docker-compose.yml <<'COMPOSE'
@@ -94,6 +114,14 @@ services:
       - BATCH_UPDATE_ENABLED=true
       - SESSION_SECRET=${SESSION_SECRET}
       - NODE_NAME=newapi-node-1
+      - TOAPIS_TOS_BUCKET=${TOAPIS_TOS_BUCKET:-}
+      - TOAPIS_TOS_REGION=${TOAPIS_TOS_REGION:-}
+      - TOAPIS_TOS_ENDPOINT=${TOAPIS_TOS_ENDPOINT:-}
+      - TOAPIS_TOS_ACCESS_KEY=${TOAPIS_TOS_ACCESS_KEY:-}
+      - TOAPIS_TOS_SECRET_KEY=${TOAPIS_TOS_SECRET_KEY:-}
+      - TOAPIS_TOS_SECURITY_TOKEN=${TOAPIS_TOS_SECURITY_TOKEN:-}
+      - TOAPIS_TOS_PREFIX=${TOAPIS_TOS_PREFIX:-}
+      - TOAPIS_TOS_PRESIGN_HOURS=${TOAPIS_TOS_PRESIGN_HOURS:-}
     depends_on:
       redis:
         condition: service_healthy
