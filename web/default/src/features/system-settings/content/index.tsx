@@ -38,6 +38,8 @@ const defaultContentSettings: ContentSettings = {
   DataExportInterval: 5,
   Chats: '[]',
   DrawingEnabled: false,
+  VideoSuperResolutionEnabled: false,
+  VideoSuperResolutionMediaKitKey: '',
   MjNotifyEnabled: false,
   MjAccountFilterEnabled: false,
   MjForwardUrlEnabled: false,

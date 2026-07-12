@@ -180,6 +180,8 @@ export type ContentSettings = {
   DataExportInterval: number
   Chats: string
   DrawingEnabled: boolean
+  VideoSuperResolutionEnabled: boolean
+  VideoSuperResolutionMediaKitKey: string
   MjNotifyEnabled: boolean
   MjAccountFilterEnabled: boolean
   MjForwardUrlEnabled: boolean

@@ -25,9 +25,10 @@ func TestBuildSubmitPayloadTextToVideo(t *testing.T) {
 		},
 	}
 
-	payload, err := buildSubmitPayload(req, "seedance-2-fast", "seedance-2-fast")
+	payload, videoSR, err := buildSubmitPayload(req, "seedance-2-fast", "seedance-2-fast", false)
 	require.NoError(t, err)
 
+	require.Nil(t, videoSR)
 	assert.Equal(t, "seedance-2-fast", payload["model"])
 	assert.Equal(t, "make a rainy street video", payload["prompt"])
 	assert.Equal(t, 5, payload["duration"])
@@ -49,9 +50,10 @@ func TestBuildSubmitPayloadReferenceMedia(t *testing.T) {
 		},
 	}
 
-	payload, err := buildSubmitPayload(req, "seedance-2-mini", "seedance-2-mini")
+	payload, videoSR, err := buildSubmitPayload(req, "seedance-2-mini", "seedance-2-mini", false)
 	require.NoError(t, err)
 
+	require.Nil(t, videoSR)
 	assert.Equal(t, "seedance-2-mini", payload["model"])
 	assert.NotContains(t, payload, "generate_audio")
 	assert.Equal(t, []roleMedia{
@@ -76,9 +78,47 @@ func TestBuildSubmitPayloadRejectsAudioOnly(t *testing.T) {
 		},
 	}
 
-	_, err := buildSubmitPayload(req, "seedance-2", "seedance-2")
+	_, _, err := buildSubmitPayload(req, "seedance-2", "seedance-2", false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "audio_with_roles cannot be used alone")
+}
+
+func TestBuildSubmitPayloadVideoSuperResolutionRewrite(t *testing.T) {
+	req := &relaycommon.TaskSubmitReq{
+		Model:    "seedance-2",
+		Prompt:   "cinematic city",
+		Duration: 5,
+		Size:     "3840x2160",
+		Metadata: map[string]interface{}{
+			"resolution": "4k",
+		},
+	}
+
+	payload, videoSR, err := buildSubmitPayload(req, "seedance-2", "seedance-2", true)
+	require.NoError(t, err)
+	require.NotNil(t, videoSR)
+
+	assert.Equal(t, "480p", payload["resolution"])
+	assert.Equal(t, "4k", videoSR.TargetResolution)
+	assert.Equal(t, "480p", videoSR.SourceResolution)
+}
+
+func TestBuildSubmitPayloadVideoSuperResolutionUsesResolutionLimit(t *testing.T) {
+	req := &relaycommon.TaskSubmitReq{
+		Model:    "seedance-2",
+		Prompt:   "cinematic city",
+		Duration: 5,
+		Size:     "2560x1440",
+		Metadata: map[string]interface{}{},
+	}
+
+	payload, videoSR, err := buildSubmitPayload(req, "seedance-2", "seedance-2", true)
+	require.NoError(t, err)
+	require.NotNil(t, videoSR)
+
+	assert.Equal(t, "480p", payload["resolution"])
+	assert.Equal(t, 1440, videoSR.ResolutionLimit)
+	assert.Equal(t, "16:9", payload["aspect_ratio"])
 }
 
 func TestParseTaskResultCompleted(t *testing.T) {

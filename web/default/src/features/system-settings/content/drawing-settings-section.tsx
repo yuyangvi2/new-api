@@ -27,9 +27,11 @@ import {
   FormControl,
   FormDescription,
   FormField,
+  FormItem,
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 
 import {
@@ -43,6 +45,8 @@ import { useUpdateOption } from '../hooks/use-update-option'
 
 const drawingSchema = z.object({
   DrawingEnabled: z.boolean(),
+  VideoSuperResolutionEnabled: z.boolean(),
+  VideoSuperResolutionMediaKitKey: z.string(),
   MjNotifyEnabled: z.boolean(),
   MjAccountFilterEnabled: z.boolean(),
   MjForwardUrlEnabled: z.boolean(),
@@ -51,6 +55,10 @@ const drawingSchema = z.object({
 })
 
 type DrawingFormValues = z.infer<typeof drawingSchema>
+type DrawingSwitchName = Exclude<
+  keyof DrawingFormValues,
+  'VideoSuperResolutionMediaKitKey'
+>
 
 type DrawingSettingsSectionProps = {
   defaultValues: DrawingFormValues
@@ -71,17 +79,26 @@ export function DrawingSettingsSection({
   }, [defaultValues, form])
 
   const onSubmit = async (values: DrawingFormValues) => {
-    const updates = Object.entries(values).filter(
-      ([key, value]) => value !== defaultValues[key as keyof DrawingFormValues]
-    )
+    const updates = Object.entries(values).filter(([key, value]) => {
+      if (key === 'VideoSuperResolutionMediaKitKey') {
+        return String(value).trim() !== ''
+      }
+      return value !== defaultValues[key as keyof DrawingFormValues]
+    })
 
     for (const [key, value] of updates) {
-      await updateOption.mutateAsync({ key, value })
+      await updateOption.mutateAsync({
+        key,
+        value:
+          key === 'VideoSuperResolutionMediaKitKey'
+            ? String(value).trim()
+            : value,
+      })
     }
   }
 
   const switches: Array<{
-    name: keyof DrawingFormValues
+    name: DrawingSwitchName
     label: string
     description: string
   }> = [
@@ -90,6 +107,13 @@ export function DrawingSettingsSection({
       label: t('Enable drawing features'),
       description: t(
         'Required to expose MjProxy-style image generation to end users.'
+      ),
+    },
+    {
+      name: 'VideoSuperResolutionEnabled',
+      label: t('Enable Seedance video super resolution'),
+      description: t(
+        'When users request output above 1080p, generate at 480p first and enhance it with AI MediaKit.'
       ),
     },
     {
@@ -161,6 +185,29 @@ export function DrawingSettingsSection({
                 )}
               />
             ))}
+            <FormField
+              control={form.control}
+              name='VideoSuperResolutionMediaKitKey'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('AI MediaKit API Key')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='password'
+                      autoComplete='off'
+                      placeholder={t('Leave blank to keep the saved key')}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Required when Seedance video super resolution is enabled.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
         </SettingsForm>
       </Form>

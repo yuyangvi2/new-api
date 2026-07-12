@@ -107,6 +107,9 @@ const CONTENT_SECTIONS = [
       <DrawingSettingsSection
         defaultValues={{
           DrawingEnabled: settings.DrawingEnabled,
+          VideoSuperResolutionEnabled: settings.VideoSuperResolutionEnabled,
+          VideoSuperResolutionMediaKitKey:
+            settings.VideoSuperResolutionMediaKitKey,
           MjNotifyEnabled: settings.MjNotifyEnabled,
           MjAccountFilterEnabled: settings.MjAccountFilterEnabled,
           MjForwardUrlEnabled: settings.MjForwardUrlEnabled,

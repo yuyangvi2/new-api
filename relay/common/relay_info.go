@@ -685,6 +685,20 @@ type TaskRelayInfo struct {
 	// a specific channel (e.g., remix on origin task's channel). Stored as any
 	// to avoid an import cycle with model; callers type-assert to *model.Channel.
 	LockedChannel any
+
+	VideoSuperResolution *TaskVideoSuperResolution
+}
+
+type TaskVideoSuperResolution struct {
+	TargetResolution string `json:"target_resolution,omitempty"`
+	ResolutionLimit  int    `json:"resolution_limit,omitempty"`
+	SourceResolution string `json:"source_resolution,omitempty"`
+	MediaKitTaskID   string `json:"mediakit_task_id,omitempty"`
+	Status           string `json:"status,omitempty"`
+	ResultURL        string `json:"result_url,omitempty"`
+	Error            string `json:"error,omitempty"`
+	SubmittedAt      int64  `json:"submitted_at,omitempty"`
+	FinishedAt       int64  `json:"finished_at,omitempty"`
 }
 
 type TaskSubmitReq struct {

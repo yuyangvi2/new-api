@@ -52,6 +52,8 @@ func InitOptionMap() {
 	common.OptionMap["DisplayTokenStatEnabled"] = strconv.FormatBool(common.DisplayTokenStatEnabled)
 	common.OptionMap["DrawingEnabled"] = strconv.FormatBool(common.DrawingEnabled)
 	common.OptionMap["TaskEnabled"] = strconv.FormatBool(common.TaskEnabled)
+	common.OptionMap["VideoSuperResolutionEnabled"] = strconv.FormatBool(common.VideoSuperResolutionEnabled)
+	common.OptionMap["VideoSuperResolutionMediaKitKey"] = common.VideoSuperResolutionMediaKitKey
 	common.OptionMap["DataExportEnabled"] = strconv.FormatBool(common.DataExportEnabled)
 	common.OptionMap["ChannelDisableThreshold"] = strconv.FormatFloat(common.ChannelDisableThreshold, 'f', -1, 64)
 	common.OptionMap["EmailDomainRestrictionEnabled"] = strconv.FormatBool(common.EmailDomainRestrictionEnabled)
@@ -324,6 +326,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.DrawingEnabled = boolValue
 		case "TaskEnabled":
 			common.TaskEnabled = boolValue
+		case "VideoSuperResolutionEnabled":
+			common.VideoSuperResolutionEnabled = boolValue
 		case "DataExportEnabled":
 			common.DataExportEnabled = boolValue
 		case "DefaultCollapseSidebar":
@@ -380,6 +384,8 @@ func updateOptionMap(key string, value string) (err error) {
 		common.SMTPFrom = value
 	case "SMTPToken":
 		common.SMTPToken = value
+	case "VideoSuperResolutionMediaKitKey":
+		common.VideoSuperResolutionMediaKitKey = value
 	case "ServerAddress":
 		system_setting.ServerAddress = value
 	case "WorkerUrl":

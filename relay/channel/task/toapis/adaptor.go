@@ -86,9 +86,12 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	if err != nil {
 		return nil, err
 	}
-	payload, err := buildSubmitPayload(&req, info.OriginModelName, info.UpstreamModelName)
+	payload, videoSR, err := buildSubmitPayload(&req, info.OriginModelName, info.UpstreamModelName, common.VideoSuperResolutionEnabled)
 	if err != nil {
 		return nil, err
+	}
+	if videoSR != nil && info.TaskRelayInfo != nil {
+		info.TaskRelayInfo.VideoSuperResolution = videoSR
 	}
 	data, err := common.Marshal(payload)
 	if err != nil {
@@ -212,7 +215,7 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 	case isSuccessStatus(status):
 		info.Status = model.TaskStatusSuccess
 		info.Progress = taskcommon.ProgressComplete
-		info.Url = maybeTransferToTOS(extractResultURL(data))
+		info.Url = extractResultURL(data)
 	case isFailureStatus(status):
 		info.Status = model.TaskStatusFailure
 		info.Progress = taskcommon.ProgressComplete
@@ -239,7 +242,7 @@ func (a *TaskAdaptor) GetChannelName() string {
 	return ChannelName
 }
 
-func buildSubmitPayload(req *relaycommon.TaskSubmitReq, originModel, upstreamModel string) (map[string]any, error) {
+func buildSubmitPayload(req *relaycommon.TaskSubmitReq, originModel, upstreamModel string, videoSREnabled bool) (map[string]any, *relaycommon.TaskVideoSuperResolution, error) {
 	modelName := toapisModel(firstNonEmpty(upstreamModel, originModel, req.Model))
 	payload := map[string]any{}
 	for k, v := range req.Metadata {
@@ -258,12 +261,13 @@ func buildSubmitPayload(req *relaycommon.TaskSubmitReq, originModel, upstreamMod
 	}
 	applySize(payload, req.Size)
 	applyMetadataAliases(payload, req.Metadata)
+	videoSR := applyVideoSuperResolutionRewrite(req, payload, videoSREnabled)
 
 	if _, has := payload["video_with_roles"]; !has {
 		videos, err := roleMediaFromURLList(req.Metadata, "reference_video", 3, "video_with_roles",
 			"referenceVideoUrls", "reference_video_urls", "video_files")
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if len(videos) > 0 {
 			payload["video_with_roles"] = videos
@@ -273,7 +277,7 @@ func buildSubmitPayload(req *relaycommon.TaskSubmitReq, originModel, upstreamMod
 		audios, err := roleMediaFromURLList(req.Metadata, "reference_audio", 3, "audio_with_roles",
 			"referenceAudioUrls", "reference_audio_urls", "audio_files")
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if len(audios) > 0 {
 			payload["audio_with_roles"] = audios
@@ -282,7 +286,7 @@ func buildSubmitPayload(req *relaycommon.TaskSubmitReq, originModel, upstreamMod
 	if _, hasRoles := payload["image_with_roles"]; !hasRoles && payload["image_urls"] == nil {
 		images, err := buildImageRoles(req, payload, modelName)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if len(images) > 0 {
 			payload["image_with_roles"] = images
@@ -292,9 +296,9 @@ func buildSubmitPayload(req *relaycommon.TaskSubmitReq, originModel, upstreamMod
 		delete(payload, "generate_audio")
 	}
 	if err := validateRoleMediaPayload(payload, modelName); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return payload, nil
+	return payload, videoSR, nil
 }
 
 func applyMetadataAliases(payload map[string]any, metadata map[string]any) {
