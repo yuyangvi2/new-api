@@ -38,8 +38,10 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			toapisPrivateAvatarRoute.GET("/groups", controller.ListToAPIsAvatarGroups)
 			toapisPrivateAvatarRoute.POST("/groups", controller.CreateToAPIsAvatarGroup)
+			toapisPrivateAvatarRoute.DELETE("/groups/:group_id", controller.DeleteToAPIsAvatarGroup)
 			toapisPrivateAvatarRoute.GET("/assets", controller.ListToAPIsAvatarAssets)
 			toapisPrivateAvatarRoute.POST("/assets", controller.CreateToAPIsAvatarAsset)
+			toapisPrivateAvatarRoute.DELETE("/assets/:asset_id", controller.DeleteToAPIsAvatarAsset)
 			toapisPrivateAvatarRoute.POST("/assets/refresh", controller.RefreshToAPIsAvatarAssets)
 		}
 		perfMetricsRoute := apiRouter.Group("/perf-metrics")

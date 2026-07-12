@@ -124,6 +124,19 @@ func CreateToAPIsAvatarGroup(c *gin.Context) {
 	common.ApiSuccess(c, group)
 }
 
+func DeleteToAPIsAvatarGroup(c *gin.Context) {
+	groupID := strings.TrimSpace(c.Param("group_id"))
+	if groupID == "" {
+		common.ApiErrorMsg(c, "group_id is required")
+		return
+	}
+	if err := model.DeleteToAPIsAvatarGroup(c.GetInt("id"), groupID); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, gin.H{"deleted": true})
+}
+
 func ListToAPIsAvatarAssets(c *gin.Context) {
 	userID := c.GetInt("id")
 	groupID := strings.TrimSpace(c.Query("group_id"))
@@ -197,6 +210,19 @@ func CreateToAPIsAvatarAsset(c *gin.Context) {
 		return
 	}
 	common.ApiSuccess(c, asset)
+}
+
+func DeleteToAPIsAvatarAsset(c *gin.Context) {
+	assetID := strings.TrimSpace(c.Param("asset_id"))
+	if assetID == "" {
+		common.ApiErrorMsg(c, "asset_id is required")
+		return
+	}
+	if err := model.DeleteToAPIsAvatarAsset(c.GetInt("id"), assetID); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, gin.H{"deleted": true})
 }
 
 func RefreshToAPIsAvatarAssets(c *gin.Context) {

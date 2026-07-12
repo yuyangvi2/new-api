@@ -33,9 +33,9 @@ func TestEstimateSeedanceQuotaForDefaultDirectStandard(t *testing.T) {
 
 	require.True(t, ok)
 	assert.Equal(t, 108000, tokens)
-	assert.Equal(t, 46.0, pricePerMillionCNY)
-	assert.Equal(t, 354857, quota)
-	assert.InDelta(t, 4.968, float64(quota)/common.QuotaPerUnit*operation_setting.USDExchangeRate, 0.00001)
+	assert.Equal(t, 50.0, pricePerMillionCNY)
+	assert.Equal(t, 385714, quota)
+	assert.InDelta(t, 5.4, float64(quota)/common.QuotaPerUnit*operation_setting.USDExchangeRate, 0.00001)
 }
 
 func TestEstimateSeedanceQuotaForMiniVideoInputUsesVideoPrice(t *testing.T) {
@@ -63,12 +63,12 @@ func TestSeedancePricePerMillionCNYUsesCorrectFastVideoPrice(t *testing.T) {
 	pricePerMillionCNY, ok := SeedancePricePerMillionCNY("seedance2.0_fast_direct", "720p", true)
 
 	require.True(t, ok)
-	assert.Equal(t, 14.0, pricePerMillionCNY)
+	assert.Equal(t, 20.0, pricePerMillionCNY)
 }
 
 func TestSeedancePricePerMillionCNYSupportsAPIZFastAlias(t *testing.T) {
 	pricePerMillionCNY, ok := SeedancePricePerMillionCNY("seedance_2.0_fast", "720p", false)
 
 	require.True(t, ok)
-	assert.Equal(t, 37.0, pricePerMillionCNY)
+	assert.Equal(t, 40.0, pricePerMillionCNY)
 }

@@ -286,6 +286,12 @@ export async function createToAPIsAvatarGroup(input: {
   return unwrapData<ToAPIsAvatarGroup>(res)
 }
 
+export async function deleteToAPIsAvatarGroup(groupId: string): Promise<void> {
+  await api.delete(
+    `${API_ENDPOINTS.TOAPIS_AVATAR_GROUPS}/${encodeURIComponent(groupId)}`
+  )
+}
+
 export async function listToAPIsAvatarAssets(
   groupId?: string
 ): Promise<ToAPIsAvatarAsset[]> {
@@ -302,6 +308,12 @@ export async function createToAPIsAvatarAsset(input: {
 }): Promise<ToAPIsAvatarAsset> {
   const res = await api.post(API_ENDPOINTS.TOAPIS_AVATAR_ASSETS, input)
   return unwrapData<ToAPIsAvatarAsset>(res)
+}
+
+export async function deleteToAPIsAvatarAsset(assetId: string): Promise<void> {
+  await api.delete(
+    `${API_ENDPOINTS.TOAPIS_AVATAR_ASSETS}/${encodeURIComponent(assetId)}`
+  )
 }
 
 export async function refreshToAPIsAvatarAssets(

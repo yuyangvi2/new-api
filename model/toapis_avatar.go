@@ -97,3 +97,16 @@ func SaveToAPIsAvatarAsset(asset *ToAPIsAvatarAsset) error {
 	}
 	return DB.Create(asset).Error
 }
+
+func DeleteToAPIsAvatarGroup(userID int, groupID string) error {
+	return DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("user_id = ? AND group_id = ?", userID, groupID).Delete(&ToAPIsAvatarAsset{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("user_id = ? AND group_id = ?", userID, groupID).Delete(&ToAPIsAvatarGroup{}).Error
+	})
+}
+
+func DeleteToAPIsAvatarAsset(userID int, assetID string) error {
+	return DB.Where("user_id = ? AND asset_id = ?", userID, assetID).Delete(&ToAPIsAvatarAsset{}).Error
+}

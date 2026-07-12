@@ -16,12 +16,22 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type MouseEvent,
+} from 'react'
 import {
   CheckIcon,
+  ImageIcon,
   Loader2Icon,
-  PlusIcon,
   RefreshCwIcon,
+  Trash2Icon,
+  UploadIcon,
   UserRoundIcon,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -37,22 +47,20 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
+
 import {
   createToAPIsAvatarAsset,
   createToAPIsAvatarGroup,
+  deleteToAPIsAvatarAsset,
+  deleteToAPIsAvatarGroup,
   listToAPIsAvatarAssets,
   listToAPIsAvatarGroups,
   refreshToAPIsAvatarAssets,
+  uploadReferenceMedia,
 } from '../api'
+import { MAX_IMAGE_UPLOAD_BYTES } from '../constants'
 import type { ToAPIsAvatarAsset, ToAPIsAvatarGroup } from '../types'
 
 interface ToAPIsAvatarAssetsDialogProps {
@@ -63,22 +71,27 @@ interface ToAPIsAvatarAssetsDialogProps {
   onSelect: (value: string) => void
 }
 
+type AssetCount = {
+  available: number
+  total: number
+}
+
 export function ToAPIsAvatarAssetsDialog(
   props: ToAPIsAvatarAssetsDialogProps
 ) {
   const { t } = useTranslation()
+  const uploadInputRef = useRef<HTMLInputElement>(null)
   const [groups, setGroups] = useState<ToAPIsAvatarGroup[]>([])
-  const [assets, setAssets] = useState<ToAPIsAvatarAsset[]>([])
+  const [allAssets, setAllAssets] = useState<ToAPIsAvatarAsset[]>([])
   const [selectedGroupId, setSelectedGroupId] = useState('')
   const [groupName, setGroupName] = useState('')
   const [groupDescription, setGroupDescription] = useState('')
-  const [assetName, setAssetName] = useState('')
-  const [sourceUrl, setSourceUrl] = useState('')
-  const [showCreateGroupForm, setShowCreateGroupForm] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isCreatingGroup, setIsCreatingGroup] = useState(false)
-  const [isCreatingAsset, setIsCreatingAsset] = useState(false)
-  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isUploadingAsset, setIsUploadingAsset] = useState(false)
+  const [isRefreshingAssets, setIsRefreshingAssets] = useState(false)
+  const [deletingGroupId, setDeletingGroupId] = useState('')
+  const [deletingAssetId, setDeletingAssetId] = useState('')
 
   const selectedSet = useMemo(
     () => new Set(props.selectedValues),
@@ -86,19 +99,49 @@ export function ToAPIsAvatarAssetsDialog(
   )
   const limitReached = props.selectedValues.length >= props.maxItems
 
-  const loadGroups = useCallback(async () => {
+  const selectedGroup = useMemo(
+    () => groups.find((group) => group.group_id === selectedGroupId),
+    [groups, selectedGroupId]
+  )
+
+  const imageAssets = useMemo(
+    () => allAssets.filter((asset) => asset.asset_type === 'image'),
+    [allAssets]
+  )
+
+  const selectedGroupAssets = useMemo(
+    () => imageAssets.filter((asset) => asset.group_id === selectedGroupId),
+    [imageAssets, selectedGroupId]
+  )
+
+  const countsByGroupId = useMemo(() => {
+    const counts = new Map<string, AssetCount>()
+    for (const asset of imageAssets) {
+      const count = counts.get(asset.group_id) ?? { available: 0, total: 0 }
+      count.total += 1
+      if (asset.status === 'active') {
+        count.available += 1
+      }
+      counts.set(asset.group_id, count)
+    }
+    return counts
+  }, [imageAssets])
+
+  const loadLibrary = useCallback(async () => {
     setIsLoading(true)
     try {
-      const nextGroups = await listToAPIsAvatarGroups()
+      const [nextGroups, nextAssets] = await Promise.all([
+        listToAPIsAvatarGroups(),
+        listToAPIsAvatarAssets(),
+      ])
       setGroups(nextGroups)
+      setAllAssets(nextAssets)
       setSelectedGroupId((current) => {
-        if (
-          nextGroups.length > 0 &&
-          !nextGroups.some((group) => group.group_id === current)
-        ) {
-          return nextGroups[0].group_id
+        if (nextGroups.length === 0) return ''
+        if (nextGroups.some((group) => group.group_id === current)) {
+          return current
         }
-        return current
+        return nextGroups[0].group_id
       })
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : t('Load failed'))
@@ -107,37 +150,16 @@ export function ToAPIsAvatarAssetsDialog(
     }
   }, [t])
 
-  const loadAssets = useCallback(async (groupId: string) => {
-    if (!groupId) {
-      setAssets([])
-      return
-    }
-    setIsLoading(true)
-    try {
-      setAssets(await listToAPIsAvatarAssets(groupId))
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : t('Load failed'))
-    } finally {
-      setIsLoading(false)
-    }
-  }, [t])
-
   useEffect(() => {
     if (!props.open) return
-    void loadGroups()
-  }, [loadGroups, props.open])
+    void loadLibrary()
+  }, [loadLibrary, props.open])
 
   useEffect(() => {
     if (props.open) return
-    setShowCreateGroupForm(false)
     setGroupName('')
     setGroupDescription('')
   }, [props.open])
-
-  useEffect(() => {
-    if (!props.open) return
-    void loadAssets(selectedGroupId)
-  }, [loadAssets, props.open, selectedGroupId])
 
   const handleCreateGroup = async () => {
     const name = groupName.trim()
@@ -151,11 +173,13 @@ export function ToAPIsAvatarAssetsDialog(
         name,
         description: groupDescription.trim() || undefined,
       })
-      setGroups((prev) => [group, ...prev])
+      setGroups((prev) => [
+        group,
+        ...prev.filter((item) => item.group_id !== group.group_id),
+      ])
       setSelectedGroupId(group.group_id)
       setGroupName('')
       setGroupDescription('')
-      setShowCreateGroupForm(false)
       toast.success(t('Created'))
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : t('Create failed'))
@@ -164,268 +188,411 @@ export function ToAPIsAvatarAssetsDialog(
     }
   }
 
-  const handleCreateAsset = async () => {
-    const url = sourceUrl.trim()
+  const handleUploadAsset = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
     if (!selectedGroupId) {
       toast.error(t('Please create or select an avatar asset group first.'))
       return
     }
-    if (!isHTTPURL(url)) {
-      toast.error(t('Please enter a valid HTTP URL'))
+    if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
+      toast.error(
+        t('File is too large (max {{size}})', {
+          size: `${Math.round(MAX_IMAGE_UPLOAD_BYTES / 1024 / 1024)} MB`,
+        })
+      )
       return
     }
-    setIsCreatingAsset(true)
+
+    setIsUploadingAsset(true)
     try {
+      const uploadedUrl = await uploadReferenceMedia(file, 'image')
       const asset = await createToAPIsAvatarAsset({
         group_id: selectedGroupId,
-        source_url: url,
-        name: assetName.trim() || undefined,
+        source_url: uploadedUrl,
+        name: file.name.replace(/\.[^.]+$/, ''),
       })
-      setAssets((prev) => [asset, ...prev])
-      setAssetName('')
-      setSourceUrl('')
-      toast.success(t('Created'))
+      setAllAssets((prev) => [
+        asset,
+        ...prev.filter((item) => item.asset_id !== asset.asset_id),
+      ])
+      toast.success(t('Upload complete'))
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : t('Create failed'))
+      toast.error(error instanceof Error ? error.message : t('Upload failed'))
     } finally {
-      setIsCreatingAsset(false)
+      setIsUploadingAsset(false)
     }
   }
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true)
+  const handleRefreshAssets = async () => {
+    if (!selectedGroupId) return
+    setIsRefreshingAssets(true)
     try {
-      setAssets(await refreshToAPIsAvatarAssets(selectedGroupId))
+      const nextAssets = await refreshToAPIsAvatarAssets(selectedGroupId)
+      setAllAssets((prev) => [
+        ...nextAssets,
+        ...prev.filter((asset) => asset.group_id !== selectedGroupId),
+      ])
       toast.success(t('Refreshed'))
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : t('Refresh failed'))
     } finally {
-      setIsRefreshing(false)
+      setIsRefreshingAssets(false)
     }
   }
 
-  const selectableAssets = assets.filter((asset) => asset.asset_type === 'image')
+  const handleDeleteGroup = async (
+    group: ToAPIsAvatarGroup,
+    event: MouseEvent<HTMLButtonElement>
+  ) => {
+    event.stopPropagation()
+    if (!window.confirm(t('Delete this avatar asset group?'))) return
 
-  let assetsContent = (
-    <div className='text-muted-foreground flex min-h-28 items-center justify-center rounded-md border text-sm'>
-      {t('No avatar assets')}
-    </div>
-  )
-  if (isLoading && selectableAssets.length === 0) {
-    assetsContent = (
-      <div className='text-muted-foreground flex min-h-28 items-center justify-center gap-2 rounded-md border text-sm'>
-        <Loader2Icon className='animate-spin' size={16} />
-        {t('Loading')}
-      </div>
-    )
-  } else if (selectableAssets.length > 0) {
-    assetsContent = (
-      <div className='grid max-h-80 gap-2 overflow-y-auto'>
-        {selectableAssets.map((asset) => {
-          const referenceValue = `asset://${asset.asset_id}`
-          const isActive = asset.status === 'active'
-          const isSelected = selectedSet.has(referenceValue)
-          const canUse = isActive && !isSelected && !limitReached
-          return (
-            <div
-              key={asset.asset_id}
-              className='grid gap-3 rounded-md border p-2 sm:grid-cols-[64px_1fr_auto]'
-            >
-              <div className='bg-muted flex size-16 items-center justify-center overflow-hidden rounded-md'>
-                {asset.source_url ? (
-                  <img
-                    src={asset.source_url}
-                    alt={asset.name || asset.asset_id}
-                    className='size-full object-cover'
-                  />
-                ) : (
-                  <UserRoundIcon
-                    className='text-muted-foreground'
-                    size={22}
-                  />
-                )}
-              </div>
-              <div className='min-w-0 space-y-1'>
-                <div className='flex items-center gap-2'>
-                  <span className='truncate text-sm font-medium'>
-                    {asset.name || asset.asset_id}
-                  </span>
-                  <Badge variant='outline'>{asset.status}</Badge>
-                </div>
-                <p className='text-muted-foreground truncate text-xs'>
-                  {asset.asset_id}
-                </p>
-                <p
-                  className='text-muted-foreground truncate text-xs'
-                  title={asset.source_url}
-                >
-                  {asset.source_url}
-                </p>
-              </div>
-              <Button
-                type='button'
-                variant={isSelected ? 'secondary' : 'default'}
-                size='sm'
-                disabled={!canUse}
-                onClick={() => props.onSelect(referenceValue)}
-              >
-                {isSelected && <CheckIcon size={14} />}
-                {isSelected ? t('Added') : t('Use')}
-              </Button>
-            </div>
-          )
-        })}
-      </div>
-    )
+    setDeletingGroupId(group.group_id)
+    try {
+      await deleteToAPIsAvatarGroup(group.group_id)
+      const nextGroups = groups.filter((item) => item.group_id !== group.group_id)
+      setGroups(nextGroups)
+      setAllAssets((prev) =>
+        prev.filter((asset) => asset.group_id !== group.group_id)
+      )
+      if (selectedGroupId === group.group_id) {
+        setSelectedGroupId(nextGroups[0]?.group_id ?? '')
+      }
+      toast.success(t('Deleted'))
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : t('Delete failed'))
+    } finally {
+      setDeletingGroupId('')
+    }
+  }
+
+  const handleDeleteAsset = async (
+    asset: ToAPIsAvatarAsset,
+    event: MouseEvent<HTMLButtonElement>
+  ) => {
+    event.stopPropagation()
+    if (!window.confirm(t('Delete this avatar asset?'))) return
+
+    setDeletingAssetId(asset.asset_id)
+    try {
+      await deleteToAPIsAvatarAsset(asset.asset_id)
+      setAllAssets((prev) =>
+        prev.filter((item) => item.asset_id !== asset.asset_id)
+      )
+      toast.success(t('Deleted'))
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : t('Delete failed'))
+    } finally {
+      setDeletingAssetId('')
+    }
+  }
+
+  const handleSelectAsset = (asset: ToAPIsAvatarAsset) => {
+    const referenceValue = `asset://${asset.asset_id}`
+    if (asset.status !== 'active' || selectedSet.has(referenceValue)) return
+    if (limitReached) {
+      toast.error(t('Reference image limit reached'))
+      return
+    }
+    props.onSelect(referenceValue)
   }
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className='max-h-[calc(100vh-2rem)] overflow-hidden sm:max-w-2xl'>
-        <DialogHeader>
-          <DialogTitle>{t('Select avatar asset')}</DialogTitle>
-          <DialogDescription>
+      <DialogContent className='max-h-[calc(100vh-2rem)] overflow-hidden border-[#2b3039] bg-[#151922] p-8 text-zinc-100 shadow-2xl sm:max-w-[1264px]'>
+        <DialogHeader className='gap-2 pr-8'>
+          <DialogTitle className='text-2xl font-semibold text-zinc-100'>
+            {t('Virtual avatar asset library')}
+          </DialogTitle>
+          <DialogDescription className='text-base text-zinc-400'>
             {t(
-              'Use active ToAPIs private avatar image assets as reference images.'
+              'Uploaded assets can be reused in the Seedance-2 playground for the current account.'
             )}
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-4 overflow-y-auto pr-1'>
-          <div className='space-y-2 rounded-md border p-3'>
-            <div className='flex flex-wrap items-center justify-between gap-2'>
-              <Label>{t('Avatar asset group')}</Label>
-              <div className='flex flex-wrap items-center gap-2'>
-                {!showCreateGroupForm && (
-                  <Button
-                    type='button'
-                    variant='outline'
-                    size='sm'
-                    disabled={isCreatingGroup}
-                    onClick={() => setShowCreateGroupForm(true)}
-                  >
-                    <PlusIcon size={14} />
-                    {t('Create asset group')}
-                  </Button>
+        <div className='grid min-h-0 gap-5 overflow-hidden pt-10 lg:grid-cols-[380px_1fr]'>
+          <aside className='flex min-h-0 flex-col rounded-3xl border border-[#303541] bg-[#191e27] p-5'>
+            <div className='space-y-3'>
+              <h3 className='text-lg font-semibold text-zinc-100'>
+                {t('Create asset group')}
+              </h3>
+              <Input
+                value={groupName}
+                onChange={(event) => setGroupName(event.target.value)}
+                placeholder={t('Enter asset group name')}
+                disabled={isCreatingGroup}
+                className='h-12 rounded-2xl border-[#303541] bg-[#10151d] px-4 text-base text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-orange-500/40'
+              />
+              <Textarea
+                value={groupDescription}
+                onChange={(event) => setGroupDescription(event.target.value)}
+                placeholder={t('Enter asset group description, optional')}
+                disabled={isCreatingGroup}
+                className='min-h-28 rounded-2xl border-[#303541] bg-[#10151d] px-4 py-3 text-base text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-orange-500/40'
+              />
+              <Button
+                type='button'
+                disabled={isCreatingGroup || !groupName.trim()}
+                onClick={handleCreateGroup}
+                className='h-12 rounded-2xl bg-orange-400 px-6 text-base font-semibold text-white hover:bg-orange-500'
+              >
+                {isCreatingGroup ? (
+                  <Loader2Icon className='animate-spin' size={17} />
+                ) : null}
+                {t('Create asset group')}
+              </Button>
+            </div>
+
+            <div className='mt-8 flex min-h-0 flex-1 flex-col'>
+              <div className='mb-4 flex items-center justify-between gap-2'>
+                <h3 className='text-lg font-semibold text-zinc-100'>
+                  {t('Asset group history')}
+                </h3>
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  disabled={isLoading}
+                  onClick={loadLibrary}
+                  aria-label={t('Refresh')}
+                  className='size-8 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'
+                >
+                  {isLoading ? (
+                    <Loader2Icon className='animate-spin' size={18} />
+                  ) : (
+                    <RefreshCwIcon size={18} />
+                  )}
+                </Button>
+              </div>
+
+              <div className='min-h-0 flex-1 space-y-3 overflow-y-auto pr-1'>
+                {groups.length === 0 && (
+                  <div className='flex min-h-28 items-center justify-center rounded-2xl border border-dashed border-[#303541] text-sm text-zinc-500'>
+                    {isLoading ? t('Loading') : t('No avatar asset groups')}
+                  </div>
                 )}
+                {groups.map((group) => {
+                  const count = countsByGroupId.get(group.group_id) ?? {
+                    available: 0,
+                    total: 0,
+                  }
+                  const selected = group.group_id === selectedGroupId
+                  return (
+                    <div
+                      key={group.group_id}
+                      role='button'
+                      tabIndex={0}
+                      className={cn(
+                        'grid min-h-20 cursor-pointer grid-cols-[1fr_auto] items-center gap-3 rounded-3xl border px-5 py-4 outline-none transition-colors',
+                        selected
+                          ? 'border-orange-500/70 bg-orange-500/10'
+                          : 'border-[#303541] bg-[#10151d] hover:border-zinc-500'
+                      )}
+                      onClick={() => setSelectedGroupId(group.group_id)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          setSelectedGroupId(group.group_id)
+                        }
+                      }}
+                    >
+                      <div className='min-w-0 space-y-1'>
+                        <p className='truncate text-base font-semibold text-zinc-100'>
+                          {group.name || group.group_id}
+                        </p>
+                        <p className='text-sm text-zinc-400'>
+                          {t('{{available}}/{{total}} available', count)}
+                        </p>
+                      </div>
+                      <div className='flex items-center gap-2'>
+                        <UserRoundIcon size={18} className='text-zinc-400' />
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='icon'
+                          disabled={deletingGroupId === group.group_id}
+                          onClick={(event) => handleDeleteGroup(group, event)}
+                          aria-label={t('Delete')}
+                          className='size-8 text-zinc-400 hover:bg-zinc-800 hover:text-red-300'
+                        >
+                          {deletingGroupId === group.group_id ? (
+                            <Loader2Icon className='animate-spin' size={16} />
+                          ) : (
+                            <Trash2Icon size={16} />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </aside>
+
+          <section className='flex min-h-[560px] min-w-0 flex-col rounded-3xl border border-[#303541] bg-[#10151d] p-5'>
+            <div className='flex flex-wrap items-start justify-between gap-4'>
+              <div className='min-w-0'>
+                <h3 className='truncate text-lg font-semibold text-zinc-100'>
+                  {selectedGroup?.name || t('Select group')}
+                </h3>
+                {selectedGroup && (
+                  <p className='mt-1 truncate text-sm text-zinc-400'>
+                    {selectedGroup.description || selectedGroup.group_id}
+                  </p>
+                )}
+              </div>
+              <div className='flex items-center gap-2'>
                 <Button
                   type='button'
                   variant='outline'
-                  size='sm'
-                  disabled={!selectedGroupId || isRefreshing || isLoading}
-                  onClick={handleRefresh}
+                  disabled={!selectedGroupId || isUploadingAsset}
+                  onClick={() => uploadInputRef.current?.click()}
+                  className='h-12 rounded-2xl border-[#303541] bg-transparent px-5 text-base font-semibold text-zinc-100 hover:bg-zinc-800 hover:text-zinc-100'
                 >
-                  {isRefreshing ? (
-                    <Loader2Icon className='animate-spin' size={14} />
+                  {isUploadingAsset ? (
+                    <Loader2Icon className='animate-spin' size={18} />
                   ) : (
-                    <RefreshCwIcon size={14} />
+                    <UploadIcon size={18} />
                   )}
-                  {t('Refresh')}
+                  {t('Upload image')}
                 </Button>
-              </div>
-            </div>
-            <Select
-              value={selectedGroupId}
-              onValueChange={(value) => setSelectedGroupId(value ?? '')}
-              disabled={groups.length === 0 || isLoading}
-            >
-              <SelectTrigger className='w-full'>
-                <SelectValue placeholder={t('Select group')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {groups.map((group) => (
-                    <SelectItem key={group.group_id} value={group.group_id}>
-                      {group.name || group.group_id}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            {showCreateGroupForm && (
-              <div className='grid gap-2 sm:grid-cols-[1fr_1fr_auto]'>
-                <Input
-                  value={groupName}
-                  onChange={(event) => setGroupName(event.target.value)}
-                  placeholder={t('Group name')}
-                  disabled={isCreatingGroup}
-                />
-                <Input
-                  value={groupDescription}
-                  onChange={(event) => setGroupDescription(event.target.value)}
-                  placeholder={t('Group description (optional)')}
-                  disabled={isCreatingGroup}
-                />
                 <Button
                   type='button'
-                  disabled={isCreatingGroup || !groupName.trim()}
-                  onClick={handleCreateGroup}
+                  variant='outline'
+                  size='icon'
+                  disabled={!selectedGroupId || isRefreshingAssets}
+                  onClick={handleRefreshAssets}
+                  aria-label={t('Refresh')}
+                  className='size-12 rounded-2xl border-[#303541] bg-transparent text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'
                 >
-                  {isCreatingGroup ? (
-                    <Loader2Icon className='animate-spin' size={14} />
+                  {isRefreshingAssets ? (
+                    <Loader2Icon className='animate-spin' size={18} />
                   ) : (
-                    <PlusIcon size={14} />
+                    <RefreshCwIcon size={18} />
                   )}
-                  {t('Add avatar asset group')}
                 </Button>
-              </div>
-            )}
-          </div>
-
-          {selectedGroupId && (
-            <div className='space-y-2 rounded-md border p-3'>
-              <Label>{t('New avatar asset')}</Label>
-              <div className='grid gap-2 sm:grid-cols-[0.8fr_1fr_auto]'>
-                <Input
-                  value={assetName}
-                  onChange={(event) => setAssetName(event.target.value)}
-                  placeholder={t('Asset name (optional)')}
-                  disabled={isCreatingAsset}
+                <input
+                  ref={uploadInputRef}
+                  type='file'
+                  accept='image/*'
+                  className='hidden'
+                  onChange={handleUploadAsset}
                 />
-                <Input
-                  value={sourceUrl}
-                  onChange={(event) => setSourceUrl(event.target.value)}
-                  placeholder={t('Public image URL')}
-                  disabled={isCreatingAsset}
-                />
-                <Button
-                  type='button'
-                  disabled={isCreatingAsset || !sourceUrl.trim()}
-                  onClick={handleCreateAsset}
-                >
-                  {isCreatingAsset ? (
-                    <Loader2Icon className='animate-spin' size={14} />
-                  ) : (
-                    <PlusIcon size={14} />
-                  )}
-                  {t('Add asset')}
-                </Button>
               </div>
             </div>
-          )}
 
-          <div className='space-y-2'>
-            <div className='flex items-center justify-between gap-2'>
-              <Label>{t('Avatar assets')}</Label>
-              {limitReached && (
-                <span className='text-muted-foreground text-xs'>
-                  {t('Reference image limit reached')}
-                </span>
+            <div className='mt-6 min-h-0 flex-1 overflow-y-auto pr-1'>
+              {!selectedGroupId && (
+                <div className='flex h-full min-h-64 items-center justify-center rounded-2xl border border-dashed border-[#303541] text-sm text-zinc-500'>
+                  {t('Please create or select an avatar asset group first.')}
+                </div>
+              )}
+              {selectedGroupId && selectedGroupAssets.length === 0 && (
+                <div className='flex h-full min-h-64 items-center justify-center rounded-2xl border border-dashed border-[#303541] text-sm text-zinc-500'>
+                  {isLoading ? t('Loading') : t('No avatar assets')}
+                </div>
+              )}
+              {selectedGroupAssets.length > 0 && (
+                <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'>
+                  {selectedGroupAssets.map((asset) => {
+                    const referenceValue = `asset://${asset.asset_id}`
+                    const isActive = asset.status === 'active'
+                    const isSelected = selectedSet.has(referenceValue)
+                    const canUse = isActive && !isSelected && !limitReached
+                    return (
+                      <div
+                        key={asset.asset_id}
+                        role='button'
+                        tabIndex={isActive ? 0 : -1}
+                        aria-disabled={!canUse}
+                        className={cn(
+                          'group overflow-hidden rounded-3xl border bg-[#151922] text-left outline-none transition-colors',
+                          isSelected
+                            ? 'border-orange-500/80'
+                            : 'border-[#303541] hover:border-zinc-500',
+                          canUse ? 'cursor-pointer' : 'cursor-default'
+                        )}
+                        onClick={() => handleSelectAsset(asset)}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') return
+                          event.preventDefault()
+                          handleSelectAsset(asset)
+                        }}
+                      >
+                        <div className='relative aspect-square overflow-hidden bg-[#0d1118]'>
+                          {asset.source_url ? (
+                            <img
+                              src={asset.source_url}
+                              alt={asset.name || asset.asset_id}
+                              className='size-full object-cover'
+                            />
+                          ) : (
+                            <div className='flex size-full items-center justify-center'>
+                              <ImageIcon className='text-zinc-600' size={34} />
+                            </div>
+                          )}
+                          <Badge className='absolute top-3 left-3 rounded-md bg-zinc-950/70 text-zinc-100 hover:bg-zinc-950/70'>
+                            {t('Virtual avatar asset')}
+                          </Badge>
+                          {isSelected && (
+                            <div className='absolute top-3 right-3 flex size-8 items-center justify-center rounded-full bg-orange-500 text-white'>
+                              <CheckIcon size={18} />
+                            </div>
+                          )}
+                        </div>
+                        <div className='space-y-1 px-4 py-3'>
+                          <div className='flex items-center gap-2'>
+                            <p className='min-w-0 flex-1 truncate text-base font-semibold text-zinc-100'>
+                              {asset.name || asset.asset_id}
+                            </p>
+                            <Button
+                              type='button'
+                              variant='ghost'
+                              size='icon'
+                              disabled={deletingAssetId === asset.asset_id}
+                              onClick={(event) => handleDeleteAsset(asset, event)}
+                              aria-label={t('Delete')}
+                              className='size-8 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-red-300'
+                            >
+                              {deletingAssetId === asset.asset_id ? (
+                                <Loader2Icon
+                                  className='animate-spin'
+                                  size={16}
+                                />
+                              ) : (
+                                <Trash2Icon size={16} />
+                              )}
+                            </Button>
+                          </div>
+                          <p className='text-sm text-zinc-400'>
+                            {formatAvatarAssetStatus(asset.status, t)}
+                          </p>
+                          <p className='truncate text-sm text-zinc-400'>
+                            {t('Reusable under the current account')}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               )}
             </div>
-            {assetsContent}
-          </div>
+          </section>
         </div>
       </DialogContent>
     </Dialog>
   )
 }
 
-function isHTTPURL(value: string): boolean {
-  try {
-    const url = new URL(value)
-    return url.protocol === 'http:' || url.protocol === 'https:'
-  } catch {
-    return false
-  }
+function formatAvatarAssetStatus(
+  status: string,
+  t: (key: string) => string
+): string {
+  if (status === 'active') return t('Available')
+  if (status === 'processing') return t('Processing')
+  if (status === 'failed') return t('Failed')
+  return status
 }
