@@ -245,7 +245,7 @@ export function Footer(props: FooterProps) {
               </span>
             </Link>
             <p className='text-muted-foreground mt-6 max-w-xs text-sm leading-7'>
-              {t('Built for unified AI model access, billing, and operations.')}
+              {t('One Token, All AI')}
             </p>
             {demoSiteEnabled && (
               <div className='text-brand mt-5 text-xs font-semibold tracking-wide'>

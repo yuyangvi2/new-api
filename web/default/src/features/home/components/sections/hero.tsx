@@ -39,16 +39,16 @@ interface HeroProps {
 
 const HERO_SLIDES = [
   {
-    eyebrow: 'Video',
-    title: 'Seedance 2.5',
+    eyebrow: 'Flagship',
+    title: 'GPT 5.6',
     description:
-      'A long-form video generation model for cinematic stories and product shots.',
+      'The latest flagship family with stronger reasoning, coding, and agentic workflows.',
     primary: 'View model',
-    secondary: 'Coming soon',
+    secondary: 'API docs',
     href: '/market',
     tone: 'from-orange-100 via-amber-50 to-stone-100',
     backgroundImage: '/images/hero/tokone-hero-slide-1.webp',
-    tags: ['Seedance 2.5', '99.9% SLA', '50+ AI models', '5min migration'],
+    tags: ['GPT 5.6 Sol', 'GPT 5.6 Terra', 'GPT 5.6 Luna'],
   },
   {
     eyebrow: 'Reasoning',
@@ -64,15 +64,15 @@ const HERO_SLIDES = [
   },
   {
     eyebrow: 'Creative',
-    title: 'GPT Image Studio',
+    title: 'Grok 4.5',
     description:
-      'High quality image generation and editing through one unified API.',
+      'Fast multimodal understanding and generation with real-time knowledge, through one unified API.',
     primary: 'View model',
     secondary: 'Pricing',
     href: '/market',
     tone: 'from-fuchsia-100 via-rose-50 to-stone-100',
     backgroundImage: '/images/hero/tokone-hero-slide-3.webp',
-    tags: ['Text to Image', 'Image edit', 'Batch tasks', 'Stable routing'],
+    tags: ['Multimodal', 'Real-time knowledge', 'Vision', 'Stable routing'],
   },
   {
     eyebrow: 'Model Access',
@@ -300,7 +300,9 @@ export function Hero(props: HeroProps) {
             <div className='bg-border h-px flex-1' />
           </div>
           <p className='text-muted-foreground mx-auto mt-3 max-w-3xl text-xs leading-6'>
-            {t('Moonshot, MiniMax, Kling, Vidu, Grok, Doubao and Qwen')}
+            {t(
+              'Zhipu GLM, Moonshot, MiMo, MiniMax, Kling, Vidu, Grok, Doubao and Qwen'
+            )}
           </p>
         </div>
       </div>

@@ -198,7 +198,7 @@ function MarketModelCard(props: { model: MarketModel }) {
 }
 
 function MarketSidebar(props: {
-  vendors: Array<{ name: string; count: number }>
+  vendors: Array<{ name: string; count: number; icon?: string }>
   tasks: Array<{ name: string; count: number }>
   activeTask: string
   activeVendor: string
@@ -264,12 +264,17 @@ function MarketSidebar(props: {
                 type='button'
                 onClick={() => props.onVendorChange(vendor.name)}
                 className={cn(
-                  'rounded-xl border px-3 py-1.5 text-xs transition-colors',
+                  'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs transition-colors',
                   props.activeVendor === vendor.name
                     ? 'bg-foreground text-background'
                     : 'bg-background text-muted-foreground hover:text-foreground'
                 )}
               >
+                {vendor.icon ? (
+                  <span className='flex size-4 shrink-0 items-center justify-center'>
+                    {getLobeIcon(vendor.icon, 16)}
+                  </span>
+                ) : null}
                 {vendor.name} ({vendor.count})
               </button>
             ))}
@@ -303,7 +308,7 @@ export function Market() {
   }, [pricing.models])
 
   const marketSummary = useMemo(() => {
-    const counts = new Map<string, number>()
+    const vendorInfo = new Map<string, { count: number; icon?: string }>()
     const taskCounts = new Map<string, number>(TASKS.map((task) => [task, 0]))
     const kindCounts = new Map<MarketKind, number>(
       MODEL_TYPES.map((item) => [item.value, 0])
@@ -311,7 +316,11 @@ export function Market() {
 
     for (const model of models) {
       if (model.vendor_name) {
-        counts.set(model.vendor_name, (counts.get(model.vendor_name) ?? 0) + 1)
+        const existing = vendorInfo.get(model.vendor_name)
+        vendorInfo.set(model.vendor_name, {
+          count: (existing?.count ?? 0) + 1,
+          icon: existing?.icon || model.vendor_icon || model.icon,
+        })
       }
       kindCounts.set(
         model.marketKind,
@@ -325,7 +334,11 @@ export function Market() {
     }
 
     return {
-      vendors: [...counts.entries()].map(([name, count]) => ({ name, count })),
+      vendors: [...vendorInfo.entries()].map(([name, info]) => ({
+        name,
+        count: info.count,
+        icon: info.icon,
+      })),
       tasks: TASKS.map((task) => ({
         name: task,
         count: taskCounts.get(task) ?? 0,
