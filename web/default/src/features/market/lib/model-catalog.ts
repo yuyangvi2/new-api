@@ -117,6 +117,11 @@ export function splitTags(tags?: string): string[] {
 }
 
 export function inferKind(model: PricingModel): MarketKind {
+  const modelType = Number(model.model_type)
+  if (modelType === 3) return 'video'
+  if (modelType === 2) return 'image'
+  if (modelType === 4) return 'audio'
+
   const values = [
     ...(model.input_modalities ?? []),
     ...(model.output_modalities ?? []),
@@ -127,9 +132,55 @@ export function inferKind(model: PricingModel): MarketKind {
     .join(' ')
     .toLowerCase()
 
-  if (values.includes('video')) return 'video'
-  if (values.includes('audio')) return 'audio'
-  if (values.includes('image') || values.includes('vision')) return 'image'
+  if (
+    [
+      'video',
+      'openai-video',
+      'seedance',
+      'kling',
+      'sora',
+      'veo',
+      'vidu',
+      'hailuo',
+      'wan2',
+      'wan-2',
+      'wanx2',
+      'wanx-2',
+      'dreamina',
+    ].some((term) => values.includes(term))
+  ) {
+    return 'video'
+  }
+  if (
+    ['audio', 'speech', 'whisper', 'tts', 'stt', 'suno', 'music', 'voice'].some(
+      (term) => values.includes(term)
+    )
+  ) {
+    return 'audio'
+  }
+  if (
+    [
+      'image',
+      'images',
+      'image-generation',
+      'vision',
+      'dall-e',
+      'dalle',
+      'gpt-image',
+      'flux',
+      'midjourney',
+      'jimeng',
+      'nano-banana',
+      'stable-diffusion',
+      'sdxl',
+      'ideogram',
+      'recraft',
+      'kolors',
+      'imagen',
+    ].some((term) => values.includes(term))
+  ) {
+    return 'image'
+  }
   return 'text'
 }
 

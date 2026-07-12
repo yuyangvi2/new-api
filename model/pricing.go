@@ -22,6 +22,7 @@ type Pricing struct {
 	Tags                   string                  `json:"tags,omitempty"`
 	VendorID               int                     `json:"vendor_id,omitempty"`
 	QuotaType              int                     `json:"quota_type"`
+	ModelType              int                     `json:"model_type"`
 	ModelRatio             float64                 `json:"model_ratio"`
 	ModelPrice             float64                 `json:"model_price"`
 	OwnerBy                string                  `json:"owner_by"`
@@ -37,6 +38,13 @@ type Pricing struct {
 	BillingExpr            string                  `json:"billing_expr,omitempty"`
 	PricingVersion         string                  `json:"pricing_version,omitempty"`
 }
+
+const (
+	pricingModelTypeText = iota + 1
+	pricingModelTypeImage
+	pricingModelTypeVideo
+	pricingModelTypeAudio
+)
 
 type PricingVendor struct {
 	ID          int    `json:"id"`
@@ -189,6 +197,7 @@ func updatePricing() {
 	}
 
 	modelGroupsMap := make(map[string]*types.Set[string])
+	modelChannelTypes := make(map[string][]int)
 
 	for _, ability := range enableAbilities {
 		groups, ok := modelGroupsMap[ability.Model]
@@ -197,6 +206,9 @@ func updatePricing() {
 			modelGroupsMap[ability.Model] = groups
 		}
 		groups.Add(ability.Group)
+		if !containsInt(modelChannelTypes[ability.Model], ability.ChannelType) {
+			modelChannelTypes[ability.Model] = append(modelChannelTypes[ability.Model], ability.ChannelType)
+		}
 	}
 
 	//这里使用切片而不是Set，因为一个模型可能支持多个端点类型，并且第一个端点是优先使用端点
@@ -291,6 +303,7 @@ func updatePricing() {
 			ModelName:              model,
 			EnableGroup:            groups.Items(),
 			SupportedEndpointTypes: modelSupportEndpointTypes[model],
+			ModelType:              pricingModelTypeText,
 		}
 
 		// 补充模型元数据（描述、标签、供应商、状态）
@@ -337,6 +350,7 @@ func updatePricing() {
 				pricing.BillingExpr = expr
 			}
 		}
+		pricing.ModelType = inferPricingModelType(model, pricing.Tags, modelChannelTypes[model], pricing.SupportedEndpointTypes, pricing.ImageRatio != nil, pricing.AudioRatio != nil || pricing.AudioCompletionRatio != nil)
 		pricingMap = append(pricingMap, pricing)
 	}
 
@@ -356,6 +370,78 @@ func updatePricing() {
 	modelEnableGroupsLock.Unlock()
 
 	lastGetPricingTime = time.Now()
+}
+
+func inferPricingModelType(modelName string, tags string, channelTypes []int, endpoints []constant.EndpointType, hasImageRatio bool, hasAudioRatio bool) int {
+	signalParts := []string{modelName, tags}
+	for _, endpoint := range endpoints {
+		signalParts = append(signalParts, string(endpoint))
+	}
+	signal := strings.ToLower(strings.Join(signalParts, " "))
+
+	for _, channelType := range channelTypes {
+		switch channelType {
+		case constant.ChannelTypeKling,
+			constant.ChannelTypeVidu,
+			constant.ChannelTypeDoubaoVideo,
+			constant.ChannelTypeSora,
+			constant.ChannelTypeVCLM,
+			constant.ChannelTypeToAPIs:
+			return pricingModelTypeVideo
+		}
+	}
+	if containsPricingSignal(signal, []string{
+		"video", "openai-video", "seedance", "seeddream-video", "kling", "sora",
+		"veo", "vidu", "hailuo", "wan2", "wan-2", "wanx2", "wanx-2",
+		"dreamina", "runway", "pika", "luma", "ltx-video",
+	}) {
+		return pricingModelTypeVideo
+	}
+
+	for _, channelType := range channelTypes {
+		if channelType == constant.ChannelTypeSunoAPI {
+			return pricingModelTypeAudio
+		}
+	}
+	if hasAudioRatio || containsPricingSignal(signal, []string{
+		"audio", "speech", "whisper", "tts", "stt", "suno", "music", "voice",
+	}) {
+		return pricingModelTypeAudio
+	}
+
+	for _, channelType := range channelTypes {
+		switch channelType {
+		case constant.ChannelTypeJimeng, constant.ChannelTypeAIArt:
+			return pricingModelTypeImage
+		}
+	}
+	if hasImageRatio || containsPricingSignal(signal, []string{
+		"image", "images", "image-generation", "dall-e", "dalle", "gpt-image",
+		"flux", "midjourney", "jimeng", "nano-banana", "stable-diffusion",
+		"sdxl", "ideogram", "recraft", "kolors", "imagen",
+	}) {
+		return pricingModelTypeImage
+	}
+
+	return pricingModelTypeText
+}
+
+func containsPricingSignal(signal string, terms []string) bool {
+	for _, term := range terms {
+		if strings.Contains(signal, term) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsInt(values []int, target int) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 // GetSupportedEndpointMap 返回全局端点到路径的映射
