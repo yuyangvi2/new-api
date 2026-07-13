@@ -116,20 +116,65 @@ export function splitTags(tags?: string): string[] {
     .filter(Boolean)
 }
 
-export function inferKind(model: PricingModel): MarketKind {
+export function inferKind(model: MarketModel): MarketKind {
+  if (model.marketKind) return model.marketKind
+
+  const modelType = Number(model.model_type)
+  if (modelType === 3) return 'video'
+  if (modelType === 2) return 'image'
+  if (modelType === 4) return 'audio'
+
+  const endpoints = (model.supported_endpoint_types ?? []).map((item) =>
+    item.toLowerCase()
+  )
+  const inputModalities = (model.input_modalities ?? []).map((item) =>
+    item.toLowerCase()
+  )
+  const outputModalities = (model.output_modalities ?? []).map((item) =>
+    item.toLowerCase()
+  )
   const values = [
-    ...(model.input_modalities ?? []),
-    ...(model.output_modalities ?? []),
-    ...(model.supported_endpoint_types ?? []),
-    model.tags ?? '',
+    ...endpoints,
+    ...inputModalities,
+    ...outputModalities,
+    ...splitTags(model.tags),
     model.model_name,
   ]
     .join(' ')
     .toLowerCase()
 
-  if (values.includes('video')) return 'video'
-  if (values.includes('audio')) return 'audio'
-  if (values.includes('image') || values.includes('vision')) return 'image'
+  if (
+    endpoints.includes('openai-video') ||
+    outputModalities.includes('video') ||
+    values.includes('video')
+  ) {
+    return 'video'
+  }
+
+  if (
+    outputModalities.includes('audio') ||
+    values.includes('audio') ||
+    values.includes('tts') ||
+    values.includes('stt') ||
+    values.includes('whisper') ||
+    values.includes('speech')
+  ) {
+    return 'audio'
+  }
+
+  if (
+    endpoints.includes('image-generation') ||
+    outputModalities.includes('image') ||
+    values.includes('text to image') ||
+    values.includes('text-to-image') ||
+    values.includes('image generation') ||
+    values.includes('gpt-image') ||
+    values.includes('dall') ||
+    values.includes('midjourney')
+  ) {
+    return 'image'
+  }
+
   return 'text'
 }
 
