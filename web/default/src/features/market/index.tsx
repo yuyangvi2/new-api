@@ -24,6 +24,7 @@ import {
   useState,
   type ComponentType,
   type MouseEvent,
+  type ReactNode,
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -34,7 +35,14 @@ import { Input } from '@/components/ui/input'
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
+import { DEFAULT_TOKEN_UNIT } from '../pricing/constants'
+import {
+  getDynamicDisplayGroupRatio,
+  getDynamicPricingSummary,
+} from '../pricing/lib/dynamic-price'
 import { usePricingData } from '../pricing/hooks/use-pricing-data'
+import { isTokenBasedModel } from '../pricing/lib/model-helpers'
+import { formatPrice, formatRequestPrice } from '../pricing/lib/price'
 import {
   FALLBACK_MODELS,
   inferKind,
@@ -55,7 +63,20 @@ const MODEL_TYPES: Array<{
   { value: 'audio', label: 'Audio', icon: Music2 },
 ]
 
-const TASKS = ['Chat', 'Text to Image', 'Image to Video', 'Image edit', 'Audio']
+const TASKS = [
+  'Chat',
+  'Text to Image',
+  'Image to Video',
+  'Image edit',
+  'Audio',
+]
+const CHAT_ENDPOINTS = new Set([
+  'openai',
+  'openai-response',
+  'openai-response-compact',
+  'anthropic',
+  'gemini',
+])
 
 type IndexedMarketModel = MarketModel & {
   marketKind: MarketKind
@@ -79,12 +100,63 @@ function modelMatchesTask(model: IndexedMarketModel, task: string): boolean {
   if (task === 'all') return true
 
   const normalizedTask = task.toLowerCase()
+  const endpoints = model.supported_endpoint_types ?? []
+  const endpointSet = new Set(
+    endpoints.map((endpoint) => endpoint.toLowerCase())
+  )
+  const inputModalities = model.input_modalities ?? []
+  const outputModalities = model.output_modalities ?? []
+
+  if (task === 'Chat') {
+    if (
+      endpoints.some((endpoint) =>
+        CHAT_ENDPOINTS.has(endpoint.toLowerCase())
+      )
+    ) {
+      return model.marketKind === 'text' || !endpointSet.has('image-generation')
+    }
+    return model.marketKind === 'text' || model.searchText.includes('chat')
+  }
+
+  if (task === 'Text to Image') {
+    return (
+      endpointSet.has('image-generation') ||
+      (inputModalities.includes('text') &&
+        outputModalities.includes('image')) ||
+      model.searchText.includes('text to image') ||
+      model.searchText.includes('text-to-image')
+    )
+  }
+
+  if (task === 'Image to Video') {
+    return (
+      (inputModalities.includes('image') &&
+        outputModalities.includes('video')) ||
+      model.searchText.includes('image to video') ||
+      model.searchText.includes('image-to-video') ||
+      model.searchText.includes('i2v')
+    )
+  }
+
+  if (task === 'Image edit') {
+    return (
+      model.searchText.includes('image edit') ||
+      model.searchText.includes('image-edit') ||
+      model.searchText.includes('edit image') ||
+      model.searchText.includes('image variation')
+    )
+  }
+
   if (model.marketKind === normalizedTask) return true
 
   return model.searchText.includes(normalizedTask)
 }
 
-function MarketModelCard(props: { model: MarketModel }) {
+function MarketModelCard(props: {
+  model: MarketModel
+  priceRate: number
+  usdExchangeRate: number
+}) {
   const { t } = useTranslation()
   const model = props.model
   const vendor = model.vendor_name || t('Unknown provider')
@@ -95,14 +167,78 @@ function MarketModelCard(props: { model: MarketModel }) {
   const modelIconKey = model.icon || model.vendor_icon
   const modelIcon = modelIconKey ? getLobeIcon(modelIconKey, 28) : null
   const initial = model.model_name?.charAt(0).toUpperCase() || '?'
-  const price =
-    model.quota_type === 1
-      ? t('{{amount}} credits', {
-          amount: model.model_price ?? model.model_ratio,
-        })
-      : t('{{amount}} credits/M', {
-          amount: Math.round(model.model_ratio * 100),
-        })
+  const isDynamicPricing =
+    model.billing_mode === 'tiered_expr' && Boolean(model.billing_expr)
+  const dynamicSummary = isDynamicPricing
+    ? getDynamicPricingSummary(model, {
+        tokenUnit: DEFAULT_TOKEN_UNIT,
+        showRechargePrice: false,
+        priceRate: props.priceRate,
+        usdExchangeRate: props.usdExchangeRate,
+        groupRatioMultiplier: getDynamicDisplayGroupRatio(model),
+      })
+    : null
+
+  let priceSummary: ReactNode
+  if (dynamicSummary?.isSpecialExpression) {
+    priceSummary = t('Special billing expression')
+  } else if (dynamicSummary && dynamicSummary.primaryEntries.length > 0) {
+    priceSummary = dynamicSummary.primaryEntries.map((entry) => (
+      <span key={entry.key} className='whitespace-nowrap'>
+        {t(entry.shortLabel)}{' '}
+        <span className='font-mono font-semibold'>{entry.formatted}</span>/1M
+      </span>
+    ))
+  } else if (dynamicSummary) {
+    priceSummary = t('Dynamic Pricing')
+  } else if (isTokenBasedModel(model)) {
+    priceSummary = (
+      <>
+        <span className='whitespace-nowrap'>
+          {t('Input')}{' '}
+          <span className='font-mono font-semibold'>
+            {formatPrice(
+              model,
+              'input',
+              DEFAULT_TOKEN_UNIT,
+              false,
+              props.priceRate,
+              props.usdExchangeRate
+            )}
+          </span>
+          /1M
+        </span>
+        <span className='whitespace-nowrap'>
+          {t('Output')}{' '}
+          <span className='font-mono font-semibold'>
+            {formatPrice(
+              model,
+              'output',
+              DEFAULT_TOKEN_UNIT,
+              false,
+              props.priceRate,
+              props.usdExchangeRate
+            )}
+          </span>
+          /1M
+        </span>
+      </>
+    )
+  } else {
+    priceSummary = (
+      <span className='whitespace-nowrap'>
+        <span className='font-mono font-semibold'>
+          {formatRequestPrice(
+            model,
+            false,
+            props.priceRate,
+            props.usdExchangeRate
+          )}
+        </span>{' '}
+        / {t('request')}
+      </span>
+    )
+  }
 
   const handleCopy = async (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation()
@@ -158,9 +294,9 @@ function MarketModelCard(props: { model: MarketModel }) {
             </div>
             <p className='text-muted-foreground mt-1 text-xs'>{vendor}</p>
           </div>
-          <Badge variant='secondary' className='h-6 rounded-full'>
-            {price}
-          </Badge>
+          <div className='bg-muted text-muted-foreground flex max-w-[52%] shrink-0 flex-wrap justify-end gap-x-2 gap-y-0.5 rounded-lg px-2.5 py-1 text-right text-[11px] leading-5'>
+            {priceSummary}
+          </div>
         </div>
         <p className='text-muted-foreground line-clamp-2 min-h-10 text-xs leading-5'>
           {model.description || t('No description available.')}
@@ -471,7 +607,12 @@ export function Market() {
 
             <div className='mt-4 grid gap-5 md:grid-cols-2 xl:grid-cols-3'>
               {filteredModels.map((model) => (
-                <MarketModelCard key={model.model_name} model={model} />
+                <MarketModelCard
+                  key={model.model_name}
+                  model={model}
+                  priceRate={pricing.priceRate}
+                  usdExchangeRate={pricing.usdExchangeRate}
+                />
               ))}
             </div>
 

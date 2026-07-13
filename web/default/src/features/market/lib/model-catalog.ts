@@ -116,23 +116,36 @@ export function splitTags(tags?: string): string[] {
     .filter(Boolean)
 }
 
-export function inferKind(model: PricingModel): MarketKind {
+export function inferKind(model: MarketModel): MarketKind {
+  if (model.marketKind) return model.marketKind
+
   const modelType = Number(model.model_type)
   if (modelType === 3) return 'video'
   if (modelType === 2) return 'image'
   if (modelType === 4) return 'audio'
 
+  const endpoints = (model.supported_endpoint_types ?? []).map((item) =>
+    item.toLowerCase()
+  )
+  const inputModalities = (model.input_modalities ?? []).map((item) =>
+    item.toLowerCase()
+  )
+  const outputModalities = (model.output_modalities ?? []).map((item) =>
+    item.toLowerCase()
+  )
   const values = [
-    ...(model.input_modalities ?? []),
-    ...(model.output_modalities ?? []),
-    ...(model.supported_endpoint_types ?? []),
-    model.tags ?? '',
+    ...endpoints,
+    ...inputModalities,
+    ...outputModalities,
+    ...splitTags(model.tags),
     model.model_name,
   ]
     .join(' ')
     .toLowerCase()
 
   if (
+    endpoints.includes('openai-video') ||
+    outputModalities.includes('video') ||
     [
       'video',
       'openai-video',
@@ -152,6 +165,7 @@ export function inferKind(model: PricingModel): MarketKind {
     return 'video'
   }
   if (
+    outputModalities.includes('audio') ||
     ['audio', 'speech', 'whisper', 'tts', 'stt', 'suno', 'music', 'voice'].some(
       (term) => values.includes(term)
     )
@@ -159,6 +173,8 @@ export function inferKind(model: PricingModel): MarketKind {
     return 'audio'
   }
   if (
+    endpoints.includes('image-generation') ||
+    outputModalities.includes('image') ||
     [
       'image',
       'images',
