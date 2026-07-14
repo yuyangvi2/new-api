@@ -38,7 +38,7 @@ func TestBuildOfficialAlipayPaymentPutsCharsetInGatewayQuery(t *testing.T) {
 	gateway, params, err := buildOfficialAlipayPayment(
 		officialPaymentOrder{
 			tradeNo: "USR1NOabc123",
-			name:    "TUC100",
+			name:    "Tokone充值",
 			money:   10,
 		},
 		"https://cn.tokone.ai",
@@ -54,6 +54,10 @@ func TestBuildOfficialAlipayPaymentPutsCharsetInGatewayQuery(t *testing.T) {
 	assert.Equal(t, "https://cn.tokone.ai/api/official/alipay/notify", params["notify_url"])
 	assert.Equal(t, "https://cn.tokone.ai/wallet", params["return_url"])
 	assert.NotEmpty(t, params["sign"])
+
+	bizContent := map[string]any{}
+	require.NoError(t, common.Unmarshal([]byte(params["biz_content"]), &bizContent))
+	assert.Equal(t, "Tokone充值", bizContent["subject"])
 }
 
 func TestOfficialPaymentAddressUsesForwardedOrigin(t *testing.T) {

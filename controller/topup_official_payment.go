@@ -93,7 +93,7 @@ func requestOfficialTopUpPay(c *gin.Context, req EpayRequest, userId int, payMon
 	tradeNo := fmt.Sprintf("USR%dNO%s%d", userId, common.GetRandomString(6), time.Now().Unix())
 	order := officialPaymentOrder{
 		tradeNo: tradeNo,
-		name:    fmt.Sprintf("TUC%d", req.Amount),
+		name:    "Tokone充值",
 		money:   payMoney,
 	}
 	topUp := &model.TopUp{
