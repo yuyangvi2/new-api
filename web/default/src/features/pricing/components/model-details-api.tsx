@@ -39,7 +39,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useStatus } from '@/hooks/use-status'
-import { getServerAddress } from '@/lib/server-address'
+import { getApiBaseAddress } from '@/lib/server-address'
 
 import {
   buildRateLimits,
@@ -449,7 +449,7 @@ function CodeSamplesSection(props: {
   const { status } = useStatus()
 
   const baseUrl = useMemo(() => {
-    return getServerAddress(status, 'https://api.example.com')
+    return getApiBaseAddress(status, 'https://api.example.com')
   }, [status])
 
   const endpoints = useMemo(() => {

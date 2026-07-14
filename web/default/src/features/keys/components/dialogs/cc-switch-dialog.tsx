@@ -27,7 +27,7 @@ import { ComboboxInput } from '@/components/ui/combobox-input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { getUserModels } from '@/lib/api'
-import { getServerAddress } from '@/lib/server-address'
+import { getApiBaseAddress } from '@/lib/server-address'
 
 const APP_CONFIGS = {
   claude: {
@@ -60,7 +60,7 @@ function buildCCSwitchURL(
   models: Record<string, string>,
   apiKey: string
 ): string {
-  const serverAddress = getServerAddress()
+  const serverAddress = getApiBaseAddress()
   const endpoint = app === 'codex' ? serverAddress + '/v1' : serverAddress
   const params = new URLSearchParams()
   params.set('resource', 'provider')

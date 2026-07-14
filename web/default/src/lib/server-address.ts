@@ -52,6 +52,37 @@ function readServerAddressFromStatus(status: StatusLike): string | undefined {
   )
 }
 
+function readApiBaseAddressFromValue(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined
+
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue
+    const url = (item as Record<string, unknown>).url
+    const normalized = normalizeServerAddress(url)
+    if (normalized) return normalized
+  }
+
+  return undefined
+}
+
+function readApiBaseAddressFromStatus(status: StatusLike): string | undefined {
+  if (!status) return undefined
+
+  const record = status as Record<string, unknown>
+  const data = record.data as Record<string, unknown> | undefined
+
+  if (record.api_info_enabled === false || data?.api_info_enabled === false) {
+    return undefined
+  }
+
+  return (
+    readApiBaseAddressFromValue(record.api_info) ??
+    readApiBaseAddressFromValue(record.apiInfo) ??
+    readApiBaseAddressFromValue(data?.api_info) ??
+    readApiBaseAddressFromValue(data?.apiInfo)
+  )
+}
+
 function readStoredStatus(): StatusLike {
   if (typeof window === 'undefined') return undefined
 
@@ -78,4 +109,17 @@ export function getServerAddress(
   if (typeof window !== 'undefined') return window.location.origin
 
   return ''
+}
+
+export function getApiBaseAddress(
+  status?: StatusLike,
+  fallback = ''
+): string {
+  const fromStatus = readApiBaseAddressFromStatus(status)
+  if (fromStatus) return fromStatus
+
+  const fromStorage = readApiBaseAddressFromStatus(readStoredStatus())
+  if (fromStorage) return fromStorage
+
+  return getServerAddress(status, fallback)
 }
