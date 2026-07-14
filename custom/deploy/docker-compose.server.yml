@@ -23,6 +23,8 @@ services:
       - ERROR_LOG_ENABLED=true
       - BATCH_UPDATE_ENABLED=true
       - SESSION_SECRET=${SESSION_SECRET}   # 多实例/重启保持会话，务必改成随机串
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
+      - SESSION_COOKIE_TRUSTED_URL=${SESSION_COOKIE_TRUSTED_URL:-https://www.tokone.ai}
       - NODE_NAME=newapi-node-1
     depends_on:
       - redis
