@@ -88,3 +88,15 @@ func TestOfficialPaymentCallbackAddressPrefersExplicitSetting(t *testing.T) {
 
 	assert.Equal(t, "https://callback.example.com", officialPaymentCallbackAddress(c))
 }
+
+func TestAlipaySignContentIncludesSignType(t *testing.T) {
+	content := alipaySignContent(map[string]string{
+		"app_id":    "2021006158665022",
+		"method":    "alipay.trade.page.pay",
+		"charset":   "utf-8",
+		"sign_type": "RSA2",
+		"sign":      "ignored",
+	})
+
+	assert.Equal(t, "app_id=2021006158665022&charset=utf-8&method=alipay.trade.page.pay&sign_type=RSA2", content)
+}

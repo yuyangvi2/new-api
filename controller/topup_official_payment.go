@@ -533,7 +533,7 @@ func verifyAlipayParams(params map[string]string) bool {
 func alipaySignContent(params map[string]string) string {
 	keys := make([]string, 0, len(params))
 	for key, value := range params {
-		if key == "sign" || key == "sign_type" || value == "" {
+		if key == "sign" || value == "" {
 			continue
 		}
 		keys = append(keys, key)
