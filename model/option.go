@@ -82,6 +82,16 @@ func InitOptionMap() {
 	common.OptionMap["CustomCallbackAddress"] = ""
 	common.OptionMap["EpayId"] = ""
 	common.OptionMap["EpayKey"] = ""
+	common.OptionMap["OfficialAlipayAppID"] = setting.OfficialAlipayAppID
+	common.OptionMap["OfficialAlipayPrivateKey"] = setting.OfficialAlipayPrivateKey
+	common.OptionMap["OfficialAlipayPublicKey"] = setting.OfficialAlipayPublicKey
+	common.OptionMap["OfficialAlipayGateway"] = setting.OfficialAlipayGateway
+	common.OptionMap["OfficialWeChatPayAppID"] = setting.OfficialWeChatPayAppID
+	common.OptionMap["OfficialWeChatPayMchID"] = setting.OfficialWeChatPayMchID
+	common.OptionMap["OfficialWeChatPayMchSerialNo"] = setting.OfficialWeChatPayMchSerialNo
+	common.OptionMap["OfficialWeChatPayAPIv3Key"] = setting.OfficialWeChatPayAPIv3Key
+	common.OptionMap["OfficialWeChatPayPrivateKey"] = setting.OfficialWeChatPayPrivateKey
+	common.OptionMap["OfficialWeChatPayPlatformPublicKey"] = setting.OfficialWeChatPayPlatformPublicKey
 	common.OptionMap["Price"] = strconv.FormatFloat(operation_setting.Price, 'f', -1, 64)
 	common.OptionMap["USDExchangeRate"] = strconv.FormatFloat(operation_setting.USDExchangeRate, 'f', -1, 64)
 	common.OptionMap["MinTopUp"] = strconv.Itoa(operation_setting.MinTopUp)
@@ -404,6 +414,26 @@ func updateOptionMap(key string, value string) (err error) {
 		operation_setting.EpayId = value
 	case "EpayKey":
 		operation_setting.EpayKey = value
+	case "OfficialAlipayAppID":
+		setting.OfficialAlipayAppID = value
+	case "OfficialAlipayPrivateKey":
+		setting.OfficialAlipayPrivateKey = value
+	case "OfficialAlipayPublicKey":
+		setting.OfficialAlipayPublicKey = value
+	case "OfficialAlipayGateway":
+		setting.OfficialAlipayGateway = value
+	case "OfficialWeChatPayAppID":
+		setting.OfficialWeChatPayAppID = value
+	case "OfficialWeChatPayMchID":
+		setting.OfficialWeChatPayMchID = value
+	case "OfficialWeChatPayMchSerialNo":
+		setting.OfficialWeChatPayMchSerialNo = value
+	case "OfficialWeChatPayAPIv3Key":
+		setting.OfficialWeChatPayAPIv3Key = value
+	case "OfficialWeChatPayPrivateKey":
+		setting.OfficialWeChatPayPrivateKey = value
+	case "OfficialWeChatPayPlatformPublicKey":
+		setting.OfficialWeChatPayPlatformPublicKey = value
 	case "Price":
 		operation_setting.Price, _ = strconv.ParseFloat(value, 64)
 	case "USDExchangeRate":

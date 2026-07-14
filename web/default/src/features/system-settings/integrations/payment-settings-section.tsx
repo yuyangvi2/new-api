@@ -102,6 +102,20 @@ const paymentSchema = z.object({
   }, 'Provide a valid callback URL starting with http:// or https://'),
   EpayId: z.string(),
   EpayKey: z.string(),
+  OfficialAlipayAppID: z.string(),
+  OfficialAlipayPrivateKey: z.string(),
+  OfficialAlipayPublicKey: z.string(),
+  OfficialAlipayGateway: z.string().refine((value) => {
+    const trimmed = value.trim()
+    if (!trimmed) return true
+    return /^https?:\/\//.test(trimmed)
+  }, 'Provide a valid gateway URL starting with http:// or https://'),
+  OfficialWeChatPayAppID: z.string(),
+  OfficialWeChatPayMchID: z.string(),
+  OfficialWeChatPayMchSerialNo: z.string(),
+  OfficialWeChatPayAPIv3Key: z.string(),
+  OfficialWeChatPayPrivateKey: z.string(),
+  OfficialWeChatPayPlatformPublicKey: z.string(),
   Price: z.coerce.number().min(0),
   MinTopUp: z.coerce.number().min(0),
   CustomCallbackAddress: z
@@ -421,6 +435,19 @@ export function PaymentSettingsSection({
       PayAddress: removeTrailingSlash(values.PayAddress),
       EpayId: values.EpayId.trim(),
       EpayKey: values.EpayKey.trim(),
+      OfficialAlipayAppID: values.OfficialAlipayAppID.trim(),
+      OfficialAlipayPrivateKey: values.OfficialAlipayPrivateKey.trim(),
+      OfficialAlipayPublicKey: values.OfficialAlipayPublicKey.trim(),
+      OfficialAlipayGateway:
+        removeTrailingSlash(values.OfficialAlipayGateway) ||
+        'https://openapi.alipay.com/gateway.do',
+      OfficialWeChatPayAppID: values.OfficialWeChatPayAppID.trim(),
+      OfficialWeChatPayMchID: values.OfficialWeChatPayMchID.trim(),
+      OfficialWeChatPayMchSerialNo: values.OfficialWeChatPayMchSerialNo.trim(),
+      OfficialWeChatPayAPIv3Key: values.OfficialWeChatPayAPIv3Key.trim(),
+      OfficialWeChatPayPrivateKey: values.OfficialWeChatPayPrivateKey.trim(),
+      OfficialWeChatPayPlatformPublicKey:
+        values.OfficialWeChatPayPlatformPublicKey.trim(),
       Price: values.Price,
       MinTopUp: values.MinTopUp,
       CustomCallbackAddress: removeTrailingSlash(values.CustomCallbackAddress),
@@ -463,6 +490,24 @@ export function PaymentSettingsSection({
       PayAddress: removeTrailingSlash(initialRef.current.PayAddress),
       EpayId: initialRef.current.EpayId.trim(),
       EpayKey: initialRef.current.EpayKey.trim(),
+      OfficialAlipayAppID: initialRef.current.OfficialAlipayAppID.trim(),
+      OfficialAlipayPrivateKey:
+        initialRef.current.OfficialAlipayPrivateKey.trim(),
+      OfficialAlipayPublicKey:
+        initialRef.current.OfficialAlipayPublicKey.trim(),
+      OfficialAlipayGateway:
+        removeTrailingSlash(initialRef.current.OfficialAlipayGateway) ||
+        'https://openapi.alipay.com/gateway.do',
+      OfficialWeChatPayAppID: initialRef.current.OfficialWeChatPayAppID.trim(),
+      OfficialWeChatPayMchID: initialRef.current.OfficialWeChatPayMchID.trim(),
+      OfficialWeChatPayMchSerialNo:
+        initialRef.current.OfficialWeChatPayMchSerialNo.trim(),
+      OfficialWeChatPayAPIv3Key:
+        initialRef.current.OfficialWeChatPayAPIv3Key.trim(),
+      OfficialWeChatPayPrivateKey:
+        initialRef.current.OfficialWeChatPayPrivateKey.trim(),
+      OfficialWeChatPayPlatformPublicKey:
+        initialRef.current.OfficialWeChatPayPlatformPublicKey.trim(),
       Price: initialRef.current.Price,
       MinTopUp: initialRef.current.MinTopUp,
       CustomCallbackAddress: removeTrailingSlash(
@@ -518,6 +563,92 @@ export function PaymentSettingsSection({
 
     if (sanitized.EpayKey && sanitized.EpayKey !== initial.EpayKey) {
       updates.push({ key: 'EpayKey', value: sanitized.EpayKey })
+    }
+
+    if (sanitized.OfficialAlipayAppID !== initial.OfficialAlipayAppID) {
+      updates.push({
+        key: 'OfficialAlipayAppID',
+        value: sanitized.OfficialAlipayAppID,
+      })
+    }
+
+    if (
+      sanitized.OfficialAlipayPrivateKey &&
+      sanitized.OfficialAlipayPrivateKey !== initial.OfficialAlipayPrivateKey
+    ) {
+      updates.push({
+        key: 'OfficialAlipayPrivateKey',
+        value: sanitized.OfficialAlipayPrivateKey,
+      })
+    }
+
+    if (sanitized.OfficialAlipayPublicKey !== initial.OfficialAlipayPublicKey) {
+      updates.push({
+        key: 'OfficialAlipayPublicKey',
+        value: sanitized.OfficialAlipayPublicKey,
+      })
+    }
+
+    if (sanitized.OfficialAlipayGateway !== initial.OfficialAlipayGateway) {
+      updates.push({
+        key: 'OfficialAlipayGateway',
+        value: sanitized.OfficialAlipayGateway,
+      })
+    }
+
+    if (sanitized.OfficialWeChatPayAppID !== initial.OfficialWeChatPayAppID) {
+      updates.push({
+        key: 'OfficialWeChatPayAppID',
+        value: sanitized.OfficialWeChatPayAppID,
+      })
+    }
+
+    if (sanitized.OfficialWeChatPayMchID !== initial.OfficialWeChatPayMchID) {
+      updates.push({
+        key: 'OfficialWeChatPayMchID',
+        value: sanitized.OfficialWeChatPayMchID,
+      })
+    }
+
+    if (
+      sanitized.OfficialWeChatPayMchSerialNo !==
+      initial.OfficialWeChatPayMchSerialNo
+    ) {
+      updates.push({
+        key: 'OfficialWeChatPayMchSerialNo',
+        value: sanitized.OfficialWeChatPayMchSerialNo,
+      })
+    }
+
+    if (
+      sanitized.OfficialWeChatPayAPIv3Key &&
+      sanitized.OfficialWeChatPayAPIv3Key !== initial.OfficialWeChatPayAPIv3Key
+    ) {
+      updates.push({
+        key: 'OfficialWeChatPayAPIv3Key',
+        value: sanitized.OfficialWeChatPayAPIv3Key,
+      })
+    }
+
+    if (
+      sanitized.OfficialWeChatPayPrivateKey &&
+      sanitized.OfficialWeChatPayPrivateKey !==
+        initial.OfficialWeChatPayPrivateKey
+    ) {
+      updates.push({
+        key: 'OfficialWeChatPayPrivateKey',
+        value: sanitized.OfficialWeChatPayPrivateKey,
+      })
+    }
+
+    if (
+      sanitized.OfficialWeChatPayPlatformPublicKey !==
+      initial.OfficialWeChatPayPlatformPublicKey
+    ) {
+      updates.push({
+        key: 'OfficialWeChatPayPlatformPublicKey',
+        value: sanitized.OfficialWeChatPayPlatformPublicKey,
+      })
     }
 
     if (sanitized.Price !== initial.Price) {
@@ -877,9 +1008,11 @@ export function PaymentSettingsSection({
           />
           <Tabs defaultValue='general' className='min-w-0'>
             <div className='overflow-x-auto pb-1'>
-              <TabsList className='grid min-w-[44rem] grid-cols-6'>
+              <TabsList className='grid min-w-[58rem] grid-cols-8'>
                 <TabsTrigger value='general'>{t('General')}</TabsTrigger>
                 <TabsTrigger value='epay'>Epay</TabsTrigger>
+                <TabsTrigger value='alipay'>{t('Alipay')}</TabsTrigger>
+                <TabsTrigger value='wechat-pay'>{t('WeChat Pay')}</TabsTrigger>
                 <TabsTrigger value='stripe'>{t('Stripe')}</TabsTrigger>
                 <TabsTrigger value='creem'>Creem</TabsTrigger>
                 <TabsTrigger value='waffo-pancake'>Waffo Pancake</TabsTrigger>
@@ -1238,6 +1371,275 @@ export function PaymentSettingsSection({
                     )}
                   />
                 </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value='alipay' className={paymentTabContentClassName}>
+              <div className='space-y-4'>
+                <div>
+                  <h3 className='text-lg font-medium'>
+                    {t('Official Alipay')}
+                  </h3>
+                  <p className='text-muted-foreground text-sm'>
+                    {t(
+                      'Direct Alipay Open Platform integration for official merchant accounts'
+                    )}
+                  </p>
+                </div>
+
+                <div className='grid gap-6 md:grid-cols-2'>
+                  <FormField
+                    control={form.control}
+                    name='OfficialAlipayAppID'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Alipay App ID')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            autoComplete='off'
+                            {...field}
+                            onChange={(event) =>
+                              field.onChange(event.target.value)
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='OfficialAlipayGateway'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Alipay gateway')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='https://openapi.alipay.com/gateway.do'
+                            {...field}
+                            onChange={(event) =>
+                              field.onChange(event.target.value)
+                            }
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Use the production OpenAPI gateway unless you are testing in the Alipay sandbox.'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name='OfficialAlipayPrivateKey'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {t('Alipay application private key')}
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          rows={5}
+                          placeholder={t('Enter new key to update')}
+                          {...field}
+                          onChange={(event) =>
+                            field.onChange(event.target.value)
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t('Leave blank unless rotating the secret')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='OfficialAlipayPublicKey'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Alipay public key')}</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          rows={5}
+                          {...field}
+                          onChange={(event) =>
+                            field.onChange(event.target.value)
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t('Used to verify Alipay payment callbacks.')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent
+              value='wechat-pay'
+              className={paymentTabContentClassName}
+            >
+              <div className='space-y-4'>
+                <div>
+                  <h3 className='text-lg font-medium'>{t('WeChat Pay')}</h3>
+                  <p className='text-muted-foreground text-sm'>
+                    {t(
+                      'Direct WeChat Pay API v3 Native payment integration for official merchant accounts'
+                    )}
+                  </p>
+                </div>
+
+                <div className='grid gap-6 md:grid-cols-2'>
+                  <FormField
+                    control={form.control}
+                    name='OfficialWeChatPayAppID'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('WeChat Pay App ID')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            autoComplete='off'
+                            {...field}
+                            onChange={(event) =>
+                              field.onChange(event.target.value)
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='OfficialWeChatPayMchID'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('WeChat Pay merchant ID')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            autoComplete='off'
+                            {...field}
+                            onChange={(event) =>
+                              field.onChange(event.target.value)
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className='grid gap-6 md:grid-cols-2'>
+                  <FormField
+                    control={form.control}
+                    name='OfficialWeChatPayMchSerialNo'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t('WeChat Pay merchant certificate serial number')}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            autoComplete='off'
+                            {...field}
+                            onChange={(event) =>
+                              field.onChange(event.target.value)
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='OfficialWeChatPayAPIv3Key'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('WeChat Pay API v3 key')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type='password'
+                            placeholder={t('Enter new key to update')}
+                            autoComplete='new-password'
+                            {...field}
+                            onChange={(event) =>
+                              field.onChange(event.target.value)
+                            }
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t('Leave blank unless rotating the secret')}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name='OfficialWeChatPayPrivateKey'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {t('WeChat Pay merchant private key')}
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          rows={5}
+                          placeholder={t('Enter new key to update')}
+                          {...field}
+                          onChange={(event) =>
+                            field.onChange(event.target.value)
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t('Leave blank unless rotating the secret')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='OfficialWeChatPayPlatformPublicKey'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {t('WeChat Pay platform public key')}
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          rows={5}
+                          {...field}
+                          onChange={(event) =>
+                            field.onChange(event.target.value)
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t('Used to verify WeChat Pay payment callbacks.')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </TabsContent>
 

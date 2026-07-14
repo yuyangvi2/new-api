@@ -96,7 +96,7 @@ func isEpayTopUpEnabled() bool {
 	if !isPaymentComplianceConfirmed() {
 		return false
 	}
-	return isEpayWebhookConfigured() && len(operation_setting.PayMethods) > 0
+	return len(availableStandardPayMethods(operation_setting.PayMethods)) > 0
 }
 
 func isEpayWebhookConfigured() bool {
@@ -106,5 +106,24 @@ func isEpayWebhookConfigured() bool {
 }
 
 func isEpayWebhookEnabled() bool {
-	return isEpayTopUpEnabled()
+	return isPaymentComplianceConfirmed() && isEpayWebhookConfigured() && len(operation_setting.PayMethods) > 0
+}
+
+func isOfficialPaymentConfigured() bool {
+	return isOfficialAlipayConfigured() || isOfficialWeChatPayConfigured()
+}
+
+func isOfficialAlipayConfigured() bool {
+	return strings.TrimSpace(setting.OfficialAlipayAppID) != "" &&
+		strings.TrimSpace(setting.OfficialAlipayPrivateKey) != "" &&
+		strings.TrimSpace(setting.OfficialAlipayPublicKey) != ""
+}
+
+func isOfficialWeChatPayConfigured() bool {
+	return strings.TrimSpace(setting.OfficialWeChatPayAppID) != "" &&
+		strings.TrimSpace(setting.OfficialWeChatPayMchID) != "" &&
+		strings.TrimSpace(setting.OfficialWeChatPayMchSerialNo) != "" &&
+		strings.TrimSpace(setting.OfficialWeChatPayAPIv3Key) != "" &&
+		strings.TrimSpace(setting.OfficialWeChatPayPrivateKey) != "" &&
+		strings.TrimSpace(setting.OfficialWeChatPayPlatformPublicKey) != ""
 }

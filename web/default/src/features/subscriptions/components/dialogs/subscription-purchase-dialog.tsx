@@ -215,6 +215,10 @@ export function SubscriptionPurchaseDialog(props: Props) {
         document.body.removeChild(form)
         toast.success(t('Payment initiated'))
         props.onOpenChange(false)
+      } else if (res.message === 'success' && res.data?.pay_link) {
+        window.open(res.data.pay_link, '_blank')
+        toast.success(t('Payment initiated'))
+        props.onOpenChange(false)
       } else {
         toast.error(
           res.message && res.message !== 'success'
@@ -405,12 +409,10 @@ export function SubscriptionPurchaseDialog(props: Props) {
             {hasEpay && (
               <div className='grid grid-cols-[minmax(0,1fr)_auto] gap-2'>
                 <Select
-                  items={[
-                    ...(props.epayMethods || []).map((m) => ({
-                      value: m.type,
-                      label: m.name || m.type,
-                    })),
-                  ]}
+                  items={(props.epayMethods || []).map((m) => ({
+                    value: m.type,
+                    label: m.name || m.type,
+                  }))}
                   value={selectedEpayMethod}
                   onValueChange={(v) => v !== null && setSelectedEpayMethod(v)}
                   disabled={limitReached}

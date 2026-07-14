@@ -25,20 +25,24 @@ type TopUp struct {
 }
 
 const (
-	PaymentMethodStripe       = "stripe"
-	PaymentMethodCreem        = "creem"
-	PaymentMethodWaffo        = "waffo"
-	PaymentMethodWaffoPancake = "waffo_pancake"
-	PaymentMethodBalance      = "balance"
+	PaymentMethodStripe         = "stripe"
+	PaymentMethodCreem          = "creem"
+	PaymentMethodWaffo          = "waffo"
+	PaymentMethodWaffoPancake   = "waffo_pancake"
+	PaymentMethodBalance        = "balance"
+	PaymentMethodOfficialAlipay = "alipay_official"
+	PaymentMethodOfficialWeChat = "wechat_pay"
 )
 
 const (
-	PaymentProviderEpay         = "epay"
-	PaymentProviderStripe       = "stripe"
-	PaymentProviderCreem        = "creem"
-	PaymentProviderWaffo        = "waffo"
-	PaymentProviderWaffoPancake = "waffo_pancake"
-	PaymentProviderBalance      = "balance"
+	PaymentProviderEpay           = "epay"
+	PaymentProviderStripe         = "stripe"
+	PaymentProviderCreem          = "creem"
+	PaymentProviderWaffo          = "waffo"
+	PaymentProviderWaffoPancake   = "waffo_pancake"
+	PaymentProviderBalance        = "balance"
+	PaymentProviderOfficialAlipay = "official_alipay"
+	PaymentProviderOfficialWeChat = "official_wechat_pay"
 )
 
 var (

@@ -37,6 +37,9 @@ export type RedemptionResponse = ApiResponse<number>
 export type AmountResponse = ApiResponse<string>
 export type PaymentResponse = ApiResponse<Record<string, unknown>> & {
   url?: string
+  data?: Record<string, unknown> & {
+    pay_link?: string
+  }
 }
 export type StripePaymentResponse = ApiResponse<{ pay_link: string }>
 export type AffiliateCodeResponse = ApiResponse<string>
@@ -59,6 +62,9 @@ export type WaffoPancakePaymentResponse = ApiResponse<
     }
   | string
 >
+export type PaymentStatusResponse = ApiResponse<{
+  status: string
+}>
 
 /**
  * Creem product configuration

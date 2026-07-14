@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,6 +29,8 @@ func GetTopUpInfo(c *gin.Context) {
 	payMethods := operation_setting.PayMethods
 	if !complianceConfirmed {
 		payMethods = []map[string]string{}
+	} else {
+		payMethods = availableStandardPayMethods(payMethods)
 	}
 
 	// 如果启用了 Stripe 支付，添加到支付方法列表
@@ -96,7 +99,7 @@ func GetTopUpInfo(c *gin.Context) {
 	}
 
 	data := gin.H{
-		"enable_online_topup":              isEpayTopUpEnabled(),
+		"enable_online_topup":              len(payMethods) > 0,
 		"enable_stripe_topup":              isStripeTopUpEnabled(),
 		"enable_creem_topup":               isCreemTopUpEnabled(),
 		"enable_waffo_topup":               enableWaffo,
@@ -121,6 +124,51 @@ func GetTopUpInfo(c *gin.Context) {
 		"topup_link":              common.TopUpLink,
 	}
 	common.ApiSuccess(c, data)
+}
+
+func availableStandardPayMethods(methods []map[string]string) []map[string]string {
+	out := make([]map[string]string, 0, len(methods)+2)
+	epayConfigured := isEpayWebhookConfigured()
+	officialAlipayConfigured := isOfficialAlipayConfigured()
+	officialWeChatConfigured := isOfficialWeChatPayConfigured()
+	hasOfficialAlipay := false
+	hasOfficialWeChat := false
+	for _, method := range methods {
+		methodType := strings.TrimSpace(method["type"])
+		switch methodType {
+		case model.PaymentMethodOfficialAlipay:
+			if officialAlipayConfigured {
+				out = append(out, method)
+				hasOfficialAlipay = true
+			}
+		case model.PaymentMethodOfficialWeChat:
+			if officialWeChatConfigured {
+				out = append(out, method)
+				hasOfficialWeChat = true
+			}
+		case model.PaymentMethodStripe, model.PaymentMethodWaffo, model.PaymentMethodWaffoPancake, model.PaymentMethodCreem:
+			out = append(out, method)
+		default:
+			if epayConfigured {
+				out = append(out, method)
+			}
+		}
+	}
+	if officialAlipayConfigured && !hasOfficialAlipay {
+		out = append(out, map[string]string{
+			"name": "支付宝官方",
+			"icon": "SiAlipay",
+			"type": model.PaymentMethodOfficialAlipay,
+		})
+	}
+	if officialWeChatConfigured && !hasOfficialWeChat {
+		out = append(out, map[string]string{
+			"name": "微信支付官方",
+			"icon": "SiWechat",
+			"type": model.PaymentMethodOfficialWeChat,
+		})
+	}
+	return out
 }
 
 type EpayRequest struct {
@@ -210,8 +258,12 @@ func RequestEpay(c *gin.Context) {
 		return
 	}
 
-	if !operation_setting.ContainsPayMethod(req.PaymentMethod) {
+	if !containsConfiguredPaymentMethod(req.PaymentMethod) {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "支付方式不存在"})
+		return
+	}
+	if isOfficialPaymentMethod(req.PaymentMethod) {
+		requestOfficialTopUpPay(c, req, id, payMoney)
 		return
 	}
 

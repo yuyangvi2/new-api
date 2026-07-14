@@ -284,6 +284,16 @@ export type BillingSettings = {
   PayAddress: string
   EpayId: string
   EpayKey: string
+  OfficialAlipayAppID: string
+  OfficialAlipayPrivateKey: string
+  OfficialAlipayPublicKey: string
+  OfficialAlipayGateway: string
+  OfficialWeChatPayAppID: string
+  OfficialWeChatPayMchID: string
+  OfficialWeChatPayMchSerialNo: string
+  OfficialWeChatPayAPIv3Key: string
+  OfficialWeChatPayPrivateKey: string
+  OfficialWeChatPayPlatformPublicKey: string
   Price: number
   MinTopUp: number
   CustomCallbackAddress: string

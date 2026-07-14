@@ -20,6 +20,7 @@ import { Route as PricingIndexRouteImport } from './routes/pricing/index'
 import { Route as MarketIndexRouteImport } from './routes/market/index'
 import { Route as AboutIndexRouteImport } from './routes/about/index'
 import { Route as OauthProviderRouteImport } from './routes/oauth/$provider'
+import { Route as ConsoleWechatPayRouteImport } from './routes/console/wechat-pay'
 import { Route as ConsoleTopupRouteImport } from './routes/console/topup'
 import { Route as ConsoleLogRouteImport } from './routes/console/log'
 import { Route as AuthenticatedChat2linkRouteImport } from './routes/_authenticated/chat2link'
@@ -124,6 +125,11 @@ const AboutIndexRoute = AboutIndexRouteImport.update({
 const OauthProviderRoute = OauthProviderRouteImport.update({
   id: '/oauth/$provider',
   path: '/oauth/$provider',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConsoleWechatPayRoute = ConsoleWechatPayRouteImport.update({
+  id: '/console/wechat-pay',
+  path: '/console/wechat-pay',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConsoleTopupRoute = ConsoleTopupRouteImport.update({
@@ -439,6 +445,7 @@ export interface FileRoutesByFullPath {
   '/chat2link': typeof AuthenticatedChat2linkRoute
   '/console/log': typeof ConsoleLogRoute
   '/console/topup': typeof ConsoleTopupRoute
+  '/console/wechat-pay': typeof ConsoleWechatPayRoute
   '/oauth/$provider': typeof OauthProviderRoute
   '/about/': typeof AboutIndexRoute
   '/market/': typeof MarketIndexRoute
@@ -501,6 +508,7 @@ export interface FileRoutesByTo {
   '/chat2link': typeof AuthenticatedChat2linkRoute
   '/console/log': typeof ConsoleLogRoute
   '/console/topup': typeof ConsoleTopupRoute
+  '/console/wechat-pay': typeof ConsoleWechatPayRoute
   '/oauth/$provider': typeof OauthProviderRoute
   '/about': typeof AboutIndexRoute
   '/market': typeof MarketIndexRoute
@@ -567,6 +575,7 @@ export interface FileRoutesById {
   '/_authenticated/chat2link': typeof AuthenticatedChat2linkRoute
   '/console/log': typeof ConsoleLogRoute
   '/console/topup': typeof ConsoleTopupRoute
+  '/console/wechat-pay': typeof ConsoleWechatPayRoute
   '/oauth/$provider': typeof OauthProviderRoute
   '/about/': typeof AboutIndexRoute
   '/market/': typeof MarketIndexRoute
@@ -632,6 +641,7 @@ export interface FileRouteTypes {
     | '/chat2link'
     | '/console/log'
     | '/console/topup'
+    | '/console/wechat-pay'
     | '/oauth/$provider'
     | '/about/'
     | '/market/'
@@ -694,6 +704,7 @@ export interface FileRouteTypes {
     | '/chat2link'
     | '/console/log'
     | '/console/topup'
+    | '/console/wechat-pay'
     | '/oauth/$provider'
     | '/about'
     | '/market'
@@ -759,6 +770,7 @@ export interface FileRouteTypes {
     | '/_authenticated/chat2link'
     | '/console/log'
     | '/console/topup'
+    | '/console/wechat-pay'
     | '/oauth/$provider'
     | '/about/'
     | '/market/'
@@ -816,6 +828,7 @@ export interface RootRouteChildren {
   errors503Route: typeof errors503Route
   ConsoleLogRoute: typeof ConsoleLogRoute
   ConsoleTopupRoute: typeof ConsoleTopupRoute
+  ConsoleWechatPayRoute: typeof ConsoleWechatPayRoute
   OauthProviderRoute: typeof OauthProviderRoute
   AboutIndexRoute: typeof AboutIndexRoute
   MarketIndexRoute: typeof MarketIndexRoute
@@ -903,6 +916,13 @@ declare module '@tanstack/react-router' {
       path: '/oauth/$provider'
       fullPath: '/oauth/$provider'
       preLoaderRoute: typeof OauthProviderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/console/wechat-pay': {
+      id: '/console/wechat-pay'
+      path: '/console/wechat-pay'
+      fullPath: '/console/wechat-pay'
+      preLoaderRoute: typeof ConsoleWechatPayRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/console/topup': {
@@ -1419,6 +1439,7 @@ const rootRouteChildren: RootRouteChildren = {
   errors503Route: errors503Route,
   ConsoleLogRoute: ConsoleLogRoute,
   ConsoleTopupRoute: ConsoleTopupRoute,
+  ConsoleWechatPayRoute: ConsoleWechatPayRoute,
   OauthProviderRoute: OauthProviderRoute,
   AboutIndexRoute: AboutIndexRoute,
   MarketIndexRoute: MarketIndexRoute,
