@@ -96,7 +96,18 @@ func TestAlipaySignContentIncludesSignType(t *testing.T) {
 		"charset":   "utf-8",
 		"sign_type": "RSA2",
 		"sign":      "ignored",
-	})
+	}, true)
 
 	assert.Equal(t, "app_id=2021006158665022&charset=utf-8&method=alipay.trade.page.pay&sign_type=RSA2", content)
+}
+
+func TestAlipayNotifySignContentExcludesSignType(t *testing.T) {
+	content := alipaySignContent(map[string]string{
+		"app_id":    "2021006158665022",
+		"charset":   "utf-8",
+		"sign_type": "RSA2",
+		"sign":      "ignored",
+	}, false)
+
+	assert.Equal(t, "app_id=2021006158665022&charset=utf-8", content)
 }

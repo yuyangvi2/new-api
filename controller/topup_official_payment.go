@@ -265,7 +265,7 @@ func buildOfficialAlipayPayment(order officialPaymentOrder, callbackAddress stri
 	if params["app_id"] == "" {
 		return "", nil, errors.New("OfficialAlipayAppID is not configured")
 	}
-	signature, err := rsaSign(alipaySignContent(params), privateKey)
+	signature, err := rsaSign(alipaySignContent(params, true), privateKey)
 	if err != nil {
 		return "", nil, err
 	}
@@ -526,13 +526,16 @@ func verifyAlipayParams(params map[string]string) bool {
 	if err != nil {
 		return false
 	}
-	digest := sha256.Sum256([]byte(alipaySignContent(params)))
+	digest := sha256.Sum256([]byte(alipaySignContent(params, false)))
 	return rsa.VerifyPKCS1v15(publicKey, crypto.SHA256, digest[:], signBytes) == nil
 }
 
-func alipaySignContent(params map[string]string) string {
+func alipaySignContent(params map[string]string, includeSignType bool) string {
 	keys := make([]string, 0, len(params))
 	for key, value := range params {
+		if key == "sign_type" && !includeSignType {
+			continue
+		}
 		if key == "sign" || value == "" {
 			continue
 		}
