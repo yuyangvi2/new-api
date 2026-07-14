@@ -37,20 +37,15 @@ import {
   getVideoVariantDisplayName,
   isHiddenVideoVariantModel,
 } from './constants'
+import { isVideoGenerationModelName } from './model-classification'
 import { useImageGenerator, useVideoGenerator } from './hooks'
 import type { GeneratorMode, GroupOption, ModelOption } from './types'
 
 const IMAGE_MODEL_RE =
   /dall-e|image|flux|sd|stable|gpt-image|midjourney|ideogram/i
-const VIDEO_MODEL_RE =
-  /kling|jimeng|sora|vidu|cogvideo|video|hailuo|minimax|wan|seedance|runway|luma|pika|veo|i2v|t2v|s2v/i
-const NON_VIDEO_MODEL_RE =
-  /embedding|seedream|seed-|suno|lyrics|music|image|dall-e|gpt-image|flux|stable|midjourney|ideogram/i
 
 function isVideoGenerationModel(model: ModelOption): boolean {
-  const name = model.value
-  if (NON_VIDEO_MODEL_RE.test(name) && !/seedance/i.test(name)) return false
-  return VIDEO_MODEL_RE.test(name)
+  return isVideoGenerationModelName(model.value)
 }
 
 function selectGroupForModel(model: ModelOption, currentGroup: string): string {
