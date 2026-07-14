@@ -16,11 +16,26 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-declare module 'bun:test' {
-  export function describe(name: string, fn: () => void): void
-  export function it(name: string, fn: () => void): void
-  export function expect(value: unknown): {
-    toBe(expected: unknown): void
-    toBeUndefined(): void
-  }
-}
+import { describe, expect, it } from 'bun:test'
+
+import { isVideoGenerationModelName } from './model-classification'
+
+describe('isVideoGenerationModelName', () => {
+  it('does not classify MiniMax text models as video models', () => {
+    const textModels = [
+      'minimax-m2.5',
+      'minimax-m2.5-highspeed',
+      'minimax-m2.7',
+      'minimax-m3',
+    ]
+
+    for (const model of textModels) {
+      expect(isVideoGenerationModelName(model)).toBe(false)
+    }
+  })
+
+  it('keeps known MiniMax video models in the video list', () => {
+    expect(isVideoGenerationModelName('video-01')).toBe(true)
+    expect(isVideoGenerationModelName('I2V-01-Director')).toBe(true)
+  })
+})

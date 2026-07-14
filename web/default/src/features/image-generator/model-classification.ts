@@ -16,11 +16,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-declare module 'bun:test' {
-  export function describe(name: string, fn: () => void): void
-  export function it(name: string, fn: () => void): void
-  export function expect(value: unknown): {
-    toBe(expected: unknown): void
-    toBeUndefined(): void
-  }
+const VIDEO_MODEL_RE =
+  /kling|jimeng|sora|vidu|cogvideo|video|hailuo|wan|seedance|runway|luma|pika|veo|i2v|t2v|s2v/i
+const NON_VIDEO_MODEL_RE =
+  /embedding|seedream|seed-|suno|lyrics|music|image|dall-e|gpt-image|flux|stable|midjourney|ideogram/i
+
+export function isVideoGenerationModelName(model: string): boolean {
+  const name = model.trim()
+
+  if (NON_VIDEO_MODEL_RE.test(name) && !/seedance/i.test(name)) return false
+  return VIDEO_MODEL_RE.test(name)
 }
