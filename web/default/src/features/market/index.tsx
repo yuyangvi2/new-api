@@ -17,9 +17,24 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
-import { Copy, FileText, ImageIcon, Music2, Search, Video } from 'lucide-react'
+import {
+  Brain,
+  ChevronLeft,
+  ChevronRight,
+  Code2,
+  Copy,
+  FileText,
+  ImageIcon,
+  Layers3,
+  MessageSquareText,
+  Music2,
+  Search,
+  Sparkles,
+  Video,
+} from 'lucide-react'
 import {
   useDeferredValue,
+  useEffect,
   useMemo,
   useState,
   type ComponentType,
@@ -31,16 +46,17 @@ import { toast } from 'sonner'
 
 import { PublicLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
 import { DEFAULT_TOKEN_UNIT } from '../pricing/constants'
+import { usePricingData } from '../pricing/hooks/use-pricing-data'
 import {
   getDynamicDisplayGroupRatio,
   getDynamicPricingSummary,
 } from '../pricing/lib/dynamic-price'
-import { usePricingData } from '../pricing/hooks/use-pricing-data'
 import { isTokenBasedModel } from '../pricing/lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '../pricing/lib/price'
 import {
@@ -63,12 +79,82 @@ const MODEL_TYPES: Array<{
   { value: 'audio', label: 'Audio', icon: Music2 },
 ]
 
-const TASKS = [
-  'Chat',
-  'Text to Image',
-  'Image to Video',
-  'Image edit',
-  'Audio',
+const MARKET_PAGE_SIZE = 18
+
+type MarketTask = {
+  value: string
+  label: string
+  kinds: MarketKind[]
+  icon: ComponentType<{ className?: string }>
+}
+
+const TASKS: MarketTask[] = [
+  {
+    value: 'chat',
+    label: 'Chat',
+    kinds: ['text'],
+    icon: MessageSquareText,
+  },
+  {
+    value: 'reasoning',
+    label: 'Reasoning',
+    kinds: ['text'],
+    icon: Brain,
+  },
+  {
+    value: 'coding',
+    label: 'Coding',
+    kinds: ['text'],
+    icon: Code2,
+  },
+  {
+    value: 'long-context',
+    label: 'Long context',
+    kinds: ['text'],
+    icon: FileText,
+  },
+  {
+    value: 'vision',
+    label: 'Vision',
+    kinds: ['text'],
+    icon: ImageIcon,
+  },
+  {
+    value: 'text-to-image',
+    label: 'Text to Image',
+    kinds: ['image'],
+    icon: Sparkles,
+  },
+  {
+    value: 'image-edit',
+    label: 'Image edit',
+    kinds: ['image'],
+    icon: ImageIcon,
+  },
+  {
+    value: 'text-to-video',
+    label: 'Text to Video',
+    kinds: ['video'],
+    icon: Video,
+  },
+  {
+    value: 'image-to-video',
+    label: 'Image to Video',
+    kinds: ['video'],
+    icon: ImageIcon,
+  },
+  {
+    value: 'text-to-speech',
+    label: 'Text to Speech',
+    kinds: ['audio'],
+    icon: Music2,
+  },
+  {
+    value: 'speech-to-text',
+    label: 'Speech to Text',
+    kinds: ['audio'],
+    icon: Music2,
+  },
 ]
 const CHAT_ENDPOINTS = new Set([
   'openai',
@@ -96,60 +182,183 @@ function modelSignals(model: MarketModel): string[] {
   ].filter(Boolean) as string[]
 }
 
+function hasSignal(model: IndexedMarketModel, signals: string[]): boolean {
+  return signals.some((signal) => model.searchText.includes(signal))
+}
+
+function modelHasEndpoint(
+  model: IndexedMarketModel,
+  endpoint: string
+): boolean {
+  return (model.supported_endpoint_types ?? []).some(
+    (item) => item.toLowerCase() === endpoint
+  )
+}
+
+function modelHasModality(
+  model: IndexedMarketModel,
+  direction: 'input' | 'output',
+  modality: string
+): boolean {
+  const values =
+    direction === 'input'
+      ? (model.input_modalities ?? [])
+      : (model.output_modalities ?? [])
+  return values.some((item) => item.toLowerCase() === modality)
+}
+
+function modelIsVision(model: IndexedMarketModel): boolean {
+  return (
+    modelHasModality(model, 'input', 'image') ||
+    modelHasModality(model, 'input', 'video') ||
+    hasSignal(model, ['vision', 'visual', 'multimodal', 'multi-modal', '-vl'])
+  )
+}
+
+function modelIsReasoning(model: IndexedMarketModel): boolean {
+  return (
+    (model.capabilities ?? []).includes('reasoning') ||
+    hasSignal(model, [
+      'reasoning',
+      'reasoner',
+      'thinking',
+      'think',
+      'qwq',
+      'qvq',
+      'r1',
+      'o1',
+      'o3',
+      'o4',
+    ])
+  )
+}
+
+function modelIsCoding(model: IndexedMarketModel): boolean {
+  return hasSignal(model, [
+    'code',
+    'coder',
+    'coding',
+    'codex',
+    'codestral',
+    'devstral',
+    'programming',
+    'software',
+  ])
+}
+
+function modelIsLongContext(model: IndexedMarketModel): boolean {
+  const contextLength = Number(model.context_length ?? 0)
+  return (
+    contextLength >= 128000 ||
+    hasSignal(model, [
+      'long context',
+      'long-context',
+      'long',
+      '128k',
+      '200k',
+      '256k',
+      '1m',
+    ])
+  )
+}
+
+function modelSupportsChat(model: IndexedMarketModel): boolean {
+  if (model.marketKind !== 'text') return false
+  return (model.supported_endpoint_types ?? []).some((endpoint) =>
+    CHAT_ENDPOINTS.has(endpoint.toLowerCase())
+  )
+}
+
 function modelMatchesTask(model: IndexedMarketModel, task: string): boolean {
   if (task === 'all') return true
 
-  const normalizedTask = task.toLowerCase()
-  const endpoints = model.supported_endpoint_types ?? []
-  const endpointSet = new Set(
-    endpoints.map((endpoint) => endpoint.toLowerCase())
-  )
-  const inputModalities = model.input_modalities ?? []
-  const outputModalities = model.output_modalities ?? []
-
-  if (task === 'Chat') {
-    if (
-      endpoints.some((endpoint) =>
-        CHAT_ENDPOINTS.has(endpoint.toLowerCase())
-      )
-    ) {
-      return model.marketKind === 'text' || !endpointSet.has('image-generation')
-    }
-    return model.marketKind === 'text' || model.searchText.includes('chat')
+  if (task === 'chat') {
+    return (
+      modelSupportsChat(model) &&
+      !modelIsReasoning(model) &&
+      !modelIsCoding(model) &&
+      !modelIsLongContext(model) &&
+      !modelIsVision(model)
+    )
   }
 
-  if (task === 'Text to Image') {
+  if (task === 'reasoning') {
+    return model.marketKind === 'text' && modelIsReasoning(model)
+  }
+  if (task === 'coding') {
+    return model.marketKind === 'text' && modelIsCoding(model)
+  }
+  if (task === 'long-context') {
+    return model.marketKind === 'text' && modelIsLongContext(model)
+  }
+  if (task === 'vision') {
+    return model.marketKind === 'text' && modelIsVision(model)
+  }
+
+  if (task === 'text-to-image') {
     return (
-      endpointSet.has('image-generation') ||
-      (inputModalities.includes('text') &&
-        outputModalities.includes('image')) ||
+      modelHasEndpoint(model, 'image-generation') ||
+      (modelHasModality(model, 'input', 'text') &&
+        modelHasModality(model, 'output', 'image')) ||
       model.searchText.includes('text to image') ||
       model.searchText.includes('text-to-image')
     )
   }
 
-  if (task === 'Image to Video') {
+  if (task === 'image-edit') {
     return (
-      (inputModalities.includes('image') &&
-        outputModalities.includes('video')) ||
-      model.searchText.includes('image to video') ||
-      model.searchText.includes('image-to-video') ||
-      model.searchText.includes('i2v')
+      model.marketKind === 'image' &&
+      (model.searchText.includes('image edit') ||
+        model.searchText.includes('image-edit') ||
+        model.searchText.includes('edit image') ||
+        model.searchText.includes('image variation'))
     )
   }
 
-  if (task === 'Image edit') {
+  if (task === 'text-to-video') {
     return (
-      model.searchText.includes('image edit') ||
-      model.searchText.includes('image-edit') ||
-      model.searchText.includes('edit image') ||
-      model.searchText.includes('image variation')
+      model.marketKind === 'video' &&
+      (modelHasEndpoint(model, 'openai-video') ||
+        modelHasModality(model, 'output', 'video') ||
+        model.searchText.includes('text to video') ||
+        model.searchText.includes('text-to-video') ||
+        model.searchText.includes('t2v'))
     )
   }
 
-  if (model.marketKind === normalizedTask) return true
+  if (task === 'image-to-video') {
+    return (
+      model.marketKind === 'video' &&
+      (modelHasModality(model, 'input', 'image') ||
+        model.searchText.includes('image to video') ||
+        model.searchText.includes('image-to-video') ||
+        model.searchText.includes('i2v') ||
+        model.searchText.includes('vision'))
+    )
+  }
 
-  return model.searchText.includes(normalizedTask)
+  if (task === 'text-to-speech') {
+    return (
+      model.marketKind === 'audio' &&
+      (model.searchText.includes('tts') ||
+        model.searchText.includes('text to speech') ||
+        model.searchText.includes('speech synthesis') ||
+        model.searchText.includes('voice'))
+    )
+  }
+
+  if (task === 'speech-to-text') {
+    return (
+      model.marketKind === 'audio' &&
+      (model.searchText.includes('stt') ||
+        model.searchText.includes('speech to text') ||
+        model.searchText.includes('asr') ||
+        model.searchText.includes('transcription') ||
+        model.searchText.includes('whisper'))
+    )
+  }
+
+  return false
 }
 
 function MarketModelCard(props: {
@@ -275,27 +484,30 @@ function MarketModelCard(props: {
         </div>
       </Link>
       <div className='space-y-3 p-4'>
-        <div className='flex items-start justify-between gap-3'>
-          <div className='min-w-0'>
-            <div className='flex items-center gap-2'>
-              <h3 className='truncate text-base font-bold'>
-                <Link to={detailHref} className='hover:text-brand'>
-                  {model.model_name}
-                </Link>
-              </h3>
-              <button
-                type='button'
-                onClick={handleCopy}
-                className='text-muted-foreground hover:text-foreground shrink-0 transition-colors'
-                aria-label={t('Copy model name')}
-              >
-                <Copy className='size-3.5' />
-              </button>
-            </div>
-            <p className='text-muted-foreground mt-1 text-xs'>{vendor}</p>
+        <div className='min-w-0'>
+          <div className='flex min-w-0 items-center gap-2'>
+            <h3 className='min-w-0 truncate font-mono text-base font-bold'>
+              <Link to={detailHref} className='hover:text-brand'>
+                {model.model_name}
+              </Link>
+            </h3>
+            <button
+              type='button'
+              onClick={handleCopy}
+              className='text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 rounded-md border p-1 transition-colors'
+              aria-label={t('Copy model name')}
+            >
+              <Copy className='size-3.5' />
+            </button>
           </div>
-          <div className='bg-muted text-muted-foreground flex max-w-[52%] shrink-0 flex-wrap justify-end gap-x-2 gap-y-0.5 rounded-lg px-2.5 py-1 text-right text-[11px] leading-5'>
-            {priceSummary}
+          <p className='text-muted-foreground mt-1 text-xs'>{vendor}</p>
+          <div className='mt-2 border-y py-2'>
+            <div className='text-muted-foreground text-[10px] leading-none font-semibold tracking-[0.16em] uppercase'>
+              {t('Price')}
+            </div>
+            <div className='text-muted-foreground mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs leading-5'>
+              {priceSummary}
+            </div>
           </div>
         </div>
         <p className='text-muted-foreground line-clamp-2 min-h-10 text-xs leading-5'>
@@ -335,7 +547,10 @@ function MarketModelCard(props: {
 
 function MarketSidebar(props: {
   vendors: Array<{ name: string; count: number; icon?: string }>
-  tasks: Array<{ name: string; count: number }>
+  tasks: Array<MarketTask & { count: number }>
+  kindLabel: string
+  kindCount: number
+  providerScopeCount: number
   activeTask: string
   activeVendor: string
   onTaskChange: (task: string) => void
@@ -347,52 +562,69 @@ function MarketSidebar(props: {
     <aside className='bg-card/92 rounded-2xl border p-4 shadow-sm'>
       <div className='space-y-5'>
         <div>
-          <div className='text-sm font-semibold'>{t('Tasks')}</div>
-          <div className='mt-2 flex flex-wrap gap-2'>
+          <div className='flex items-center justify-between gap-2'>
+            <div className='text-sm font-semibold'>{t('Tasks')}</div>
+            <Badge variant='outline' className='text-[11px]'>
+              {t(props.kindLabel)} · {props.kindCount}
+            </Badge>
+          </div>
+          <div className='mt-3 grid gap-2'>
             <button
               type='button'
               onClick={() => props.onTaskChange('all')}
               className={cn(
-                'rounded-xl border px-3 py-1.5 text-xs transition-colors',
+                'flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs transition-colors',
                 props.activeTask === 'all'
                   ? 'bg-foreground text-background'
                   : 'bg-background text-muted-foreground hover:text-foreground'
               )}
             >
-              {t('All')}
+              <span className='inline-flex min-w-0 items-center gap-2'>
+                <Layers3 className='size-3.5 shrink-0' />
+                <span className='truncate'>{t('All tasks')}</span>
+              </span>
+              <span className='font-mono'>{props.kindCount}</span>
             </button>
-            {props.tasks.map((task) => (
-              <button
-                key={task.name}
-                type='button'
-                onClick={() => props.onTaskChange(task.name)}
-                className={cn(
-                  'rounded-xl border px-3 py-1.5 text-xs transition-colors',
-                  props.activeTask === task.name
-                    ? 'bg-foreground text-background'
-                    : 'bg-background text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {t(task.name)} ({task.count})
-              </button>
-            ))}
+            {props.tasks.map((task) => {
+              const TaskIcon = task.icon
+              return (
+                <button
+                  key={task.value}
+                  type='button'
+                  onClick={() => props.onTaskChange(task.value)}
+                  className={cn(
+                    'flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs transition-colors',
+                    props.activeTask === task.value
+                      ? 'bg-foreground text-background'
+                      : 'bg-background text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <span className='inline-flex min-w-0 items-center gap-2'>
+                    <TaskIcon className='size-3.5 shrink-0' />
+                    <span className='truncate'>{t(task.label)}</span>
+                  </span>
+                  <span className='font-mono'>{task.count}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
 
         <div>
           <div className='text-sm font-semibold'>{t('Providers')}</div>
-          <div className='mt-3 flex flex-wrap gap-2'>
+          <div className='mt-3 grid gap-2'>
             <button
               type='button'
               onClick={() => props.onVendorChange('all')}
               className={cn(
-                'rounded-xl border px-3 py-1.5 text-xs transition-colors',
+                'flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs transition-colors',
                 props.activeVendor === 'all'
                   ? 'bg-foreground text-background'
                   : 'bg-background text-muted-foreground hover:text-foreground'
               )}
             >
-              {t('All')}
+              <span>{t('All')}</span>
+              <span className='font-mono'>{props.providerScopeCount}</span>
             </button>
             {props.vendors.map((vendor) => (
               <button
@@ -400,18 +632,21 @@ function MarketSidebar(props: {
                 type='button'
                 onClick={() => props.onVendorChange(vendor.name)}
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs transition-colors',
+                  'flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs transition-colors',
                   props.activeVendor === vendor.name
                     ? 'bg-foreground text-background'
                     : 'bg-background text-muted-foreground hover:text-foreground'
                 )}
               >
-                {vendor.icon ? (
-                  <span className='flex size-4 shrink-0 items-center justify-center'>
-                    {getLobeIcon(vendor.icon, 16)}
-                  </span>
-                ) : null}
-                {vendor.name} ({vendor.count})
+                <span className='inline-flex min-w-0 items-center gap-2'>
+                  {vendor.icon ? (
+                    <span className='flex size-4 shrink-0 items-center justify-center'>
+                      {getLobeIcon(vendor.icon, 16)}
+                    </span>
+                  ) : null}
+                  <span className='truncate'>{vendor.name}</span>
+                </span>
+                <span className='font-mono'>{vendor.count}</span>
               </button>
             ))}
           </div>
@@ -428,6 +663,7 @@ export function Market() {
   const [activeKind, setActiveKind] = useState<MarketKind>('text')
   const [activeTask, setActiveTask] = useState('all')
   const [activeVendor, setActiveVendor] = useState('all')
+  const [page, setPage] = useState(1)
   const pricing = usePricingData()
 
   const models = useMemo<IndexedMarketModel[]>(() => {
@@ -445,12 +681,38 @@ export function Market() {
 
   const marketSummary = useMemo(() => {
     const vendorInfo = new Map<string, { count: number; icon?: string }>()
-    const taskCounts = new Map<string, number>(TASKS.map((task) => [task, 0]))
+    const activeTasks = TASKS.filter((task) => task.kinds.includes(activeKind))
+    const taskCounts = new Map<string, number>(
+      activeTasks.map((task) => [task.value, 0])
+    )
     const kindCounts = new Map<MarketKind, number>(
       MODEL_TYPES.map((item) => [item.value, 0])
     )
+    let kindCount = 0
+    let providerScopeCount = 0
 
     for (const model of models) {
+      kindCounts.set(
+        model.marketKind,
+        (kindCounts.get(model.marketKind) ?? 0) + 1
+      )
+
+      if (model.marketKind !== activeKind) {
+        continue
+      }
+
+      kindCount += 1
+      for (const task of activeTasks) {
+        if (modelMatchesTask(model, task.value)) {
+          taskCounts.set(task.value, (taskCounts.get(task.value) ?? 0) + 1)
+        }
+      }
+
+      if (!modelMatchesTask(model, activeTask)) {
+        continue
+      }
+
+      providerScopeCount += 1
       if (model.vendor_name) {
         const existing = vendorInfo.get(model.vendor_name)
         vendorInfo.set(model.vendor_name, {
@@ -458,30 +720,25 @@ export function Market() {
           icon: existing?.icon || model.vendor_icon || model.icon,
         })
       }
-      kindCounts.set(
-        model.marketKind,
-        (kindCounts.get(model.marketKind) ?? 0) + 1
-      )
-      for (const task of TASKS) {
-        if (modelMatchesTask(model, task)) {
-          taskCounts.set(task, (taskCounts.get(task) ?? 0) + 1)
-        }
-      }
     }
 
     return {
-      vendors: [...vendorInfo.entries()].map(([name, info]) => ({
-        name,
-        count: info.count,
-        icon: info.icon,
-      })),
-      tasks: TASKS.map((task) => ({
-        name: task,
-        count: taskCounts.get(task) ?? 0,
+      vendors: [...vendorInfo.entries()]
+        .map(([name, info]) => ({
+          name,
+          count: info.count,
+          icon: info.icon,
+        }))
+        .sort((left, right) => right.count - left.count),
+      tasks: activeTasks.map((task) => ({
+        ...task,
+        count: taskCounts.get(task.value) ?? 0,
       })),
       kindCounts,
+      kindCount,
+      providerScopeCount,
     }
-  }, [models])
+  }, [activeKind, activeTask, models])
 
   const filteredModels = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase()
@@ -495,6 +752,48 @@ export function Market() {
       return model.searchText.includes(normalizedQuery)
     })
   }, [activeKind, activeTask, activeVendor, deferredQuery, models])
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredModels.length / MARKET_PAGE_SIZE)
+  )
+  const currentPage = Math.min(page, totalPages)
+
+  const pagedModels = useMemo(() => {
+    const start = (currentPage - 1) * MARKET_PAGE_SIZE
+    return filteredModels.slice(start, start + MARKET_PAGE_SIZE)
+  }, [currentPage, filteredModels])
+
+  const displayStart =
+    filteredModels.length === 0 ? 0 : (currentPage - 1) * MARKET_PAGE_SIZE + 1
+  const displayEnd = Math.min(
+    currentPage * MARKET_PAGE_SIZE,
+    filteredModels.length
+  )
+
+  useEffect(() => {
+    setPage(1)
+  }, [activeKind, activeTask, activeVendor, deferredQuery])
+
+  useEffect(() => {
+    if (activeTask === 'all') return
+    const taskStillVisible = marketSummary.tasks.some(
+      (task) => task.value === activeTask
+    )
+    if (!taskStillVisible) {
+      setActiveTask('all')
+    }
+  }, [activeTask, marketSummary.tasks])
+
+  useEffect(() => {
+    if (activeVendor === 'all') return
+    const vendorStillVisible = marketSummary.vendors.some(
+      (vendor) => vendor.name === activeVendor
+    )
+    if (!vendorStillVisible) {
+      setActiveVendor('all')
+    }
+  }, [activeVendor, marketSummary.vendors])
 
   return (
     <PublicLayout showMainContainer={false} showNotifications={false}>
@@ -517,6 +816,12 @@ export function Market() {
           <MarketSidebar
             vendors={marketSummary.vendors}
             tasks={marketSummary.tasks}
+            kindLabel={
+              MODEL_TYPES.find((item) => item.value === activeKind)?.label ??
+              'Text'
+            }
+            kindCount={marketSummary.kindCount}
+            providerScopeCount={marketSummary.providerScopeCount}
             activeTask={activeTask}
             activeVendor={activeVendor}
             onTaskChange={setActiveTask}
@@ -551,13 +856,16 @@ export function Market() {
                     <button
                       key={item.value}
                       type='button'
-                      onClick={() => setActiveKind(item.value)}
                       className={cn(
                         'group flex min-h-20 items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all',
                         active
                           ? 'border-brand/60 bg-brand text-white shadow-[0_12px_28px_rgb(242_107_47/0.22)]'
                           : 'bg-card text-foreground hover:border-brand/35 hover:bg-muted/40'
                       )}
+                      onClick={() => {
+                        setActiveKind(item.value)
+                        setActiveTask('all')
+                      }}
                     >
                       <span className='flex min-w-0 items-center gap-3'>
                         <span
@@ -606,7 +914,7 @@ export function Market() {
             </div>
 
             <div className='mt-4 grid gap-5 md:grid-cols-2 xl:grid-cols-3'>
-              {filteredModels.map((model) => (
+              {pagedModels.map((model) => (
                 <MarketModelCard
                   key={model.model_name}
                   model={model}
@@ -619,6 +927,52 @@ export function Market() {
             {filteredModels.length === 0 && (
               <div className='text-muted-foreground flex min-h-48 items-center justify-center text-sm'>
                 {t('No models match your current filters.')}
+              </div>
+            )}
+
+            {filteredModels.length > 0 && (
+              <div className='mt-5 flex flex-col items-center justify-between gap-3 border-t pt-4 text-sm sm:flex-row'>
+                <p className='text-muted-foreground'>
+                  {t('Showing {{start}}-{{end}} of {{total}} models', {
+                    start: displayStart,
+                    end: displayEnd,
+                    total: filteredModels.length,
+                  })}
+                </p>
+                {totalPages > 1 && (
+                  <div className='flex items-center gap-2'>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      onClick={() =>
+                        setPage((current) => Math.max(1, current - 1))
+                      }
+                      disabled={currentPage <= 1}
+                    >
+                      <ChevronLeft className='size-4' />
+                      {t('Previous page')}
+                    </Button>
+                    <span className='text-muted-foreground px-1 text-xs'>
+                      {t('Page {{current}} of {{total}}', {
+                        current: currentPage,
+                        total: totalPages,
+                      })}
+                    </span>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      onClick={() =>
+                        setPage((current) => Math.min(totalPages, current + 1))
+                      }
+                      disabled={currentPage >= totalPages}
+                    >
+                      {t('Next page')}
+                      <ChevronRight className='size-4' />
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>
