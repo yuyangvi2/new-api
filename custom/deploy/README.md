@@ -59,4 +59,4 @@ docker compose -f docker-compose.server.yml logs -f newapi | grep -iE 'root|pass
 - `TENCENT_SECRET_ID`
 - `TENCENT_SECRET_KEY`
 
-远程脚本 `custom/deploy/newapi-remote-deploy.sh` 默认使用 `/opt/new-api-deploy`。如果服务器上已有测试用 `newapi` compose，脚本会先备份旧 `docker-compose.yml`，再写入托管 compose 并覆盖该测试部署。托管部署使用 `newapi`、`newapi-postgres`、`newapi-redis`、`newapi-network` 等独立资源。脚本不修改 x2api 的 compose，只会在现有 `sub2api-caddy` 的 Caddyfile 中维护 `cn.tokone.ai` 的受管标记块，校验失败会回滚 Caddyfile。
+远程脚本 `custom/deploy/newapi-remote-deploy.sh` 默认使用 `/opt/new-api-deploy`。如果服务器上已有测试用 `newapi` compose，脚本会先备份旧 `docker-compose.yml`，再写入托管 compose 并覆盖该测试部署。托管部署使用 `newapi`、`newapi-postgres`、`newapi-redis`、`newapi-network` 等独立资源。脚本不修改 x2api 的 compose，只会在现有 `sub2api-caddy` 的 Caddyfile 中维护 `www.tokone.ai` 的受管标记块，校验失败会回滚 Caddyfile。
