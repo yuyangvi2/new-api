@@ -348,6 +348,40 @@ func TestRequestOpenAI2ClaudeMessage_ClaudeOpus48HighUsesAdaptiveThinking(t *tes
 	require.Nil(t, claudeRequest.TopK)
 }
 
+func TestRequestOpenAI2ClaudeMessage_ClaudeOpus47And48OmitSamplingParams(t *testing.T) {
+	tests := []struct {
+		name  string
+		model string
+	}{
+		{name: "opus 4.7", model: "claude-opus-4-7"},
+		{name: "opus 4.8", model: "claude-opus-4-8"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := dto.GeneralOpenAIRequest{
+				Model:       tt.model,
+				Temperature: commonPointer(0.7),
+				TopP:        commonPointer(0.9),
+				TopK:        commonPointer(40),
+				Messages: []dto.Message{
+					{
+						Role:    "user",
+						Content: "hello",
+					},
+				},
+			}
+
+			claudeRequest, err := RequestOpenAI2ClaudeMessage(nil, request)
+			require.NoError(t, err)
+			require.Equal(t, tt.model, claudeRequest.Model)
+			require.Nil(t, claudeRequest.Temperature)
+			require.Nil(t, claudeRequest.TopP)
+			require.Nil(t, claudeRequest.TopK)
+		})
+	}
+}
+
 func TestRequestOpenAI2ClaudeMessage_ClaudeOpus48ThinkingUsesAdaptiveHighEffort(t *testing.T) {
 	request := dto.GeneralOpenAIRequest{
 		Model:       "claude-opus-4-8-thinking",
