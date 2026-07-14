@@ -70,6 +70,8 @@ ensure_secret REDIS_PASSWORD
 ensure_secret SESSION_SECRET
 upsert_env NEWAPI_IMAGE "$IMAGE"
 upsert_env CADDY_NETWORK "$CADDY_NETWORK"
+upsert_env SESSION_COOKIE_SECURE "true"
+upsert_env SESSION_COOKIE_TRUSTED_URL "https://${DOMAIN}"
 chmod 600 .env
 
 cat > docker-compose.yml <<'COMPOSE'
@@ -93,6 +95,8 @@ services:
       - ERROR_LOG_ENABLED=true
       - BATCH_UPDATE_ENABLED=true
       - SESSION_SECRET=${SESSION_SECRET}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE}
+      - SESSION_COOKIE_TRUSTED_URL=${SESSION_COOKIE_TRUSTED_URL}
       - NODE_NAME=newapi-node-1
     depends_on:
       redis:
