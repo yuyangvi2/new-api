@@ -90,15 +90,30 @@ For commercial licensing, please contact support@quantumnous.com
     background:
       radial-gradient(
         ellipse 58% 48% at 12% -10%,
-        color-mix(in oklch, var(--brand) 18%, transparent) 0%,
+        color-mix(in oklch, var(--brand) 10%, transparent) 0%,
         transparent 64%
       ),
       radial-gradient(
         ellipse 44% 34% at 88% 0%,
-        color-mix(in oklch, var(--chart-4) 18%, transparent) 0%,
+        color-mix(in oklch, var(--chart-4) 10%, transparent) 0%,
         transparent 68%
       ),
-      var(--background);
+      color-mix(in oklch, white 70%, var(--background));
+  }
+
+  .dark .tokone-shell {
+    background:
+      radial-gradient(
+        ellipse 58% 48% at 12% -10%,
+        color-mix(in oklch, var(--brand) 8%, transparent) 0%,
+        transparent 64%
+      ),
+      radial-gradient(
+        ellipse 44% 34% at 88% 0%,
+        color-mix(in oklch, var(--chart-4) 7%, transparent) 0%,
+        transparent 68%
+      ),
+      color-mix(in oklch, white 6%, var(--background));
   }
 
   .tokone-surface {
