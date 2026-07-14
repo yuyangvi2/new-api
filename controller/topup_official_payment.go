@@ -140,7 +140,7 @@ func requestOfficialSubscriptionPay(c *gin.Context, method string, userId int, p
 func respondOfficialPayment(c *gin.Context, method string, order officialPaymentOrder, returnSuffix string) {
 	switch method {
 	case model.PaymentMethodOfficialAlipay:
-		uri, params, err := buildOfficialAlipayPayment(order, returnSuffix)
+		uri, params, err := buildOfficialAlipayPayment(order, officialPaymentCallbackAddress(c), officialPaymentReturnPath(c, returnSuffix))
 		if err != nil {
 			logger.LogError(c.Request.Context(), fmt.Sprintf("支付宝官方 拉起支付失败 trade_no=%s error=%q", order.tradeNo, err.Error()))
 			c.JSON(http.StatusOK, gin.H{"message": "error", "data": "拉起支付失败"})
@@ -171,7 +171,68 @@ func officialPaymentProvider(method string) string {
 	}
 }
 
-func buildOfficialAlipayPayment(order officialPaymentOrder, returnSuffix string) (string, map[string]string, error) {
+func officialPaymentCallbackAddress(c *gin.Context) string {
+	if callbackAddress := strings.TrimSpace(operation_setting.CustomCallbackAddress); callbackAddress != "" {
+		return strings.TrimRight(callbackAddress, "/")
+	}
+	if origin := requestPublicOrigin(c.Request); origin != "" {
+		return origin
+	}
+	return strings.TrimRight(service.GetCallbackAddress(), "/")
+}
+
+func officialPaymentReturnPath(c *gin.Context, suffix string) string {
+	if origin := requestPublicOrigin(c.Request); origin != "" {
+		return origin + common.ThemeAwarePath(suffix)
+	}
+	return paymentReturnPath(suffix)
+}
+
+func requestPublicOrigin(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	host := firstForwardedHeaderValue(r.Header.Get("X-Forwarded-Host"))
+	if host == "" {
+		host = strings.TrimSpace(r.Host)
+	}
+	if host == "" || strings.ContainsAny(host, "/\\") {
+		return ""
+	}
+	proto := firstForwardedHeaderValue(r.Header.Get("X-Forwarded-Proto"))
+	if proto == "" {
+		if r.TLS != nil {
+			proto = "https"
+		} else {
+			proto = "http"
+		}
+	}
+	proto = strings.ToLower(proto)
+	if proto != "http" && proto != "https" {
+		return ""
+	}
+	return proto + "://" + strings.TrimRight(host, "/")
+}
+
+func firstForwardedHeaderValue(value string) string {
+	if index := strings.Index(value, ","); index >= 0 {
+		value = value[:index]
+	}
+	return strings.TrimSpace(value)
+}
+
+func gatewayWithQueryParam(gateway string, key string, value string) (string, error) {
+	uri, err := url.Parse(gateway)
+	if err != nil {
+		return "", err
+	}
+	query := uri.Query()
+	query.Set(key, value)
+	uri.RawQuery = query.Encode()
+	return uri.String(), nil
+}
+
+func buildOfficialAlipayPayment(order officialPaymentOrder, callbackAddress string, returnURL string) (string, map[string]string, error) {
 	privateKey, err := parseRSAPrivateKey(setting.OfficialAlipayPrivateKey)
 	if err != nil {
 		return "", nil, err
@@ -180,7 +241,6 @@ func buildOfficialAlipayPayment(order officialPaymentOrder, returnSuffix string)
 	if gateway == "" {
 		gateway = "https://openapi.alipay.com/gateway.do"
 	}
-	callbackAddress := strings.TrimRight(service.GetCallbackAddress(), "/")
 	bizContent, err := common.Marshal(map[string]any{
 		"out_trade_no": order.tradeNo,
 		"product_code": "FAST_INSTANT_TRADE_PAY",
@@ -199,7 +259,7 @@ func buildOfficialAlipayPayment(order officialPaymentOrder, returnSuffix string)
 		"timestamp":   time.Now().Format("2006-01-02 15:04:05"),
 		"version":     "1.0",
 		"notify_url":  callbackAddress + "/api/official/alipay/notify",
-		"return_url":  paymentReturnPath(returnSuffix),
+		"return_url":  returnURL,
 		"biz_content": string(bizContent),
 	}
 	if params["app_id"] == "" {
@@ -210,7 +270,12 @@ func buildOfficialAlipayPayment(order officialPaymentOrder, returnSuffix string)
 		return "", nil, err
 	}
 	params["sign"] = signature
-	return gateway, params, nil
+	delete(params, "charset")
+	uri, err := gatewayWithQueryParam(gateway, "charset", "utf-8")
+	if err != nil {
+		return "", nil, err
+	}
+	return uri, params, nil
 }
 
 func OfficialAlipayNotify(c *gin.Context) {
@@ -272,7 +337,7 @@ func buildOfficialWeChatPayment(c *gin.Context, order officialPaymentOrder) (str
 	if appID == "" || mchID == "" || serialNo == "" {
 		return "", errors.New("WeChat Pay app id, mch id, or merchant serial number is not configured")
 	}
-	callbackAddress := strings.TrimRight(service.GetCallbackAddress(), "/")
+	callbackAddress := officialPaymentCallbackAddress(c)
 	bodyBytes, err := common.Marshal(map[string]any{
 		"appid":        appID,
 		"mchid":        mchID,
@@ -318,7 +383,7 @@ func buildOfficialWeChatPayment(c *gin.Context, order officialPaymentOrder) (str
 	values := url.Values{}
 	values.Set("code_url", data.CodeURL)
 	values.Set("trade_no", order.tradeNo)
-	return paymentReturnPath("/console/wechat-pay?" + values.Encode()), nil
+	return officialPaymentReturnPath(c, "/console/wechat-pay?"+values.Encode()), nil
 }
 
 func OfficialWeChatPayNotify(c *gin.Context) {
