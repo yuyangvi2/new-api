@@ -241,9 +241,9 @@ trap 'rm -f "$TMP_CADDY" "$NEXT_CADDY" "$ROLLBACK_CADDY"' EXIT
 
 docker exec "$CADDY_CTR" sh -c 'cat /etc/caddy/Caddyfile' > "$TMP_CADDY"
 cp "$TMP_CADDY" "$ROLLBACK_CADDY"
-awk -v begin="$BEGIN" -v end="$END" '
-  $0 == begin { skip = 1; next }
-  $0 == end { skip = 0; next }
+awk '
+  $0 ~ /^# >>> new-api .* \(managed by new-api deploy workflow\) >>>$/ { skip = 1; next }
+  $0 ~ /^# <<< new-api .* \(managed by new-api deploy workflow\) <<<$/{ skip = 0; next }
   !skip { print }
 ' "$TMP_CADDY" > "$NEXT_CADDY"
 

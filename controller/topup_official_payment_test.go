@@ -41,8 +41,8 @@ func TestBuildOfficialAlipayPaymentPutsCharsetInGatewayQuery(t *testing.T) {
 			name:    "Tokone充值",
 			money:   10,
 		},
-		"https://cn.tokone.ai",
-		"https://cn.tokone.ai/wallet",
+		"https://www.tokone.ai",
+		"https://www.tokone.ai/wallet",
 	)
 
 	require.NoError(t, err)
@@ -51,8 +51,8 @@ func TestBuildOfficialAlipayPaymentPutsCharsetInGatewayQuery(t *testing.T) {
 	assert.Equal(t, "utf-8", parsedGateway.Query().Get("charset"))
 	assert.Equal(t, "bar", parsedGateway.Query().Get("foo"))
 	assert.NotContains(t, params, "charset")
-	assert.Equal(t, "https://cn.tokone.ai/api/official/alipay/notify", params["notify_url"])
-	assert.Equal(t, "https://cn.tokone.ai/wallet", params["return_url"])
+	assert.Equal(t, "https://www.tokone.ai/api/official/alipay/notify", params["notify_url"])
+	assert.Equal(t, "https://www.tokone.ai/wallet", params["return_url"])
 	assert.NotEmpty(t, params["sign"])
 
 	bizContent := map[string]any{}
@@ -71,10 +71,10 @@ func TestOfficialPaymentAddressUsesForwardedOrigin(t *testing.T) {
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest(http.MethodPost, "http://newapi:3000/api/user/pay", nil)
 	c.Request.Header.Set("X-Forwarded-Proto", "https")
-	c.Request.Header.Set("X-Forwarded-Host", "cn.tokone.ai")
+	c.Request.Header.Set("X-Forwarded-Host", "www.tokone.ai")
 
-	assert.Equal(t, "https://cn.tokone.ai", officialPaymentCallbackAddress(c))
-	assert.Equal(t, "https://cn.tokone.ai"+common.ThemeAwarePath("/console/topup?show_history=true"), officialPaymentReturnPath(c, "/console/topup?show_history=true"))
+	assert.Equal(t, "https://www.tokone.ai", officialPaymentCallbackAddress(c))
+	assert.Equal(t, "https://www.tokone.ai"+common.ThemeAwarePath("/console/topup?show_history=true"), officialPaymentReturnPath(c, "/console/topup?show_history=true"))
 }
 
 func TestOfficialPaymentCallbackAddressPrefersExplicitSetting(t *testing.T) {
@@ -88,7 +88,7 @@ func TestOfficialPaymentCallbackAddressPrefersExplicitSetting(t *testing.T) {
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest(http.MethodPost, "http://newapi:3000/api/user/pay", nil)
 	c.Request.Header.Set("X-Forwarded-Proto", "https")
-	c.Request.Header.Set("X-Forwarded-Host", "cn.tokone.ai")
+	c.Request.Header.Set("X-Forwarded-Host", "www.tokone.ai")
 
 	assert.Equal(t, "https://callback.example.com", officialPaymentCallbackAddress(c))
 }
