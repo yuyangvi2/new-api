@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useMemo } from 'react'
 import type { SystemStatus } from '@/features/auth/types'
 import { useStatus } from '@/hooks/use-status'
-import { getServerAddress } from '@/lib/server-address'
+import { getApiBaseAddress } from '@/lib/server-address'
 
 import {
   type ChatPreset,
@@ -52,7 +52,7 @@ export function useChatPresets(): {
 } {
   const { status } = useStatus()
 
-  const serverAddress = useMemo(() => getServerAddress(status), [status])
+  const serverAddress = useMemo(() => getApiBaseAddress(status), [status])
 
   const chatPresets = useMemo(() => {
     const raw = extractChats(status)
