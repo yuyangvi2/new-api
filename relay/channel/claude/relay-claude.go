@@ -243,6 +243,12 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		}
 	}
 
+	if model_setting.ShouldOmitClaudeSamplingParams(claudeRequest.Model) {
+		claudeRequest.Temperature = nil
+		claudeRequest.TopP = nil
+		claudeRequest.TopK = nil
+	}
+
 	if textRequest.Stop != nil {
 		// stop maybe string/array string, convert to array string
 		switch textRequest.Stop.(type) {

@@ -22,6 +22,7 @@ import type {
   PlaygroundConfig,
   ParameterEnabled,
 } from '../../types'
+import { shouldOmitClaudeSamplingParameters } from '../model-capabilities'
 import { formatMessageForAPI, isValidMessage } from '../message/message-utils'
 
 /**
@@ -43,12 +44,15 @@ export function buildChatCompletionPayload(
     messages: processedMessages,
     stream: config.stream,
   }
+  const shouldOmitSamplingParameters = shouldOmitClaudeSamplingParameters(
+    config.model
+  )
 
-  if (parameterEnabled.temperature) {
+  if (parameterEnabled.temperature && !shouldOmitSamplingParameters) {
     payload.temperature = config.temperature
   }
 
-  if (parameterEnabled.top_p) {
+  if (parameterEnabled.top_p && !shouldOmitSamplingParameters) {
     payload.top_p = config.top_p
   }
 

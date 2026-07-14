@@ -81,6 +81,11 @@ func normalizeHeaderListValues(values []string) []string {
 	return normalizedValues
 }
 
+func ShouldOmitClaudeSamplingParams(model string) bool {
+	return strings.HasPrefix(model, "claude-opus-4-7") ||
+		strings.HasPrefix(model, "claude-opus-4-8")
+}
+
 func (c *ClaudeSettings) GetDefaultMaxTokens(model string) int {
 	if maxTokens, ok := c.DefaultMaxTokens[model]; ok {
 		return maxTokens

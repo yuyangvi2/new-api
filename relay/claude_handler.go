@@ -107,6 +107,12 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 		info.UpstreamModelName = request.Model
 	}
 
+	if model_setting.ShouldOmitClaudeSamplingParams(request.Model) {
+		request.Temperature = nil
+		request.TopP = nil
+		request.TopK = nil
+	}
+
 	if info.ChannelSetting.SystemPrompt != "" {
 		if request.System == nil {
 			request.SetStringSystem(info.ChannelSetting.SystemPrompt)
