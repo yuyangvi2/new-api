@@ -12,7 +12,7 @@ DEPLOY_DIR="${DEPLOY_DIR:-/opt/new-api-deploy}"
 CADDY_CTR="${CADDY_CTR:-sub2api-caddy}"
 CADDY_NETWORK="${CADDY_NETWORK:-sub2api-deploy_sub2api-network}"
 APP_CTR="${APP_CTR:-newapi}"
-DOMAIN="${DOMAIN:-cn.tokone.ai}"
+DOMAIN="${DOMAIN:-www.tokone.ai}"
 TS="$(date +%Y%m%d-%H%M%S)"
 
 gen_secret() {
@@ -233,7 +233,7 @@ ${DOMAIN} {
 		max_size 100MB
 	}
 	log {
-		output file /var/log/caddy/newapi-cn.log {
+		output file /var/log/caddy/newapi-www.log {
 			roll_size 50mb
 			roll_keep 10
 			roll_keep_for 720h

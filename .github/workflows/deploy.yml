@@ -23,7 +23,7 @@ env:
   CADDY_CONTAINER: "sub2api-caddy"
   CADDY_NETWORK: "sub2api-deploy_sub2api-network"
   APP_CONTAINER: "newapi"
-  PUBLIC_DOMAIN: "cn.tokone.ai"
+  PUBLIC_DOMAIN: "www.tokone.ai"
 
 permissions:
   contents: read
