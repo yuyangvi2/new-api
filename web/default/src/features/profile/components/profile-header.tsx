@@ -174,11 +174,6 @@ export function ProfileHeader(props: ProfileHeaderProps) {
                     variant='neutral'
                     copyable={false}
                   />
-                  <StatusBadge
-                    label={`${t('User ID')} ${profile.id}`}
-                    variant='info'
-                    copyText={String(profile.id)}
-                  />
                 </div>
 
                 <div className='text-muted-foreground mt-2 flex min-w-0 items-center gap-2 text-sm'>
