@@ -293,8 +293,6 @@ export const STATIC_I18N_KEYS = [
   '{{model}} is a {{kind}} model from {{provider}}. Use this guide to review pricing, supported endpoints, capabilities, and the fastest compatible API path.',
   'Intelligent API gateway console',
   'All rights reserved.',
-  'Sign in / Register',
-  'New users will automatically create an account.',
   'Continue',
   'or',
   'Ready to start?',

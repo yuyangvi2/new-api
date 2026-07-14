@@ -29,6 +29,10 @@ export function SignIn() {
   const { t } = useTranslation()
   const { redirect } = useSearch({ from: '/(auth)/sign-in' })
   const { status } = useStatus()
+  const passwordRegistrationEnabled =
+    !status?.self_use_mode_enabled &&
+    status?.register_enabled !== false &&
+    status?.password_register_enabled !== false
 
   return (
     <AuthLayout>
@@ -36,17 +40,19 @@ export function SignIn() {
         <div className='mb-6 space-y-2'>
           <h2 className='flex items-center gap-2 text-2xl font-bold tracking-tight'>
             <span className='bg-brand size-2 rounded-full' />
-            {t('Sign in / Register')}
+            {t('Sign in')}
           </h2>
-          {!status?.self_use_mode_enabled &&
-            status?.register_enabled !== false && (
-              <p className='text-muted-foreground text-sm'>
-                {t('New users will automatically create an account.')}
-                <Link to='/sign-up' className='sr-only'>
-                  {t('Sign up')}
-                </Link>
-              </p>
-            )}
+          {passwordRegistrationEnabled && (
+            <p className='text-muted-foreground text-sm'>
+              {t("Don't have an account?")}{' '}
+              <Link
+                to='/sign-up'
+                className='hover:text-primary font-medium underline underline-offset-4'
+              >
+                {t('Sign up')}
+              </Link>
+            </p>
+          )}
         </div>
 
         <UserAuthForm redirectTo={redirect} />
