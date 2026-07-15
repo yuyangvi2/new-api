@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tokone 关于页面</title>
+  </head>
+  <body>
+    <section class="tokone-about">
+      <style>
+        .tokone-about {
+          --bg: #f7f8fb;
+          --surface: #ffffff;
+          --surface-2: #f2f5f9;
+          --text: #111827;
+          --muted: #667085;
+          --border: #e5e7eb;
+          --accent: #111827;
+          --accent-2: #2563eb;
+          --success: #059669;
+
+          max-width: 1120px;
+          margin: 0 auto;
+          padding: 88px 20px 64px;
+          color: var(--text);
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        .dark .tokone-about {
+          --bg: #0b0f17;
+          --surface: #111827;
+          --surface-2: #171f2e;
+          --text: #f9fafb;
+          --muted: #a3aab8;
+          --border: rgba(255, 255, 255, 0.12);
+          --accent: #f9fafb;
+          --accent-2: #60a5fa;
+          --success: #34d399;
+        }
+
+        .tokone-about,
+        .tokone-about * {
+          box-sizing: border-box;
+        }
+
+        .tokone-about h1,
+        .tokone-about h2,
+        .tokone-about h3,
+        .tokone-about p {
+          margin: 0;
+          color: inherit;
+        }
+
+        .tokone-hero {
+          border: 1px solid var(--border);
+          border-radius: 18px;
+          background: linear-gradient(180deg, var(--surface), var(--surface-2));
+          padding: 34px;
+          margin-bottom: 18px;
+        }
+
+        .tokone-eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--accent-2);
+          font-size: 13px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          margin-bottom: 14px;
+        }
+
+        .tokone-eyebrow::before {
+          content: "";
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+          background: var(--success);
+        }
+
+        .tokone-hero h1 {
+          font-size: 36px;
+          line-height: 1.15;
+          letter-spacing: 0;
+          margin-bottom: 14px;
+        }
+
+        .tokone-hero p {
+          max-width: 820px;
+          color: var(--muted);
+          font-size: 16px;
+          line-height: 1.85;
+        }
+
+        .tokone-metrics {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 12px;
+          margin: 18px 0;
+        }
+
+        .tokone-metric,
+        .tokone-card {
+          border: 1px solid var(--border);
+          border-radius: 14px;
+          background: var(--surface);
+        }
+
+        .tokone-metric {
+          padding: 18px;
+        }
+
+        .tokone-metric strong {
+          display: block;
+          font-size: 22px;
+          line-height: 1.2;
+          margin-bottom: 6px;
+        }
+
+        .tokone-metric span {
+          color: var(--muted);
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .tokone-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 16px;
+          margin-top: 18px;
+        }
+
+        .tokone-card {
+          padding: 24px;
+        }
+
+        .tokone-card h2 {
+          font-size: 19px;
+          line-height: 1.35;
+          margin-bottom: 14px;
+        }
+
+        .tokone-card p,
+        .tokone-card li {
+          color: var(--muted);
+          font-size: 15px;
+          line-height: 1.8;
+        }
+
+        .tokone-card ul {
+          margin: 0;
+          padding-left: 20px;
+        }
+
+        .tokone-card li {
+          margin: 7px 0;
+        }
+
+        .tokone-card li::marker {
+          color: var(--accent-2);
+        }
+
+        .tokone-contact {
+          display: grid;
+          grid-template-columns: 180px 1fr;
+          gap: 24px;
+          align-items: center;
+        }
+
+        .tokone-qr {
+          width: 180px;
+          height: 180px;
+          border-radius: 14px;
+          border: 1px solid var(--border);
+          background: #fff;
+          padding: 10px;
+          object-fit: contain;
+        }
+
+        .tokone-note {
+          margin-top: 12px;
+          padding: 12px 14px;
+          border-radius: 12px;
+          background: var(--surface-2);
+          color: var(--muted);
+          font-size: 14px;
+          line-height: 1.7;
+        }
+
+        .tokone-footer {
+          margin-top: 18px;
+          color: var(--muted);
+          font-size: 13px;
+          line-height: 1.7;
+          text-align: center;
+        }
+
+        @media (max-width: 820px) {
+          .tokone-about {
+            padding: 76px 14px 44px;
+          }
+
+          .tokone-hero {
+            padding: 24px;
+          }
+
+          .tokone-hero h1 {
+            font-size: 30px;
+          }
+
+          .tokone-metrics,
+          .tokone-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .tokone-contact {
+            grid-template-columns: 1fr;
+          }
+        }
+      </style>
+
+      <div class="tokone-hero">
+        <div class="tokone-eyebrow">Enterprise AI API Gateway</div>
+        <h1>Tokone</h1>
+        <p>
+          Tokone 是面向开发者、团队与企业客户的 AI 模型 API 聚合与中转平台。我们通过统一、稳定、可观测的 API 接入层，
+          帮助业务快速连接主流大模型能力，并在模型选择、调用成本、访问线路、用量审计和生产稳定性之间取得更高效率。
+        </p>
+      </div>
+
+      <div class="tokone-metrics">
+        <div class="tokone-metric">
+          <strong>统一接口</strong>
+          <span>OpenAI 兼容调用方式，降低迁移与集成成本。</span>
+        </div>
+        <div class="tokone-metric">
+          <strong>多模型接入</strong>
+          <span>覆盖文本、视觉、图片生成、嵌入和多模态场景。</span>
+        </div>
+        <div class="tokone-metric">
+          <strong>企业级可观测</strong>
+          <span>用量、日志、价格、错误信息集中管理。</span>
+        </div>
+        <div class="tokone-metric">
+          <strong>稳定交付</strong>
+          <span>面向生产环境的线路、路由和服务治理能力。</span>
+        </div>
+      </div>
+
+      <div class="tokone-grid">
+        <div class="tokone-card">
+          <h2>平台能力</h2>
+          <ul>
+            <li>聚合 OpenAI、Claude、Gemini、DeepSeek、Qwen 等主流模型与兼容模型。</li>
+            <li>提供 OpenAI 兼容 API，现有 SDK 通常只需替换 Base URL 和 API Key。</li>
+            <li>支持 API Key 管理、分组权限、模型价格、余额、用量日志和调用追踪。</li>
+            <li>支持多线路与模型路由策略，便于在不同网络环境和业务场景中稳定接入。</li>
+          </ul>
+        </div>
+
+        <div class="tokone-card">
+          <h2>面向企业与专业团队</h2>
+          <ul>
+            <li>适合 AI 应用开发、内部工具、自动化流程、智能客服和内容生产系统。</li>
+            <li>支持按团队、项目、模型和密钥维度拆分用量，便于成本核算。</li>
+            <li>通过日志和错误信息快速定位请求失败、上游限流、参数不兼容等问题。</li>
+            <li>生产环境建议配置超时、重试、备用模型和必要的内容安全策略。</li>
+          </ul>
+        </div>
+
+        <div class="tokone-card">
+          <h2>快速接入</h2>
+          <ul>
+            <li>在控制台创建 API Key，并妥善保存在服务端环境变量中。</li>
+            <li>在模型广场查看可用模型 ID、调用价格和分组倍率。</li>
+            <li>将业务代码中的 Base URL 替换为 Tokone 提供的 API 端点。</li>
+            <li>遇到异常时，可在使用日志中查看 request id、模型、错误原因和扣费记录。</li>
+          </ul>
+        </div>
+
+        <div class="tokone-card">
+          <h2>服务说明</h2>
+          <ul>
+            <li>请勿将 API Key 暴露在前端代码、公开仓库、客户端应用或日志中。</li>
+            <li>模型可用性、价格倍率和计费规则以平台后台实时展示为准。</li>
+            <li>上游服务维护、限流、网络波动或参数变更可能导致短暂调用失败。</li>
+            <li>如用于关键业务，请根据业务等级做好降级、缓存和备用通道设计。</li>
+          </ul>
+        </div>
+
+        <div class="tokone-card" style="grid-column: 1 / -1;">
+          <h2>联系方式</h2>
+          <div class="tokone-contact">
+            <img class="tokone-qr" src="/wechat.png" alt="Tokone 联系二维码" loading="lazy" />
+            <div>
+              <p><strong>扫码联系 Tokone 客服/管理员</strong></p>
+              <p>如需充值咨询、企业接入、模型开通、接口异常排查或定制化支持，请扫码联系。</p>
+              <div class="tokone-note">
+                为便于快速定位问题，反馈时建议提供：账号邮箱、请求时间、模型 ID、日志 ID、request id、错误信息和预期结果。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tokone-footer">
+        Tokone 致力于为专业团队提供稳定、清晰、可持续的 AI API 接入基础设施。
+      </div>
+    </section>
+  </body>
+</html>
