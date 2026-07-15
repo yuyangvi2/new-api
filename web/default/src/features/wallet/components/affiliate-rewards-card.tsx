@@ -63,16 +63,16 @@ export function AffiliateRewardsCard({
 
   return (
     <Card data-card-hover='false' className='bg-muted/20 py-0'>
-      <CardContent className='grid gap-3 p-3 sm:gap-4 sm:p-4 lg:grid-cols-[minmax(200px,1fr)_minmax(180px,0.65fr)_minmax(280px,1fr)] lg:items-center'>
-        <div className='flex min-w-0 items-center gap-2.5'>
-          <div className='bg-background flex size-8 shrink-0 items-center justify-center rounded-lg border'>
+      <CardContent className='grid gap-3 p-3 sm:gap-4 sm:p-4 lg:grid-cols-[minmax(240px,1.15fr)_minmax(190px,0.65fr)_minmax(300px,1fr)] lg:items-start'>
+        <div className='flex min-w-0 items-start gap-2.5'>
+          <div className='bg-background mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border'>
             <Share2 className='text-muted-foreground size-4' />
           </div>
           <div className='min-w-0'>
             <h3 className='truncate text-sm font-semibold'>
               {t('Referral Program')}
             </h3>
-            <p className='text-muted-foreground line-clamp-1 text-xs'>
+            <p className='text-muted-foreground mt-1 text-xs leading-5'>
               {t(
                 'Earn rewards when users join through your referral link. Transfer accumulated rewards to your balance anytime.'
               )}
@@ -80,7 +80,7 @@ export function AffiliateRewardsCard({
           </div>
         </div>
 
-        <div className='grid grid-cols-3 gap-1.5 text-center'>
+        <div className='grid grid-cols-3 gap-1.5 text-center lg:pt-0.5'>
           {[
             [t('Pending'), formatQuota(user?.aff_quota ?? 0)],
             [t('Total Earned'), formatQuota(user?.aff_history_quota ?? 0)],
@@ -97,7 +97,7 @@ export function AffiliateRewardsCard({
           ))}
         </div>
 
-        <div className='flex items-center gap-2'>
+        <div className='flex items-center gap-2 lg:pt-0.5'>
           <Input
             value={affiliateLink}
             readOnly

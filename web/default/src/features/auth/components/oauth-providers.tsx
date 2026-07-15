@@ -22,7 +22,11 @@ import { useTranslation } from 'react-i18next'
 import {
   IconDiscord,
   IconGithub,
+  IconGitlab,
+  IconGmail,
+  IconGoogle,
   IconLinuxDo,
+  IconTelegram,
   IconWeChat,
 } from '@/assets/brand-icons'
 import { Button } from '@/components/ui/button'
@@ -127,10 +131,31 @@ export function OAuthProviders({
   const customProviders = status?.custom_oauth_providers
   if (customProviders && customProviders.length > 0) {
     for (const provider of customProviders) {
+      const iconKey = `${provider.icon} ${provider.slug} ${provider.name}`
+        .trim()
+        .toLowerCase()
+      let icon: ReactNode | undefined
+      if (iconKey.includes('google')) {
+        icon = <IconGoogle className='h-4 w-4' />
+      } else if (iconKey.includes('github')) {
+        icon = <IconGithub className='h-4 w-4' />
+      } else if (iconKey.includes('gitlab')) {
+        icon = <IconGitlab className='h-4 w-4' />
+      } else if (iconKey.includes('gmail')) {
+        icon = <IconGmail className='h-4 w-4' />
+      } else if (iconKey.includes('discord')) {
+        icon = <IconDiscord className='h-4 w-4' />
+      } else if (iconKey.includes('linuxdo')) {
+        icon = <IconLinuxDo className='h-4 w-4' />
+      } else if (iconKey.includes('telegram')) {
+        icon = <IconTelegram className='h-4 w-4' />
+      }
+
       providerButtons.push({
         key: `custom-${provider.slug}`,
         label: t('Continue with {{name}}', { name: provider.name }),
         onClick: () => handleCustomOAuthLogin(provider),
+        icon,
       })
     }
   }

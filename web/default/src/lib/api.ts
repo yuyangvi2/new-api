@@ -108,10 +108,6 @@ api.interceptors.response.use(
       } catch {
         /* empty */
       }
-
-      if (!skip) {
-        toast.error(t('Session expired!'))
-      }
     } else if (!skip) {
       // Other errors: show error message from response or default
       const msg =

@@ -258,6 +258,7 @@ export function Wallet(props: WalletProps) {
     },
     []
   )
+  const currentPaymentType = getCurrentPaymentType()
 
   return (
     <>
@@ -299,6 +300,7 @@ export function Wallet(props: WalletProps) {
                   loading={topupLoading}
                   priceRatio={(status?.price as number) || 1}
                   usdExchangeRate={effectiveUsdExchangeRate}
+                  selectedPaymentType={currentPaymentType}
                   onOpenBilling={() => setBillingDialogOpen(true)}
                   creemProducts={topupInfo?.creem_products}
                   enableCreemTopup={topupInfo?.enable_creem_topup}

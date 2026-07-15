@@ -86,7 +86,6 @@ const queryClient = new QueryClient({
     onError: (error) => {
       if (error instanceof AxiosError) {
         if (error.response?.status === 401) {
-          toast.error(i18next.t('Session expired!'))
           useAuthStore.getState().auth.reset()
           const redirect = `${router.history.location.href}`
           router.navigate({ to: '/sign-in', search: { redirect } })
@@ -116,7 +115,11 @@ declare module '@tanstack/react-router' {
 }
 
 // Render the app
-const rootElement = document.getElementById('root')!
+const rootElement = document.querySelector<HTMLElement>('#root')
+if (!rootElement) {
+  throw new Error('Root element not found')
+}
+const appRootElement: HTMLElement = rootElement
 let appRendered = false
 // Set document.title and favicon from cached status, then refresh from network
 ;(function initSystemBranding() {
@@ -164,7 +167,7 @@ function renderApp() {
   if (appRendered) return
   appRendered = true
 
-  const root = ReactDOM.createRoot(rootElement)
+  const root = ReactDOM.createRoot(appRootElement)
   root.render(
     <StrictMode>
       <QueryClientProvider client={queryClient}>
@@ -180,7 +183,7 @@ function renderApp() {
   )
 }
 
-initI18n()
+void initI18n()
   .catch((error: unknown) => {
     if (import.meta.env.DEV) {
       // eslint-disable-next-line no-console
@@ -188,5 +191,11 @@ initI18n()
     }
   })
   .finally(renderApp)
+  .catch((error: unknown) => {
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.warn('[app] Failed to render application', error)
+    }
+  })
 
 window.setTimeout(renderApp, 1500)

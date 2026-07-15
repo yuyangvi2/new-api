@@ -166,7 +166,6 @@ export function UserAuthForm({
         }
 
         await handleLoginSuccess(res.data as { id?: number } | null, redirectTo)
-        toast.success(t('Welcome back!'))
       }
     } catch {
       // Errors are handled by global interceptor

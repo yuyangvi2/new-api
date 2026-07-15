@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { formatLocalCurrencyAmount } from '@/lib/currency'
 
-import { DEFAULT_DISCOUNT_RATE } from '../constants'
+import { DEFAULT_DISCOUNT_RATE, PAYMENT_TYPES } from '../constants'
 
 // ============================================================================
 // Wallet-specific Formatting Functions
@@ -61,6 +61,40 @@ export function formatCurrency(amount: number | string): string {
     digitsLarge: 2,
     digitsSmall: 4,
   })
+}
+
+export type PaymentCurrency = 'CNY' | 'USD'
+
+export function getPaymentCurrency(
+  paymentType: string | undefined
+): PaymentCurrency | undefined {
+  switch (paymentType) {
+    case PAYMENT_TYPES.ALIPAY_OFFICIAL:
+    case PAYMENT_TYPES.WECHAT_OFFICIAL:
+      return 'CNY'
+    case PAYMENT_TYPES.STRIPE:
+      return 'USD'
+    default:
+      return undefined
+  }
+}
+
+export function formatPaymentCurrency(
+  amount: number | string,
+  paymentCurrency: PaymentCurrency | undefined
+): string {
+  const numeric =
+    typeof amount === 'number' ? amount : Number.parseFloat(String(amount))
+  if (!Number.isFinite(numeric)) return '-'
+  if (!paymentCurrency) return formatCurrency(numeric)
+
+  const symbol = paymentCurrency === 'CNY' ? '\uffe5' : '$'
+  const formattedNumber = new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(numeric)
+
+  return `${symbol}${formattedNumber}`
 }
 
 /**
