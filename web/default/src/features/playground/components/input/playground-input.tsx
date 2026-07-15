@@ -27,7 +27,11 @@ import {
 } from '@/components/ai-elements/prompt-input'
 
 import { getSubmittableInputText } from '../../lib'
-import type { ModelOption, GroupOption } from '../../types'
+import type {
+  ModelOption,
+  GroupOption,
+  WebSearchContextSize,
+} from '../../types'
 import { PlaygroundInputControls } from './playground-input-controls'
 import { PlaygroundInputTools } from './playground-input-tools'
 
@@ -45,6 +49,10 @@ interface PlaygroundInputProps {
   onGroupChange: (value: string) => void
   hasMessages?: boolean
   onClearMessages?: () => void
+  webSearchEnabled: boolean
+  webSearchContextSize: WebSearchContextSize
+  onWebSearchEnabledChange: (enabled: boolean) => void
+  onWebSearchContextSizeChange: (value: WebSearchContextSize) => void
 }
 
 export function PlaygroundInput({
@@ -61,6 +69,10 @@ export function PlaygroundInput({
   onGroupChange,
   hasMessages = false,
   onClearMessages,
+  webSearchEnabled,
+  webSearchContextSize,
+  onWebSearchEnabledChange,
+  onWebSearchContextSizeChange,
 }: PlaygroundInputProps) {
   const { t } = useTranslation()
   const [text, setText] = useState('')
@@ -108,8 +120,14 @@ export function PlaygroundInput({
             tools={
               <PlaygroundInputTools
                 disabled={disabled}
+                groupValue={groupValue}
                 hasMessages={hasMessages}
+                modelValue={modelValue}
                 onClearMessages={onClearMessages}
+                onWebSearchContextSizeChange={onWebSearchContextSizeChange}
+                onWebSearchEnabledChange={onWebSearchEnabledChange}
+                webSearchContextSize={webSearchContextSize}
+                webSearchEnabled={webSearchEnabled}
               />
             }
           />

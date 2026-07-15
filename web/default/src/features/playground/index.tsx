@@ -108,6 +108,14 @@ export function Playground() {
           onStop={stopGeneration}
           onSubmit={handleSendMessage}
           hasMessages={messages.length > 0}
+          webSearchEnabled={config.web_search_enabled}
+          webSearchContextSize={config.web_search_context_size}
+          onWebSearchEnabledChange={(enabled) =>
+            updateConfig('web_search_enabled', enabled)
+          }
+          onWebSearchContextSizeChange={(value) =>
+            updateConfig('web_search_context_size', value)
+          }
         />
       </div>
     </div>

@@ -16,7 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { GlobeIcon, PaperclipIcon, Trash2Icon } from 'lucide-react'
+import {
+  CheckIcon,
+  CircleSlashIcon,
+  GlobeIcon,
+  PaperclipIcon,
+  Trash2Icon,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -30,6 +36,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -41,22 +49,42 @@ import {
 import {
   ATTACHMENT_ACTIONS,
   getAttachmentActionNotice,
-  getSearchActionNotice,
+  getWebSearchCompatibility,
 } from '../../lib'
+import { WEB_SEARCH_CONTEXT_OPTIONS } from '../../constants'
+import type { WebSearchContextSize } from '../../types'
 
 type PlaygroundInputToolsProps = {
   disabled?: boolean
+  groupValue: string
   hasMessages?: boolean
+  modelValue: string
   onClearMessages?: () => void
+  onWebSearchContextSizeChange: (value: WebSearchContextSize) => void
+  onWebSearchEnabledChange: (enabled: boolean) => void
+  webSearchContextSize: WebSearchContextSize
+  webSearchEnabled: boolean
 }
 
 export function PlaygroundInputTools({
   disabled,
+  groupValue,
   hasMessages = false,
+  modelValue,
   onClearMessages,
+  onWebSearchContextSizeChange,
+  onWebSearchEnabledChange,
+  webSearchContextSize,
+  webSearchEnabled,
 }: PlaygroundInputToolsProps) {
   const { t } = useTranslation()
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const webSearchCompatibility = getWebSearchCompatibility(
+    groupValue,
+    modelValue,
+  )
+  const canEnableWebSearch = webSearchCompatibility.supported
+  const isWebSearchActive = webSearchEnabled && canEnableWebSearch
 
   const handleFileAction = (action: string) => {
     const notice = getAttachmentActionNotice(action)
@@ -65,9 +93,12 @@ export function PlaygroundInputTools({
     })
   }
 
-  const handleSearchAction = () => {
-    const notice = getSearchActionNotice()
-    toast.info(t(notice.title))
+  const handleEnableWebSearch = (enabled: boolean) => {
+    if (enabled && !webSearchCompatibility.supported) {
+      return
+    }
+
+    onWebSearchEnabledChange(enabled)
   }
 
   const handleClearMessages = () => {
@@ -115,22 +146,71 @@ export function PlaygroundInputTools({
         </Tooltip>
 
         <Tooltip>
-          <TooltipTrigger
-            render={
-              <PromptInputButton
-                aria-label={t('Search')}
-                className='text-muted-foreground hover:text-foreground hover:bg-muted/70 font-medium'
-                disabled={disabled}
-                onClick={handleSearchAction}
-                variant='ghost'
+          <DropdownMenu>
+            <TooltipTrigger
+              render={
+                <DropdownMenuTrigger
+                  render={
+                    <PromptInputButton
+                      aria-label={t('Web search')}
+                      className={
+                        isWebSearchActive
+                          ? 'bg-primary/10 text-primary hover:bg-primary/15 relative font-medium ring-1 ring-primary/15'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted/70 relative font-medium'
+                      }
+                      disabled={disabled}
+                      variant='ghost'
+                    />
+                  }
+                >
+                  <GlobeIcon size={16} />
+                  {isWebSearchActive && (
+                    <span className='bg-primary absolute top-1.5 right-1.5 size-1.5 rounded-full' />
+                  )}
+                </DropdownMenuTrigger>
+              }
+            />
+            <TooltipContent>
+              <p>{t('Web search')}</p>
+            </TooltipContent>
+            <DropdownMenuContent align='start' className='w-64'>
+              <DropdownMenuLabel>{t('Web search')}</DropdownMenuLabel>
+              <div className='text-muted-foreground px-1.5 pb-1 text-xs leading-5'>
+                {t(webSearchCompatibility.labelKey)}
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={!canEnableWebSearch && !webSearchEnabled}
+                onClick={() => handleEnableWebSearch(!webSearchEnabled)}
               >
-                <GlobeIcon size={16} />
-              </PromptInputButton>
-            }
-          />
-          <TooltipContent>
-            <p>{t('Search')}</p>
-          </TooltipContent>
+                {webSearchEnabled ? (
+                  <CheckIcon size={16} />
+                ) : (
+                  <CircleSlashIcon size={16} />
+                )}
+                {webSearchEnabled ? t('Web search enabled') : t('Off')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>{t('Search depth')}</DropdownMenuLabel>
+              {WEB_SEARCH_CONTEXT_OPTIONS.map((option) => (
+                <DropdownMenuItem
+                  disabled={!canEnableWebSearch}
+                  key={option.value}
+                  onClick={() => {
+                    onWebSearchContextSizeChange(option.value)
+                    handleEnableWebSearch(true)
+                  }}
+                >
+                  {webSearchContextSize === option.value ? (
+                    <CheckIcon size={16} />
+                  ) : (
+                    <span className='size-4' />
+                  )}
+                  {t(option.label)}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </Tooltip>
 
         <Tooltip>
@@ -156,7 +236,7 @@ export function PlaygroundInputTools({
       <ConfirmDialog
         destructive
         desc={t(
-          'All playground messages saved in this browser will be removed. This cannot be undone.'
+          'All playground messages saved in this browser will be removed. This cannot be undone.',
         )}
         confirmText={t('Clear')}
         handleConfirm={handleClearMessages}

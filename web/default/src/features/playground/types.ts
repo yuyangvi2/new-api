@@ -23,6 +23,13 @@ export type MessageStatus = 'loading' | 'streaming' | 'complete' | 'error'
 
 export type PlaygroundMessageLayoutMode = 'alternating' | 'left'
 
+export type WebSearchContextSize = 'low' | 'medium' | 'high'
+
+export type WebSearchStrategy =
+  | 'web_search_options'
+  | 'gemini_google_search'
+  | 'qwen_enable_search'
+
 export interface MessageVersion {
   id: string
   content: string
@@ -76,6 +83,22 @@ export interface ChatCompletionRequest {
   frequency_penalty?: number
   presence_penalty?: number
   seed?: number
+  tools?: ToolCallRequest[]
+  web_search_options?: WebSearchOptions
+  enable_search?: boolean
+}
+
+export interface ToolCallRequest {
+  type: 'function'
+  function: {
+    name: string
+    description?: string
+    parameters?: Record<string, unknown>
+  }
+}
+
+export interface WebSearchOptions {
+  search_context_size: WebSearchContextSize
 }
 
 export interface ChatCompletionChunk {
@@ -126,6 +149,8 @@ export interface PlaygroundConfig {
   presence_penalty: number
   seed: number | null
   stream: boolean
+  web_search_enabled: boolean
+  web_search_context_size: WebSearchContextSize
 }
 
 export interface ParameterEnabled {
