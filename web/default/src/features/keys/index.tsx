@@ -18,9 +18,11 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useTranslation } from 'react-i18next'
 
+import { CopyButton } from '@/components/copy-button'
 import { SectionPageLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { getApiBaseAddress } from '@/lib/server-address'
 
 import { ApiKeysDialogs } from './components/api-keys-dialogs'
 import { ApiKeysPrimaryButtons } from './components/api-keys-primary-buttons'
@@ -29,6 +31,11 @@ import { ApiKeysTable } from './components/api-keys-table'
 
 export function ApiKeys() {
   const { t } = useTranslation()
+  const apiBaseAddress = getApiBaseAddress()
+  const endpointUrl = apiBaseAddress.endsWith('/v1')
+    ? apiBaseAddress
+    : `${apiBaseAddress}/v1`
+
   return (
     <ApiKeysProvider>
       <SectionPageLayout fixedContent>
@@ -51,19 +58,36 @@ export function ApiKeys() {
                     <Badge variant='outline'>{t('Bearer token')}</Badge>
                   </div>
                   <h3 className='text-lg font-semibold tracking-tight'>
-                    {t('Use your key with the OpenAI-compatible API')}
+                    {t('Use your key with the OpenAI-compatible endpoint')}
                   </h3>
                   <p className='text-muted-foreground max-w-2xl text-sm leading-relaxed'>
                     {t(
-                      'Keys are shown once for security. Store them in your server environment and rotate them from this page when needed.'
+                      'Copy the base URL into your SDK or client configuration, then use your API key as a Bearer token.'
                     )}
                   </p>
                 </div>
-                <pre className='bg-foreground/[0.045] text-muted-foreground overflow-hidden rounded-lg border p-3 font-mono text-xs leading-5'>
-                  <code>{`Authorization: Bearer sk-...
-POST /v1/chat/completions
-model: gpt-4o-mini`}</code>
-                </pre>
+                <div className='bg-foreground/[0.045] min-w-0 rounded-lg border p-3'>
+                  <div className='mb-2 flex items-center justify-between gap-2'>
+                    <span className='text-muted-foreground text-xs font-medium'>
+                      {t('API Base URL')}
+                    </span>
+                    <CopyButton
+                      value={endpointUrl}
+                      tooltip={t('Copy endpoint URL')}
+                      successTooltip={t('Copied!')}
+                      aria-label={t('Copy endpoint URL')}
+                      iconClassName='size-3.5'
+                      className='size-7'
+                    />
+                  </div>
+                  <code className='text-foreground block truncate font-mono text-sm'>
+                    {endpointUrl}
+                  </code>
+                  <div className='text-muted-foreground mt-2 grid gap-1 font-mono text-xs'>
+                    <span>Authorization: Bearer sk-...</span>
+                    <span>POST /chat/completions</span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
             <div className='min-h-0 flex-1'>
