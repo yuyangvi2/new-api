@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"math"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/types"
+	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -113,6 +115,48 @@ func seedChannel(t *testing.T, id int) {
 	t.Helper()
 	ch := &model.Channel{Id: id, Name: "test_channel", Key: "sk-test", Status: common.ChannelStatusEnabled}
 	require.NoError(t, model.DB.Create(ch).Error)
+}
+
+func TestLogTaskConsumptionIncludesPublicTaskID(t *testing.T) {
+	truncate(t)
+	seedUser(t, 1, 1000000)
+
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/pg/video/generations", nil)
+	c.Set("username", "test_user")
+	c.Set("token_name", "test_token")
+
+	LogTaskConsumption(c, &relaycommon.RelayInfo{
+		UserId:          1,
+		TokenId:         1,
+		UsingGroup:      "keling",
+		OriginModelName: "kling-v2-6",
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelId: 1,
+		},
+		TaskRelayInfo: &relaycommon.TaskRelayInfo{
+			Action:       "SubmitTextToVideoJob",
+			PublicTaskID: "task_test_public_id",
+		},
+		PriceData: types.PriceData{
+			ModelPrice: -1,
+			ModelRatio: 0.14,
+			Quota:      28000,
+			GroupRatioInfo: types.GroupRatioInfo{
+				GroupRatio:        0.8,
+				GroupSpecialRatio: 0.8,
+				HasSpecialRatio:   true,
+			},
+		},
+	})
+
+	var log model.Log
+	require.NoError(t, model.LOG_DB.Where("user_id = ?", 1).First(&log).Error)
+	other, err := common.StrToMap(log.Other)
+	require.NoError(t, err)
+	assert.Equal(t, "task_test_public_id", other["task_id"])
+	assert.Equal(t, true, other["is_task"])
 }
 
 func makeTask(userId, channelId, quota, tokenId int, billingSource string, subscriptionId int) *model.Task {
