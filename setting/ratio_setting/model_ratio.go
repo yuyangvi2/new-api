@@ -10,9 +10,12 @@ import (
 
 // from songquanpeng/one-api
 const (
-	USD2RMB = 7.3 // 暂定 1 USD = 7.3 RMB
-	USD     = 500 // $0.002 = 1 -> $1 = 500
+	USD2RMB = 7.14 // 暂定 1 USD = 7.14 RMB
+	USD     = 500  // $0.002 = 1 -> $1 = 500
 	RMB     = USD / USD2RMB
+	// Official CNY-per-million token prices can be converted to ratio by
+	// dividing by 1000 first, because ratio 1 is $0.002 / 1K tokens.
+	RMBPerMillion = RMB / 1000
 )
 
 // modelRatio
@@ -193,23 +196,89 @@ var defaultModelRatio = map[string]float64{
 	"gemini-robotics-er-1.5-preview":            0.15,
 	"gemini-embedding-001":                      0.075,
 	"text-embedding-004":                        0.001,
-	"chatglm_turbo":                             0.3572,     // ￥0.005 / 1k tokens
-	"chatglm_pro":                               0.7143,     // ￥0.01 / 1k tokens
-	"chatglm_std":                               0.3572,     // ￥0.005 / 1k tokens
-	"chatglm_lite":                              0.1429,     // ￥0.002 / 1k tokens
-	"glm-4":                                     7.143,      // ￥0.1 / 1k tokens
-	"glm-4v":                                    0.05 * RMB, // ￥0.05 / 1k tokens
-	"glm-4-alltools":                            0.1 * RMB,  // ￥0.1 / 1k tokens
-	"glm-3-turbo":                               0.3572,
-	"glm-4-plus":                                0.05 * RMB,
+	"chatglm_turbo":                             0.005 * RMB, // ￥0.005 / 1k tokens
+	"chatglm_pro":                               0.01 * RMB,  // ￥0.01 / 1k tokens
+	"chatglm_std":                               0.005 * RMB, // ￥0.005 / 1k tokens
+	"chatglm_lite":                              0.002 * RMB, // ￥0.002 / 1k tokens
+	"glm-4":                                     0.1 * RMB,   // ￥0.1 / 1k tokens
+	"glm-4v":                                    0.05 * RMB,  // ￥0.05 / 1k tokens
+	"glm-4-alltools":                            0.1 * RMB,   // ￥0.1 / 1k tokens
+	"glm-3-turbo":                               0.005 * RMB,
+	"glm-4-plus":                                0.005 * RMB,
 	"glm-4-0520":                                0.1 * RMB,
-	"glm-4-air":                                 0.001 * RMB,
+	"glm-4-air":                                 0.0005 * RMB,
 	"glm-4-airx":                                0.01 * RMB,
 	"glm-4-long":                                0.001 * RMB,
 	"glm-4-flash":                               0,
+	"glm-4-flashx-250414":                       0.0001 * RMB,
+	"glm-4.7-flash":                             0,
+	"glm-4.6v-flash":                            0,
 	"glm-4v-plus":                               0.01 * RMB,
-	"qwen-turbo":                                0.8572, // ￥0.012 / 1k tokens
-	"qwen-plus":                                 10,     // ￥0.14 / 1k tokens
+	"qwen3.7-max":                               12 * RMBPerMillion,
+	"qwen3.6-max-preview":                       9 * RMBPerMillion,
+	"qwen3-max":                                 2.5 * RMBPerMillion,
+	"qwen3.6-plus":                              2 * RMBPerMillion,
+	"qwen3.5-plus":                              0.8 * RMBPerMillion,
+	"qwen-plus":                                 0.8 * RMBPerMillion,
+	"qwen-plus-latest":                          0.8 * RMBPerMillion,
+	"qwen3.6-flash":                             1.2 * RMBPerMillion,
+	"qwen3.6-flash-2026-04-16":                  1.2 * RMBPerMillion,
+	"qwen3.5-flash":                             0.2 * RMBPerMillion,
+	"qwen-flash":                                0.15 * RMBPerMillion,
+	"qwen-turbo":                                0.3 * RMBPerMillion,
+	"qwq-plus":                                  1.6 * RMBPerMillion,
+	"qwen-long":                                 0.5 * RMBPerMillion,
+	"qwen3-vl-plus":                             1 * RMBPerMillion,
+	"qwen3-vl-flash":                            0.15 * RMBPerMillion,
+	"qwen-vl-max":                               1.6 * RMBPerMillion,
+	"qwen-vl-plus":                              0.8 * RMBPerMillion,
+	"qwen3-coder":                               4 * RMBPerMillion,
+	"qwen3-coder-plus":                          4 * RMBPerMillion,
+	"qwen3-coder-flash":                         1 * RMBPerMillion,
+	"qwen3-next":                                1 * RMBPerMillion,
+	"qwen3-next-80b-a3b-thinking":               1 * RMBPerMillion,
+	"qwen3-next-80b-a3b-instruct":               1 * RMBPerMillion,
+	"qwen3-235b":                                2 * RMBPerMillion,
+	"qwen3-235b-a22b":                           2 * RMBPerMillion,
+	"qwen3-235b-a22b-thinking-2507":             2 * RMBPerMillion,
+	"qwen3-235b-a22b-instruct-2507":             2 * RMBPerMillion,
+	"qwen3-32b":                                 2 * RMBPerMillion,
+	"qwen3-30b-a3b":                             0.75 * RMBPerMillion,
+	"qwen3-30b-a3b-instruct-2507":               0.75 * RMBPerMillion,
+	"qwen3.5-397b-a17b":                         1.2 * RMBPerMillion,
+	"qwen3.5-35b-a3b":                           0.4 * RMBPerMillion,
+	"qwen3.6-35b-a3b":                           1.8 * RMBPerMillion,
+	"qwen3.6-27b":                               3 * RMBPerMillion,
+	"qwen3-vl-30b-a3b-instruct":                 0.75 * RMBPerMillion,
+	"qwen3-vl-235b-a22b-thinking":               2 * RMBPerMillion,
+	"qwen3-vl-235b-a22b-instruct":               2 * RMBPerMillion,
+	"kimi-k2.7-code":                            6.5 * RMBPerMillion,
+	"kimi-k2.7-code-highspeed":                  13 * RMBPerMillion,
+	"kimi/kimi-k2.7-code":                       6.5 * RMBPerMillion,
+	"kimi/kimi-k2.7-code-highspeed":             13 * RMBPerMillion,
+	"kimi-k2.6":                                 6.5 * RMBPerMillion,
+	"kimi/kimi-k2.6":                            6.5 * RMBPerMillion,
+	"kimi-k2.5":                                 4 * RMBPerMillion,
+	"kimi-k2-5-260127":                          4 * RMBPerMillion,
+	"kimi/kimi-k2.5":                            4 * RMBPerMillion,
+	"kimi-k2-thinking":                          4 * RMBPerMillion,
+	"Moonshot-Kimi-K2-Instruct":                 4 * RMBPerMillion,
+	"minimax-m3":                                4.2 * RMBPerMillion,
+	"MiniMax-M3":                                4.2 * RMBPerMillion,
+	"MiniMax/MiniMax-M3":                        4.2 * RMBPerMillion,
+	"minimax-m2.7":                              2.1 * RMBPerMillion,
+	"MiniMax-M2.7":                              2.1 * RMBPerMillion,
+	"MiniMax/MiniMax-M2.7":                      2.1 * RMBPerMillion,
+	"MiniMax-M2.7-highspeed":                    4.2 * RMBPerMillion,
+	"minimax-m2.5":                              2.1 * RMBPerMillion,
+	"MiniMax-M2.5":                              2.1 * RMBPerMillion,
+	"MiniMax/MiniMax-M2.5":                      2.1 * RMBPerMillion,
+	"minimax-m2.5-highspeed":                    4.2 * RMBPerMillion,
+	"MiniMax-M2.5-highspeed":                    4.2 * RMBPerMillion,
+	"MiniMax-M2.1":                              2.1 * RMBPerMillion,
+	"MiniMax/MiniMax-M2.1":                      2.1 * RMBPerMillion,
+	"MiniMax-M2.1-highspeed":                    4.2 * RMBPerMillion,
+	"MiniMax-M2":                                2.1 * RMBPerMillion,
 	// Doubao Seedance 2.0 video base tier: official 480p/720p, no video input, RMB per 1M tokens.
 	"doubao-seedance-2-0-260128":        46.0 / 14.0,
 	"dreamina-seedance-2-0-260128":      46.0 / 14.0,
@@ -235,7 +304,7 @@ var defaultModelRatio = map[string]float64{
 	"SparkDesk-v3.1":                    1.2858, // ￥0.018 / 1k tokens
 	"SparkDesk-v3.5":                    1.2858, // ￥0.018 / 1k tokens
 	"SparkDesk-v4.0":                    1.2858,
-	"hunyuan":                           7.143, // ¥0.1 / 1k tokens  // https://cloud.tencent.com/document/product/1729/97731#e0e6be58-60c8-469f-bdeb-6c264ce3b4d0
+	"hunyuan":                           0.1 * RMB, // ¥0.1 / 1k tokens  // https://cloud.tencent.com/document/product/1729/97731#e0e6be58-60c8-469f-bdeb-6c264ce3b4d0
 	// https://platform.lingyiwanwu.com/docs#-计费单元
 	// 已经按照 7.2 来换算美元价格
 	"yi-34b-chat-0205":       0.18,
@@ -320,6 +389,8 @@ var defaultModelPrice = map[string]float64{
 	"veo-3.0-fast-generate-001":      0.15,
 	"veo-3.1-generate-preview":       0.4,
 	"veo-3.1-fast-generate-preview":  0.15,
+	"image-01":                       0.025 / USD2RMB,
+	"image-01-live":                  0.025 / USD2RMB,
 }
 
 var defaultAudioRatio = map[string]float64{

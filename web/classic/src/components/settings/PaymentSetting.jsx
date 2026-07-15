@@ -37,7 +37,7 @@ const PaymentSetting = () => {
     PayAddress: '',
     EpayId: '',
     EpayKey: '',
-    Price: 7.3,
+    Price: 7.14,
     MinTopUp: 1,
     TopupGroupRatio: '',
     CustomCallbackAddress: '',

@@ -36,7 +36,7 @@ export default function SettingsPaymentGateway(props) {
     PayAddress: '',
     EpayId: '',
     EpayKey: '',
-    Price: 7.3,
+    Price: 7.14,
     MinTopUp: 1,
   });
   const formApiRef = useRef(null);
@@ -50,7 +50,7 @@ export default function SettingsPaymentGateway(props) {
         Price:
           props.options.Price !== undefined
             ? parseFloat(props.options.Price)
-            : 7.3,
+            : 7.14,
         MinTopUp:
           props.options.MinTopUp !== undefined
             ? parseFloat(props.options.MinTopUp)

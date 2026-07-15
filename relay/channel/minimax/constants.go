@@ -8,6 +8,7 @@ var ModelList = []string{
 	"abab6-chat",
 	"abab5.5-chat",
 	"abab5.5s-chat",
+	"MiniMax-M3",
 	"MiniMax-M2.7",
 	"MiniMax-M2.7-highspeed",
 	"speech-2.5-hd-preview",

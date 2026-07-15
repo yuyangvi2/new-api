@@ -10,7 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 )
 
-const seedanceDefaultUSDExchangeRate = 7.3
+const seedanceDefaultUSDExchangeRate = 7.14
 
 func SeedancePricePerMillionCNY(modelName, resolution string, hasVideoInput bool) (float64, bool) {
 	prices, ok := videoPriceTable[NormalizeSeedanceModelName(modelName)]

@@ -159,12 +159,12 @@ const PRESET_GROUPS: PresetGroup[] = [
       {
         key: 'qwen3-max',
         label: 'Qwen3 Max',
-        expr: 'len <= 32000 ? tier("short", p * 1.2 + c * 6 + cr * 0.24 + cc * 1.5) : len <= 128000 ? tier("mid", p * 2.4 + c * 12 + cr * 0.48 + cc * 3) : tier("long", p * 3 + c * 15 + cr * 0.6 + cc * 3.75)',
+        expr: 'len <= 32000 ? tier("short", p * 0.350140 + c * 1.400560) : len <= 128000 ? tier("mid", p * 0.560224 + c * 2.240896) : tier("long", p * 0.980392 + c * 3.921569)',
       },
       {
         key: 'glm-4.5-air',
         label: 'GLM-4.5 Air',
-        expr: 'len < 32000 && c < 200 ? tier("short_output", p * 0.8 + c * 2 + cr * 0.16) : len < 32000 && c >= 200 ? tier("long_output", p * 0.8 + c * 6 + cr * 0.16) : tier("mid_context", p * 1.2 + c * 8 + cr * 0.24)',
+        expr: 'len < 32000 && c < 200 ? tier("short_output", p * 0.112045 + c * 0.280112 + cr * 0.022409) : len < 32000 && c >= 200 ? tier("long_output", p * 0.112045 + c * 0.840336 + cr * 0.022409) : tier("mid_context", p * 0.168067 + c * 1.120448 + cr * 0.033613)',
       },
       {
         key: 'doubao-seed-1.8',
