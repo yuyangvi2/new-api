@@ -145,73 +145,65 @@ export function PlaygroundInputTools({
           </DropdownMenu>
         </Tooltip>
 
-        <Tooltip>
-          <DropdownMenu>
-            <TooltipTrigger
-              render={
-                <DropdownMenuTrigger
-                  render={
-                    <PromptInputButton
-                      aria-label={t('Web search')}
-                      className={
-                        isWebSearchActive
-                          ? 'bg-primary/10 text-primary hover:bg-primary/15 relative font-medium ring-1 ring-primary/15'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-muted/70 relative font-medium'
-                      }
-                      disabled={disabled}
-                      variant='ghost'
-                    />
-                  }
-                >
-                  <GlobeIcon size={16} />
-                  {isWebSearchActive && (
-                    <span className='bg-primary absolute top-1.5 right-1.5 size-1.5 rounded-full' />
-                  )}
-                </DropdownMenuTrigger>
-              }
-            />
-            <TooltipContent>
-              <p>{t('Web search')}</p>
-            </TooltipContent>
-            <DropdownMenuContent align='start' className='w-64'>
-              <DropdownMenuLabel>{t('Web search')}</DropdownMenuLabel>
-              <div className='text-muted-foreground px-1.5 pb-1 text-xs leading-5'>
-                {t(webSearchCompatibility.labelKey)}
-              </div>
-              <DropdownMenuSeparator />
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <PromptInputButton
+                aria-label={t('Web search')}
+                className={
+                  isWebSearchActive
+                    ? 'bg-primary/10 text-primary hover:bg-primary/15 relative font-medium ring-1 ring-primary/15'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/70 relative font-medium'
+                }
+                disabled={disabled}
+                title={t('Web search')}
+                variant='ghost'
+              />
+            }
+          >
+            <GlobeIcon size={16} />
+            {isWebSearchActive && (
+              <span className='bg-primary absolute top-1.5 right-1.5 size-1.5 rounded-full' />
+            )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align='start' className='w-64'>
+            <DropdownMenuLabel>{t('Web search')}</DropdownMenuLabel>
+            <div className='text-muted-foreground px-1.5 pb-1 text-xs leading-5'>
+              {t(webSearchCompatibility.labelKey)}
+            </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={!canEnableWebSearch && !webSearchEnabled}
+              onClick={() => handleEnableWebSearch(!webSearchEnabled)}
+            >
+              {webSearchEnabled ? (
+                <CheckIcon size={16} />
+              ) : (
+                <CircleSlashIcon size={16} />
+              )}
+              {webSearchEnabled ? t('Web search enabled') : t('Off')}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>{t('Search depth')}</DropdownMenuLabel>
+            {WEB_SEARCH_CONTEXT_OPTIONS.map((option) => (
               <DropdownMenuItem
-                disabled={!canEnableWebSearch && !webSearchEnabled}
-                onClick={() => handleEnableWebSearch(!webSearchEnabled)}
+                disabled={!canEnableWebSearch}
+                key={option.value}
+                onClick={() => {
+                  onWebSearchContextSizeChange(option.value)
+                  handleEnableWebSearch(true)
+                }}
               >
-                {webSearchEnabled ? (
+                {webSearchContextSize === option.value ? (
                   <CheckIcon size={16} />
                 ) : (
-                  <CircleSlashIcon size={16} />
+                  <span className='size-4' />
                 )}
-                {webSearchEnabled ? t('Web search enabled') : t('Off')}
+                {t(option.label)}
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>{t('Search depth')}</DropdownMenuLabel>
-              {WEB_SEARCH_CONTEXT_OPTIONS.map((option) => (
-                <DropdownMenuItem
-                  disabled={!canEnableWebSearch}
-                  key={option.value}
-                  onClick={() => {
-                    onWebSearchContextSizeChange(option.value)
-                    handleEnableWebSearch(true)
-                  }}
-                >
-                  {webSearchContextSize === option.value ? (
-                    <CheckIcon size={16} />
-                  ) : (
-                    <span className='size-4' />
-                  )}
-                  {t(option.label)}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </Tooltip>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <Tooltip>
           <TooltipTrigger
