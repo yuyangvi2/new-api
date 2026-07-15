@@ -21,9 +21,46 @@ import type {
   Message,
   PlaygroundConfig,
   ParameterEnabled,
+  ToolCallRequest,
 } from '../../types'
 import { shouldOmitClaudeSamplingParameters } from '../model-capabilities'
 import { formatMessageForAPI, isValidMessage } from '../message/message-utils'
+import { getWebSearchCompatibility } from '../search/web-search-compatibility'
+
+const GEMINI_GOOGLE_SEARCH_TOOL: ToolCallRequest = {
+  type: 'function',
+  function: {
+    name: 'googleSearch',
+  },
+}
+
+function applyWebSearchPayload(
+  payload: ChatCompletionRequest,
+  config: PlaygroundConfig,
+): void {
+  if (!config.web_search_enabled) {
+    return
+  }
+
+  const compatibility = getWebSearchCompatibility(config.group, config.model)
+  if (!compatibility.supported || !compatibility.strategy) {
+    return
+  }
+
+  if (compatibility.strategy === 'gemini_google_search') {
+    payload.tools = [...(payload.tools ?? []), GEMINI_GOOGLE_SEARCH_TOOL]
+    return
+  }
+
+  if (compatibility.strategy === 'qwen_enable_search') {
+    payload.enable_search = true
+    return
+  }
+
+  payload.web_search_options = {
+    search_context_size: config.web_search_context_size,
+  }
+}
 
 /**
  * Build API request payload from messages and config
@@ -31,7 +68,7 @@ import { formatMessageForAPI, isValidMessage } from '../message/message-utils'
 export function buildChatCompletionPayload(
   messages: Message[],
   config: PlaygroundConfig,
-  parameterEnabled: ParameterEnabled
+  parameterEnabled: ParameterEnabled,
 ): ChatCompletionRequest {
   // Filter and format valid messages
   const processedMessages = messages
@@ -45,7 +82,7 @@ export function buildChatCompletionPayload(
     stream: config.stream,
   }
   const shouldOmitSamplingParameters = shouldOmitClaudeSamplingParameters(
-    config.model
+    config.model,
   )
 
   if (parameterEnabled.temperature && !shouldOmitSamplingParameters) {
@@ -71,6 +108,8 @@ export function buildChatCompletionPayload(
   if (parameterEnabled.seed && config.seed !== null) {
     payload.seed = config.seed
   }
+
+  applyWebSearchPayload(payload, config)
 
   return payload
 }

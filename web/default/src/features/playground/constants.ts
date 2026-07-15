@@ -16,7 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { PlaygroundConfig, ParameterEnabled } from './types'
+import type {
+  PlaygroundConfig,
+  ParameterEnabled,
+  WebSearchContextSize,
+} from './types'
 
 // Message constants
 export const MESSAGE_ROLES = {
@@ -54,7 +58,24 @@ export const DEFAULT_CONFIG: PlaygroundConfig = {
   presence_penalty: 0,
   seed: null,
   stream: true,
+  web_search_enabled: false,
+  web_search_context_size: 'medium',
 }
+
+export const WEB_SEARCH_CONTEXT_OPTIONS = [
+  {
+    value: 'low',
+    label: 'Low context',
+  },
+  {
+    value: 'medium',
+    label: 'Medium context',
+  },
+  {
+    value: 'high',
+    label: 'High context',
+  },
+] satisfies Array<{ value: WebSearchContextSize; label: string }>
 
 export const DEFAULT_PARAMETER_ENABLED: ParameterEnabled = {
   temperature: true,
