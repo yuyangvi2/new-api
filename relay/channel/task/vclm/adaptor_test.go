@@ -26,6 +26,7 @@ func TestBuildRequestBodyDropsUnsupportedFrontendParamsForVidu(t *testing.T) {
 		Metadata: map[string]interface{}{
 			"MovementAmplitude": "auto",
 			"Resolution":        "720p",
+			"Mode":              "std",
 			"resolution":        "1080p",
 			"Payload":           "client-payload",
 		},
@@ -45,6 +46,7 @@ func TestBuildRequestBodyDropsUnsupportedFrontendParamsForVidu(t *testing.T) {
 
 	assert.NotContains(t, got, "MovementAmplitude")
 	assert.NotContains(t, got, "Resolution")
+	assert.NotContains(t, got, "Mode")
 	assert.NotContains(t, got, "resolution")
 	assert.Equal(t, "client-payload", got["Payload"])
 }

@@ -191,7 +191,7 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	body := buildRequest(action, &req, info.UpstreamModelName)
 
 	// metadata 透传/覆盖（PascalCase 键，供各 Action 特有参数）
-	if err := taskcommon.UnmarshalMetadata(sanitizeVCLMMetadata(req.Metadata), &body); err != nil {
+	if err := taskcommon.UnmarshalMetadata(sanitizeVCLMMetadata(action, req.Metadata), &body); err != nil {
 		return nil, errors.Wrap(err, "unmarshal metadata failed")
 	}
 
@@ -204,7 +204,7 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	return bytes.NewReader(data), nil
 }
 
-func sanitizeVCLMMetadata(metadata map[string]interface{}) map[string]interface{} {
+func sanitizeVCLMMetadata(action string, metadata map[string]interface{}) map[string]interface{} {
 	if len(metadata) == 0 {
 		return nil
 	}
@@ -213,6 +213,10 @@ func sanitizeVCLMMetadata(metadata map[string]interface{}) map[string]interface{
 		switch key {
 		case "MovementAmplitude", "movement_amplitude", "Resolution", "resolution":
 			continue
+		case "Mode", "mode":
+			if action == "SubmitImageToVideoViduJob" || action == "SubmitTextToVideoViduJob" {
+				continue
+			}
 		default:
 			filtered[key] = value
 		}
