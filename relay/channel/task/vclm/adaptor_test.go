@@ -10,7 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 )
 
 func TestBuildRequestBodyDropsUnsupportedFrontendParamsForVidu(t *testing.T) {
@@ -79,4 +81,39 @@ func TestBuildRequestBodyDropsUnsupportedFrontendParamsForKling(t *testing.T) {
 	assert.NotContains(t, got, "Resolution")
 	assert.Equal(t, "low quality", got["NegativePrompt"])
 	assert.Equal(t, 0.5, got["CfgScale"])
+}
+
+func TestAdjustBillingOnCompleteUsesFloatingFinalUnitDeduction(t *testing.T) {
+	originalModelRatio := ratio_setting.ModelRatio2JSONString()
+	originalGroupRatio := ratio_setting.GroupRatio2JSONString()
+	t.Cleanup(func() {
+		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(originalModelRatio))
+		require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(originalGroupRatio))
+	})
+
+	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{"kling-v2-6":0.14}`))
+	require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(`{"test-group":1}`))
+
+	adaptor := &TaskAdaptor{}
+	result, err := adaptor.ParseTaskResult([]byte(`{
+		"Response": {
+			"Status": "DONE",
+			"ResultVideoUrl": "https://example.com/video.mp4",
+			"FinalUnitDeduction": "1.5"
+		}
+	}`))
+	require.NoError(t, err)
+
+	assert.Equal(t, 1.5, result.BillingUnits)
+	assert.Zero(t, result.TotalTokens)
+	assert.Zero(t, result.CompletionTokens)
+
+	actualQuota := adaptor.AdjustBillingOnComplete(&model.Task{
+		Group: "test-group",
+		Properties: model.Properties{
+			OriginModelName: "kling-v2-6",
+		},
+	}, result)
+
+	assert.Equal(t, common.QuotaFromFloat(1.5*0.14*common.QuotaPerUnit), actualQuota)
 }

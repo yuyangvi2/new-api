@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -25,6 +24,7 @@ import (
 	taskcommon "github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 )
 
 // ============================
@@ -259,6 +259,25 @@ func (a *TaskAdaptor) GetChannelName() string {
 	return "kling"
 }
 
+func (a *TaskAdaptor) AdjustBillingOnComplete(task *model.Task, taskResult *relaycommon.TaskInfo) int {
+	if taskResult == nil || taskResult.BillingUnits <= 0 {
+		return 0
+	}
+	modelName := task.Properties.OriginModelName
+	if bc := task.PrivateData.BillingContext; bc != nil && bc.OriginModelName != "" {
+		modelName = bc.OriginModelName
+	}
+	modelRatio, ok, _ := ratio_setting.GetModelRatio(modelName)
+	if !ok || modelRatio <= 0 {
+		return 0
+	}
+	groupRatio := 1.0
+	if task.Group != "" {
+		groupRatio = ratio_setting.GetGroupRatio(task.Group)
+	}
+	return common.QuotaFromFloat(taskResult.BillingUnits * modelRatio * groupRatio * common.QuotaPerUnit)
+}
+
 // ============================
 // helpers
 // ============================
@@ -358,11 +377,8 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 			taskInfo.Url = video.Url
 		}
 		if tokens, err := strconv.ParseFloat(resPayload.Data.FinalUnitDeduction, 64); err == nil {
-			// 上游返回的扣费数值，饱和转换防止超大数值回绕成负数
-			rounded := common.QuotaFromFloat(math.Ceil(tokens))
-			if rounded > 0 {
-				taskInfo.CompletionTokens = rounded
-				taskInfo.TotalTokens = rounded
+			if tokens > 0 {
+				taskInfo.BillingUnits = tokens
 			}
 		}
 	case "failed":

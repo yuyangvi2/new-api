@@ -22,7 +22,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -446,9 +445,8 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 		} else if r.Response.Credits > 0 {
 			units = r.Response.Credits
 		}
-		if rounded := int(math.Ceil(units)); rounded > 0 {
-			info.CompletionTokens = rounded
-			info.TotalTokens = rounded
+		if units > 0 {
+			info.BillingUnits = units
 		}
 	case "FAIL":
 		info.Status = model.TaskStatusFailure
@@ -477,7 +475,7 @@ func (a *TaskAdaptor) GetChannelName() string {
 // 这样预扣(modelRatio/2 × QuotaPerUnit ≈ 半美元级)不会爆炸，完成时再按真实用量补/退。
 // 未配倍率则返回 0（回退到预扣额度不变）。
 func (a *TaskAdaptor) AdjustBillingOnComplete(task *model.Task, taskResult *relaycommon.TaskInfo) int {
-	if taskResult == nil || taskResult.TotalTokens <= 0 {
+	if taskResult == nil || taskResult.BillingUnits <= 0 {
 		return 0
 	}
 	modelName := task.Properties.OriginModelName
@@ -492,7 +490,7 @@ func (a *TaskAdaptor) AdjustBillingOnComplete(task *model.Task, taskResult *rela
 	if task.Group != "" {
 		groupRatio = ratio_setting.GetGroupRatio(task.Group)
 	}
-	return int(float64(taskResult.TotalTokens) * modelRatio * groupRatio * common.QuotaPerUnit)
+	return common.QuotaFromFloat(taskResult.BillingUnits * modelRatio * groupRatio * common.QuotaPerUnit)
 }
 
 // ============================ TC3 签名 ============================
