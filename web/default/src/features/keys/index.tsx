@@ -16,13 +16,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { Check, Copy, Gauge } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { CopyButton } from '@/components/copy-button'
 import { SectionPageLayout } from '@/components/layout'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { openExternalSpeedTest } from '@/features/dashboard/lib'
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { getApiBaseAddress } from '@/lib/server-address'
+import { cn } from '@/lib/utils'
 
 import { ApiKeysDialogs } from './components/api-keys-dialogs'
 import { ApiKeysPrimaryButtons } from './components/api-keys-primary-buttons'
@@ -31,10 +38,13 @@ import { ApiKeysTable } from './components/api-keys-table'
 
 export function ApiKeys() {
   const { t } = useTranslation()
+  const { copiedText, copyToClipboard } = useCopyToClipboard({ notify: false })
   const apiBaseAddress = getApiBaseAddress()
   const endpointUrl = apiBaseAddress.endsWith('/v1')
     ? apiBaseAddress
     : `${apiBaseAddress}/v1`
+  const isCopied = copiedText === endpointUrl
+  const copyLabel = isCopied ? t('Copied!') : t('Click to copy')
 
   return (
     <ApiKeysProvider>
@@ -50,46 +60,67 @@ export function ApiKeys() {
         </SectionPageLayout.Actions>
         <SectionPageLayout.Content>
           <div className='flex h-full min-h-0 flex-col gap-4'>
-            <Card className='tokone-cta-band shrink-0'>
-              <CardContent className='grid gap-4 p-0 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.72fr)] lg:items-center'>
-                <div className='space-y-2'>
-                  <div className='flex flex-wrap items-center gap-2'>
-                    <Badge variant='secondary'>{t('Production ready')}</Badge>
-                    <Badge variant='outline'>{t('Bearer token')}</Badge>
-                  </div>
-                  <h3 className='text-lg font-semibold tracking-tight'>
-                    {t('Use your key with the OpenAI-compatible endpoint')}
-                  </h3>
-                  <p className='text-muted-foreground max-w-2xl text-sm leading-relaxed'>
-                    {t(
-                      'Copy the base URL into your SDK or client configuration, then use your API key as a Bearer token.'
-                    )}
-                  </p>
-                </div>
-                <div className='bg-foreground/[0.045] min-w-0 rounded-lg border p-3'>
-                  <div className='mb-2 flex items-center justify-between gap-2'>
-                    <span className='text-muted-foreground text-xs font-medium'>
-                      {t('API Base URL')}
-                    </span>
-                    <CopyButton
-                      value={endpointUrl}
-                      tooltip={t('Copy endpoint URL')}
-                      successTooltip={t('Copied!')}
-                      aria-label={t('Copy endpoint URL')}
-                      iconClassName='size-3.5'
-                      className='size-7'
-                    />
-                  </div>
-                  <code className='text-foreground block truncate font-mono text-sm'>
-                    {endpointUrl}
-                  </code>
-                  <div className='text-muted-foreground mt-2 grid gap-1 font-mono text-xs'>
-                    <span>Authorization: Bearer sk-...</span>
-                    <span>POST /chat/completions</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <div className='border-border/60 bg-muted/40 text-muted-foreground inline-flex max-w-full flex-wrap items-center gap-1.5 self-start rounded-md border px-2 py-1 text-xs'>
+              <span className='font-medium'>{t('API Endpoint')}</span>
+              <span
+                aria-hidden
+                className='bg-border/70 mx-0.5 h-3 w-px shrink-0'
+              />
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type='button'
+                      onClick={() => copyToClipboard(endpointUrl)}
+                      aria-label={copyLabel}
+                      className={cn(
+                        'text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 focus-visible:text-foreground max-w-[min(68vw,420px)] truncate rounded-sm font-mono outline-none decoration-dashed underline-offset-2 hover:underline focus-visible:ring-2',
+                        isCopied && 'text-foreground'
+                      )}
+                    >
+                      {endpointUrl}
+                    </button>
+                  }
+                />
+                <TooltipContent>{copyLabel}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant='ghost'
+                      size='icon'
+                      onClick={() => copyToClipboard(endpointUrl)}
+                      aria-label={copyLabel}
+                      className='text-muted-foreground hover:text-foreground -my-0.5 size-5'
+                    >
+                      {isCopied ? (
+                        <Check className='text-success size-3' />
+                      ) : (
+                        <Copy className='size-3' />
+                      )}
+                    </Button>
+                  }
+                />
+                <TooltipContent>{copyLabel}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant='ghost'
+                      size='icon'
+                      onClick={() => openExternalSpeedTest(endpointUrl)}
+                      aria-label={t('External Speed Test')}
+                      className='text-muted-foreground hover:text-foreground -my-0.5 size-5'
+                    >
+                      <Gauge className='size-3' />
+                    </Button>
+                  }
+                />
+                <TooltipContent>{t('External Speed Test')}</TooltipContent>
+              </Tooltip>
+            </div>
             <div className='min-h-0 flex-1'>
               <ApiKeysTable />
             </div>
