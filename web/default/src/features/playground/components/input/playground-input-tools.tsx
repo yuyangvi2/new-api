@@ -35,6 +35,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -167,41 +168,44 @@ export function PlaygroundInputTools({
             )}
           </DropdownMenuTrigger>
           <DropdownMenuContent align='start' className='w-64'>
-            <DropdownMenuLabel>{t('Web search')}</DropdownMenuLabel>
-            <div className='text-muted-foreground px-1.5 pb-1 text-xs leading-5'>
-              {t(webSearchCompatibility.labelKey)}
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              disabled={!canEnableWebSearch && !webSearchEnabled}
-              onClick={() => handleEnableWebSearch(!webSearchEnabled)}
-            >
-              {webSearchEnabled ? (
-                <CheckIcon size={16} />
-              ) : (
-                <CircleSlashIcon size={16} />
-              )}
-              {webSearchEnabled ? t('Web search enabled') : t('Off')}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>{t('Search depth')}</DropdownMenuLabel>
-            {WEB_SEARCH_CONTEXT_OPTIONS.map((option) => (
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>{t('Web search')}</DropdownMenuLabel>
+              <div className='text-muted-foreground px-1.5 pb-1 text-xs leading-5'>
+                {t(webSearchCompatibility.labelKey)}
+              </div>
               <DropdownMenuItem
-                disabled={!canEnableWebSearch}
-                key={option.value}
-                onClick={() => {
-                  onWebSearchContextSizeChange(option.value)
-                  handleEnableWebSearch(true)
-                }}
+                disabled={!canEnableWebSearch && !webSearchEnabled}
+                onClick={() => handleEnableWebSearch(!webSearchEnabled)}
               >
-                {webSearchContextSize === option.value ? (
+                {webSearchEnabled ? (
                   <CheckIcon size={16} />
                 ) : (
-                  <span className='size-4' />
+                  <CircleSlashIcon size={16} />
                 )}
-                {t(option.label)}
+                {webSearchEnabled ? t('Web search enabled') : t('Off')}
               </DropdownMenuItem>
-            ))}
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>{t('Search depth')}</DropdownMenuLabel>
+              {WEB_SEARCH_CONTEXT_OPTIONS.map((option) => (
+                <DropdownMenuItem
+                  disabled={!canEnableWebSearch}
+                  key={option.value}
+                  onClick={() => {
+                    onWebSearchContextSizeChange(option.value)
+                    handleEnableWebSearch(true)
+                  }}
+                >
+                  {webSearchContextSize === option.value ? (
+                    <CheckIcon size={16} />
+                  ) : (
+                    <span className='size-4' />
+                  )}
+                  {t(option.label)}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
 
