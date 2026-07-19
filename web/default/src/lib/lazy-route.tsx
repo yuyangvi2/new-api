@@ -16,25 +16,24 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { lazy, Suspense, type ComponentType } from 'react'
 
-import { lazyRouteComponent } from '@/lib/lazy-route'
-import { useAuthStore } from '@/stores/auth-store'
+type LazyRouteModule = {
+  default: unknown
+}
 
-const SignUpRoute = lazyRouteComponent(() =>
-  import('@/features/auth/sign-up').then((module) => ({
-    default: module.SignUp,
-  }))
-)
+export function lazyRouteComponent<
+  TProps extends object = Record<string, never>,
+>(loader: () => Promise<LazyRouteModule>) {
+  const LazyComponent = lazy(
+    loader as () => Promise<{ default: ComponentType<TProps> }>
+  ) as ComponentType<TProps>
 
-export const Route = createFileRoute('/(auth)/sign-up')({
-  component: SignUpRoute,
-  beforeLoad: () => {
-    const { auth } = useAuthStore.getState()
-
-    // 如果已经有用户信息，说明已登录，注册页对其无意义，跳转到 dashboard
-    if (auth.user) {
-      throw redirect({ to: '/dashboard' })
-    }
-  },
-})
+  return function LazyRouteComponent(props: TProps) {
+    return (
+      <Suspense fallback={null}>
+        <LazyComponent {...props} />
+      </Suspense>
+    )
+  }
+}

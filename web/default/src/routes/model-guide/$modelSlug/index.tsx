@@ -18,8 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute } from '@tanstack/react-router'
 
-import { ModelGuide } from '@/features/market/model-guide'
+import { lazyRouteComponent } from '@/lib/lazy-route'
+
+const ModelGuideRoute = lazyRouteComponent(() =>
+  import('@/features/market/model-guide').then((module) => ({
+    default: module.ModelGuide,
+  }))
+)
 
 export const Route = createFileRoute('/model-guide/$modelSlug/')({
-  component: ModelGuide,
+  component: ModelGuideRoute,
 })

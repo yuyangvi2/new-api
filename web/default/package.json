@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "rsbuild dev",
     "build": "rsbuild build",
+    "bundle:stats": "node scripts/build-bundle-stats.mjs",
     "build:check": "tsgo -b && rsbuild build",
     "typecheck": "tsgo -b",
     "lint": "oxlint -c .oxlintrc.json .",

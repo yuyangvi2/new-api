@@ -378,6 +378,7 @@ function MarketModelCard(props: {
   const initial = model.model_name?.charAt(0).toUpperCase() || '?'
   const isDynamicPricing =
     model.billing_mode === 'tiered_expr' && Boolean(model.billing_expr)
+  const hasCachedPrice = isTokenBasedModel(model) && model.cache_ratio != null
   const dynamicSummary = isDynamicPricing
     ? getDynamicPricingSummary(model, {
         tokenUnit: DEFAULT_TOKEN_UNIT,
@@ -387,12 +388,20 @@ function MarketModelCard(props: {
         groupRatioMultiplier: getDynamicDisplayGroupRatio(model),
       })
     : null
+  const dynamicPriceEntries = dynamicSummary
+    ? [
+        ...dynamicSummary.primaryEntries,
+        ...dynamicSummary.entries.filter(
+          (entry) => entry.field === 'cacheReadPrice'
+        ),
+      ]
+    : []
 
   let priceSummary: ReactNode
   if (dynamicSummary?.isSpecialExpression) {
     priceSummary = t('Special billing expression')
-  } else if (dynamicSummary && dynamicSummary.primaryEntries.length > 0) {
-    priceSummary = dynamicSummary.primaryEntries.map((entry) => (
+  } else if (dynamicSummary && dynamicPriceEntries.length > 0) {
+    priceSummary = dynamicPriceEntries.map((entry) => (
       <span key={entry.key} className='whitespace-nowrap'>
         {t(entry.shortLabel)}{' '}
         <span className='font-mono font-semibold'>{entry.formatted}</span>/1M
@@ -431,6 +440,22 @@ function MarketModelCard(props: {
           </span>
           /1M
         </span>
+        {hasCachedPrice && (
+          <span className='whitespace-nowrap'>
+            {t('Cache Read')}{' '}
+            <span className='font-mono font-semibold'>
+              {formatPrice(
+                model,
+                'cache',
+                DEFAULT_TOKEN_UNIT,
+                false,
+                props.priceRate,
+                props.usdExchangeRate
+              )}
+            </span>
+            /1M
+          </span>
+        )}
       </>
     )
   } else {
@@ -546,6 +571,7 @@ function MarketModelCard(props: {
 }
 
 function MarketSidebar(props: {
+  kindCounts: Map<MarketKind, number>
   vendors: Array<{ name: string; count: number; icon?: string }>
   tasks: Array<MarketTask & { count: number }>
   kindLabel: string
@@ -553,6 +579,8 @@ function MarketSidebar(props: {
   providerScopeCount: number
   activeTask: string
   activeVendor: string
+  activeKind: MarketKind
+  onKindChange: (kind: MarketKind) => void
   onTaskChange: (task: string) => void
   onVendorChange: (vendor: string) => void
 }) {
@@ -561,6 +589,36 @@ function MarketSidebar(props: {
   return (
     <aside className='bg-card/92 rounded-2xl border p-4 shadow-sm'>
       <div className='space-y-5'>
+        <div>
+          <div className='text-sm font-semibold'>{t('Model types')}</div>
+          <div className='mt-3 grid gap-2'>
+            {MODEL_TYPES.map((item) => {
+              const Icon = item.icon
+              return (
+                <button
+                  key={item.value}
+                  type='button'
+                  onClick={() => props.onKindChange(item.value)}
+                  className={cn(
+                    'flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs transition-colors',
+                    props.activeKind === item.value
+                      ? 'bg-foreground text-background'
+                      : 'bg-background text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <span className='inline-flex min-w-0 items-center gap-2'>
+                    <Icon className='size-3.5 shrink-0' />
+                    <span className='truncate'>{t(item.label)}</span>
+                  </span>
+                  <span className='font-mono'>
+                    {props.kindCounts.get(item.value) ?? 0}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         <div>
           <div className='flex items-center justify-between gap-2'>
             <div className='text-sm font-semibold'>{t('Tasks')}</div>
@@ -799,11 +857,8 @@ export function Market() {
     <PublicLayout showMainContainer={false} showNotifications={false}>
       <main className='mx-auto max-w-7xl px-3 pt-24 pb-12 sm:px-4 md:px-6'>
         <section className='bg-card/92 rounded-2xl border px-4 py-8 text-center shadow-sm sm:rounded-3xl sm:px-6 md:px-10'>
-          <div className='text-brand mx-auto inline-flex rounded-full border border-orange-200/80 bg-orange-50/80 px-3 py-1 font-mono text-[11px] font-black tracking-[0.22em] uppercase shadow-[inset_0_-1px_0_rgb(234_117_20/0.18)] dark:border-orange-500/20 dark:bg-orange-500/10'>
-            MODEL MARKETPLACE
-          </div>
-          <h1 className='mx-auto mt-4 max-w-4xl text-3xl leading-tight font-bold tracking-tight sm:text-4xl md:text-5xl'>
-            {t('Choose the right model before you write integration code')}
+          <h1 className='mx-auto max-w-4xl text-3xl leading-tight font-bold tracking-tight sm:text-4xl md:text-5xl'>
+            {t('Find the right AI model, faster')}
           </h1>
           <p className='text-muted-foreground mx-auto mt-3 max-w-3xl text-sm leading-7 md:text-base'>
             {t(
@@ -814,6 +869,7 @@ export function Market() {
 
         <section className='mt-5 grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]'>
           <MarketSidebar
+            kindCounts={marketSummary.kindCounts}
             vendors={marketSummary.vendors}
             tasks={marketSummary.tasks}
             kindLabel={
@@ -824,6 +880,11 @@ export function Market() {
             providerScopeCount={marketSummary.providerScopeCount}
             activeTask={activeTask}
             activeVendor={activeVendor}
+            activeKind={activeKind}
+            onKindChange={(kind) => {
+              setActiveKind(kind)
+              setActiveTask('all')
+            }}
             onTaskChange={setActiveTask}
             onVendorChange={setActiveVendor}
           />
@@ -846,58 +907,6 @@ export function Market() {
                     {t('Providers')}: {marketSummary.vendors.length}
                   </Badge>
                 </div>
-              </div>
-
-              <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-4'>
-                {MODEL_TYPES.map((item) => {
-                  const Icon = item.icon
-                  const active = activeKind === item.value
-                  return (
-                    <button
-                      key={item.value}
-                      type='button'
-                      className={cn(
-                        'group flex min-h-20 items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all',
-                        active
-                          ? 'border-brand/60 bg-brand text-white shadow-[0_12px_28px_rgb(242_107_47/0.22)]'
-                          : 'bg-card text-foreground hover:border-brand/35 hover:bg-muted/40'
-                      )}
-                      onClick={() => {
-                        setActiveKind(item.value)
-                        setActiveTask('all')
-                      }}
-                    >
-                      <span className='flex min-w-0 items-center gap-3'>
-                        <span
-                          className={cn(
-                            'flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors',
-                            active
-                              ? 'bg-white/18 text-white'
-                              : 'bg-muted text-muted-foreground group-hover:text-foreground'
-                          )}
-                        >
-                          <Icon className='size-5' />
-                        </span>
-                        <span className='min-w-0'>
-                          <span className='block text-sm font-bold'>
-                            {t(item.label)}
-                          </span>
-                          <span
-                            className={cn(
-                              'mt-0.5 block text-xs',
-                              active ? 'text-white/72' : 'text-muted-foreground'
-                            )}
-                          >
-                            {t('{{count}} models', {
-                              count:
-                                marketSummary.kindCounts.get(item.value) ?? 0,
-                            })}
-                          </span>
-                        </span>
-                      </span>
-                    </button>
-                  )
-                })}
               </div>
 
               <div className='relative'>

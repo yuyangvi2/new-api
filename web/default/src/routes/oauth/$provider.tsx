@@ -27,14 +27,23 @@ import i18next from 'i18next'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
-import { OAuthCallbackScreen } from '@/features/auth/components/oauth-callback-screen'
 import { OAUTH_BIND_STORAGE_KEY } from '@/features/auth/constants'
 import { api, getSelf } from '@/lib/api'
+import { lazyRouteComponent } from '@/lib/lazy-route'
 import { useAuthStore, type AuthUser } from '@/stores/auth-store'
 
 type OAuthRequestConfig = AxiosRequestConfig & {
   skipBusinessError?: boolean
 }
+
+const OAuthCallbackScreenRoute = lazyRouteComponent<{
+  provider: string
+  mode: 'login' | 'bind'
+}>(() =>
+  import('@/features/auth/components/oauth-callback-screen').then((module) => ({
+    default: module.OAuthCallbackScreen,
+  }))
+)
 
 function OAuthCallback() {
   const navigate = useNavigate()
@@ -240,7 +249,7 @@ function OAuthCallback() {
     })()
   }, [mode, navigate, provider, search])
 
-  return <OAuthCallbackScreen provider={provider} mode={mode} />
+  return <OAuthCallbackScreenRoute provider={provider} mode={mode} />
 }
 
 export const Route = createFileRoute('/oauth/$provider')({
