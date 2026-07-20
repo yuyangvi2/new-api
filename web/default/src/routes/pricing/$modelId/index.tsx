@@ -19,8 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import z from 'zod'
 
-import { ModelDetails } from '@/features/pricing/components/model-details'
-import { getFreshModuleAccess } from '@/lib/nav-modules'
+import { lazyRouteComponent } from '@/lib/lazy-route'
+import { getFreshModuleAccess, getModuleAccess } from '@/lib/nav-modules'
 import { useAuthStore } from '@/stores/auth-store'
 
 const modelDetailsSearchSchema = z.object({
@@ -36,10 +36,17 @@ const modelDetailsSearchSchema = z.object({
   rechargePrice: z.boolean().optional(),
 })
 
+const ModelDetailsRoute = lazyRouteComponent(() =>
+  import('@/features/pricing/components/model-details').then((module) => ({
+    default: module.ModelDetails,
+  }))
+)
+
 export const Route = createFileRoute('/pricing/$modelId/')({
   validateSearch: modelDetailsSearchSchema,
-  beforeLoad: async ({ location }) => {
-    const access = await getFreshModuleAccess('pricing')
+  beforeLoad: ({ location }) => {
+    const access = getModuleAccess('pricing')
+    void getFreshModuleAccess('pricing')
     if (!access.enabled) {
       throw redirect({ to: '/' })
     }
@@ -53,5 +60,5 @@ export const Route = createFileRoute('/pricing/$modelId/')({
       }
     }
   },
-  component: ModelDetails,
+  component: ModelDetailsRoute,
 })

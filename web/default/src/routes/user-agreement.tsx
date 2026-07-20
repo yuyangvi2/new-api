@@ -18,8 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute } from '@tanstack/react-router'
 
-import { UserAgreement } from '@/features/legal'
+import { lazyRouteComponent } from '@/lib/lazy-route'
+
+const UserAgreementRoute = lazyRouteComponent(() =>
+  import('@/features/legal').then((module) => ({
+    default: module.UserAgreement,
+  }))
+)
 
 export const Route = createFileRoute('/user-agreement')({
-  component: UserAgreement,
+  component: UserAgreementRoute,
 })

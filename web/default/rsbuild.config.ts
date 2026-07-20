@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -8,6 +9,42 @@ import { tanstackRouter } from '@tanstack/router-plugin/rspack'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+type RspackStats = {
+  toJson(options: Record<string, unknown>): unknown
+}
+
+type RspackCompiler = {
+  hooks: {
+    done: {
+      tap(name: string, callback: (stats: RspackStats) => void): void
+    }
+  }
+}
+
+function bundleStatsPlugin() {
+  return {
+    name: 'bundle-stats-plugin',
+    apply(compiler: RspackCompiler) {
+      compiler.hooks.done.tap('bundle-stats-plugin', (stats) => {
+        const outputFile = path.resolve(__dirname, 'dist/bundle-stats.json')
+        const statsJson = stats.toJson({
+          all: false,
+          assets: true,
+          chunks: true,
+          chunkGroups: true,
+          entrypoints: true,
+          modules: true,
+          nestedModules: true,
+          reasons: false,
+          source: false,
+        })
+        fs.mkdirSync(path.dirname(outputFile), { recursive: true })
+        fs.writeFileSync(outputFile, JSON.stringify(statsJson, null, 2))
+      })
+    },
+  }
+}
+
 export default defineConfig(({ envMode }) => {
   const env = loadEnv({ mode: envMode, prefixes: ['VITE_'] })
   const serverUrl =
@@ -16,6 +53,7 @@ export default defineConfig(({ envMode }) => {
     'http://localhost:3000'
 
   const isProd = envMode === 'production'
+  const shouldWriteBundleStats = process.env.BUNDLE_STATS === '1'
   const devProxy = Object.fromEntries(
     (['/api', '/mj', '/pg'] as const).map((key) => [
       key,
@@ -96,6 +134,7 @@ export default defineConfig(({ envMode }) => {
             // Prod: keep route-based code splitting.
             autoCodeSplitting: isProd,
           }),
+          ...(shouldWriteBundleStats ? [bundleStatsPlugin()] : []),
         ],
       },
     },

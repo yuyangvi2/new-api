@@ -18,8 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute } from '@tanstack/react-router'
 
-import { PrivacyPolicy } from '@/features/legal'
+import { lazyRouteComponent } from '@/lib/lazy-route'
+
+const PrivacyPolicyRoute = lazyRouteComponent(() =>
+  import('@/features/legal').then((module) => ({
+    default: module.PrivacyPolicy,
+  }))
+)
 
 export const Route = createFileRoute('/privacy-policy')({
-  component: PrivacyPolicy,
+  component: PrivacyPolicyRoute,
 })

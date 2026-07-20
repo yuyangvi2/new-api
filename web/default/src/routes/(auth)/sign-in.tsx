@@ -19,30 +19,27 @@ For commercial licensing, please contact support@quantumnous.com
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 
-import { SignIn } from '@/features/auth/sign-in'
-import { getSelf } from '@/lib/api'
+import { lazyRouteComponent } from '@/lib/lazy-route'
 import { useAuthStore } from '@/stores/auth-store'
 
 const searchSchema = z.object({
   redirect: z.string().optional(),
 })
 
+const SignInRoute = lazyRouteComponent(() =>
+  import('@/features/auth/sign-in').then((module) => ({
+    default: module.SignIn,
+  }))
+)
+
 export const Route = createFileRoute('/(auth)/sign-in')({
-  component: SignIn,
+  component: SignInRoute,
   validateSearch: searchSchema,
-  beforeLoad: async ({ search }) => {
+  beforeLoad: ({ search }) => {
     const { auth } = useAuthStore.getState()
 
-    // 如果已经有用户信息，说明已登录
+    // 如果已经有用户信息，直接进入目标页；受保护路由会后台验证 session。
     if (auth.user) {
-      const self = await getSelf().catch(() => null)
-      if (!self?.success) {
-        auth.reset()
-        return
-      }
-
-      // 优先使用 redirect 参数（用户之前想去的地方）
-      // 否则跳转到 dashboard
       throw redirect({ to: search?.redirect || '/dashboard' })
     }
   },
