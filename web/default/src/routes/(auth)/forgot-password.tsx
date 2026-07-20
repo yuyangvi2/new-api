@@ -18,14 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute } from '@tanstack/react-router'
 
-import { lazyRouteComponent } from '@/lib/lazy-route'
-
-const ForgotPasswordRoute = lazyRouteComponent(() =>
-  import('@/features/auth/forgot-password').then((module) => ({
-    default: module.ForgotPassword,
-  }))
-)
+import { ForgotPassword } from '@/features/auth/forgot-password'
 
 export const Route = createFileRoute('/(auth)/forgot-password')({
-  component: ForgotPasswordRoute,
+  component: ForgotPassword,
 })

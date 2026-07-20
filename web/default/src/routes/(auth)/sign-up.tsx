@@ -18,17 +18,11 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
-import { lazyRouteComponent } from '@/lib/lazy-route'
+import { SignUp } from '@/features/auth/sign-up'
 import { useAuthStore } from '@/stores/auth-store'
 
-const SignUpRoute = lazyRouteComponent(() =>
-  import('@/features/auth/sign-up').then((module) => ({
-    default: module.SignUp,
-  }))
-)
-
 export const Route = createFileRoute('/(auth)/sign-up')({
-  component: SignUpRoute,
+  component: SignUp,
   beforeLoad: () => {
     const { auth } = useAuthStore.getState()
 

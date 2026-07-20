@@ -18,12 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute } from '@tanstack/react-router'
 
-import { lazyRouteComponent } from '@/lib/lazy-route'
-
-const MarketRoute = lazyRouteComponent(() =>
-  import('@/features/market').then((module) => ({ default: module.Market }))
-)
+import { Market } from '@/features/market'
 
 export const Route = createFileRoute('/market/')({
-  component: MarketRoute,
+  component: Market,
 })
