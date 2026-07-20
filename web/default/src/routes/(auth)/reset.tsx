@@ -18,17 +18,10 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, useSearch } from '@tanstack/react-router'
 
-import type { ResetPasswordSearchParams } from '@/features/auth/reset-password-confirm'
-import { lazyRouteComponent } from '@/lib/lazy-route'
-
-const ResetPasswordConfirmRoute = lazyRouteComponent<{
-  email?: string
-  token?: string
-}>(() =>
-  import('@/features/auth/reset-password-confirm').then((module) => ({
-    default: module.ResetPasswordConfirm,
-  }))
-)
+import {
+  ResetPasswordConfirm,
+  type ResetPasswordSearchParams,
+} from '@/features/auth/reset-password-confirm'
 
 export const Route = createFileRoute('/(auth)/reset')({
   component: ResetPassword,
@@ -39,6 +32,6 @@ function ResetPassword() {
     from: '/(auth)/reset',
   }) as ResetPasswordSearchParams
   return (
-    <ResetPasswordConfirmRoute email={search?.email} token={search?.token} />
+    <ResetPasswordConfirm email={search?.email} token={search?.token} />
   )
 }

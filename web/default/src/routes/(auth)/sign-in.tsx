@@ -19,21 +19,15 @@ For commercial licensing, please contact support@quantumnous.com
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 
-import { lazyRouteComponent } from '@/lib/lazy-route'
+import { SignIn } from '@/features/auth/sign-in'
 import { useAuthStore } from '@/stores/auth-store'
 
 const searchSchema = z.object({
   redirect: z.string().optional(),
 })
 
-const SignInRoute = lazyRouteComponent(() =>
-  import('@/features/auth/sign-in').then((module) => ({
-    default: module.SignIn,
-  }))
-)
-
 export const Route = createFileRoute('/(auth)/sign-in')({
-  component: SignInRoute,
+  component: SignIn,
   validateSearch: searchSchema,
   beforeLoad: ({ search }) => {
     const { auth } = useAuthStore.getState()

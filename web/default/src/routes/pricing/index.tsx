@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import z from 'zod'
 
-import { lazyRouteComponent } from '@/lib/lazy-route'
+import { Pricing } from '@/features/pricing'
 import { getFreshModuleAccess, getModuleAccess } from '@/lib/nav-modules'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -35,10 +35,6 @@ const pricingSearchSchema = z.object({
   view: z.enum(['card', 'table']).optional().catch(undefined),
   rechargePrice: z.boolean().optional(),
 })
-
-const PricingRoute = lazyRouteComponent(() =>
-  import('@/features/pricing').then((module) => ({ default: module.Pricing }))
-)
 
 export const Route = createFileRoute('/pricing/')({
   validateSearch: pricingSearchSchema,
@@ -58,5 +54,5 @@ export const Route = createFileRoute('/pricing/')({
       }
     }
   },
-  component: PricingRoute,
+  component: Pricing,
 })

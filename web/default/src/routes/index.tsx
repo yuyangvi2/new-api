@@ -18,12 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute } from '@tanstack/react-router'
 
-import { lazyRouteComponent } from '@/lib/lazy-route'
-
-const HomeRoute = lazyRouteComponent(() =>
-  import('@/features/home').then((module) => ({ default: module.Home }))
-)
+import { Home } from '@/features/home'
 
 export const Route = createFileRoute('/')({
-  component: HomeRoute,
+  component: Home,
 })

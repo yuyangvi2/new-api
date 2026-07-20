@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import z from 'zod'
 
-import { lazyRouteComponent } from '@/lib/lazy-route'
+import { Rankings } from '@/features/rankings'
 import { getFreshModuleAccess, getModuleAccess } from '@/lib/nav-modules'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -29,12 +29,6 @@ const rankingsSearchSchema = z.object({
     .optional()
     .catch(undefined),
 })
-
-const RankingsRoute = lazyRouteComponent(() =>
-  import('@/features/rankings').then((module) => ({
-    default: module.Rankings,
-  }))
-)
 
 export const Route = createFileRoute('/rankings/')({
   validateSearch: rankingsSearchSchema,
@@ -54,5 +48,5 @@ export const Route = createFileRoute('/rankings/')({
       }
     }
   },
-  component: RankingsRoute,
+  component: Rankings,
 })

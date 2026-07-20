@@ -18,12 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute } from '@tanstack/react-router'
 
-import { lazyRouteComponent } from '@/lib/lazy-route'
-
-const OtpRoute = lazyRouteComponent(() =>
-  import('@/features/auth/otp').then((module) => ({ default: module.Otp }))
-)
+import { Otp } from '@/features/auth/otp'
 
 export const Route = createFileRoute('/(auth)/otp')({
-  component: OtpRoute,
+  component: Otp,
 })
