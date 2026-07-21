@@ -379,10 +379,13 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		other["error_type"] = err.GetErrorType()
 		other["error_code"] = err.GetErrorCode()
 		other["status_code"] = err.StatusCode
-		other["channel_id"] = channelId
-		other["channel_name"] = c.GetString("channel_name")
-		other["channel_type"] = c.GetInt("channel_type")
+		// Channel identity is admin-only. Nest under admin_info so formatUserLogs
+		// strips it for non-admin viewers (historical top-level keys are also
+		// removed there as defense in depth).
 		adminInfo := make(map[string]interface{})
+		adminInfo["channel_id"] = channelId
+		adminInfo["channel_name"] = c.GetString("channel_name")
+		adminInfo["channel_type"] = c.GetInt("channel_type")
 		adminInfo["use_channel"] = c.GetStringSlice("use_channel")
 		isMultiKey := common.GetContextKeyBool(c, constant.ContextKeyChannelIsMultiKey)
 		if isMultiKey {

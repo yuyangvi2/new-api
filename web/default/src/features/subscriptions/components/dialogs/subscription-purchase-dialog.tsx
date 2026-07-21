@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { useSystemConfig } from '@/hooks/use-system-config'
+import { openPaymentCheckoutUrl } from '@/features/wallet/lib/payment'
 import { formatQuota } from '@/lib/format'
 import { DEFAULT_CURRENCY_CONFIG } from '@/stores/system-config-store'
 
@@ -119,8 +120,11 @@ export function SubscriptionPurchaseDialog(props: Props) {
     try {
       const res = await paySubscriptionStripe({ plan_id: plan.id })
       if (res.message === 'success' && res.data?.pay_link) {
-        window.open(res.data.pay_link, '_blank')
-        toast.success(t('Payment page opened'))
+        if (!openPaymentCheckoutUrl(res.data.pay_link, { sameTab: false })) {
+          toast.error(t('Invalid payment redirect URL'))
+          return
+        }
+        toast.success(t('Redirecting to payment page...'))
         props.onOpenChange(false)
       } else {
         toast.error(
@@ -141,8 +145,13 @@ export function SubscriptionPurchaseDialog(props: Props) {
     try {
       const res = await paySubscriptionCreem({ plan_id: plan.id })
       if (res.message === 'success' && res.data?.checkout_url) {
-        window.open(res.data.checkout_url, '_blank')
-        toast.success(t('Payment page opened'))
+        if (
+          !openPaymentCheckoutUrl(res.data.checkout_url, { sameTab: false })
+        ) {
+          toast.error(t('Invalid payment redirect URL'))
+          return
+        }
+        toast.success(t('Redirecting to payment page...'))
         props.onOpenChange(false)
       } else {
         toast.error(
@@ -158,15 +167,17 @@ export function SubscriptionPurchaseDialog(props: Props) {
     }
   }
 
-  // In-tab redirect (not window.open) — user-gesture context is lost
-  // across the await, so a popup would be blocked. Same as the wallet hook.
+  // Pancake hosted checkout: same-tab (default). Popups are unreliable after await.
   const handlePayWaffoPancake = async () => {
     setPaying(true)
     try {
       const res = await paySubscriptionWaffoPancake({ plan_id: plan.id })
       if (res.message === 'success' && res.data?.checkout_url) {
+        if (!openPaymentCheckoutUrl(res.data.checkout_url)) {
+          toast.error(t('Invalid payment redirect URL'))
+          return
+        }
         toast.success(t('Redirecting to payment page...'))
-        window.location.href = res.data.checkout_url
       } else {
         toast.error(
           res.message && res.message !== 'success'
@@ -216,7 +227,10 @@ export function SubscriptionPurchaseDialog(props: Props) {
         toast.success(t('Payment initiated'))
         props.onOpenChange(false)
       } else if (res.message === 'success' && res.data?.pay_link) {
-        window.open(res.data.pay_link, '_blank')
+        if (!openPaymentCheckoutUrl(res.data.pay_link, { sameTab: false })) {
+          toast.error(t('Invalid payment redirect URL'))
+          return
+        }
         toast.success(t('Payment initiated'))
         props.onOpenChange(false)
       } else {

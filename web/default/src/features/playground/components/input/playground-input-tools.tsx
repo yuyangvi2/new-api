@@ -53,28 +53,47 @@ import {
   getWebSearchCompatibility,
 } from '../../lib'
 import { WEB_SEARCH_CONTEXT_OPTIONS } from '../../constants'
-import type { WebSearchContextSize } from '../../types'
+import type {
+  ParameterEnabled,
+  PlaygroundConfig,
+  WebSearchContextSize,
+} from '../../types'
+import { PlaygroundParameterPanel } from './playground-parameter-panel'
 
 type PlaygroundInputToolsProps = {
+  config: PlaygroundConfig
   disabled?: boolean
   groupValue: string
   hasMessages?: boolean
   modelValue: string
   onClearMessages?: () => void
+  onConfigChange: <K extends keyof PlaygroundConfig>(
+    key: K,
+    value: PlaygroundConfig[K]
+  ) => void
+  onParameterEnabledChange: (
+    key: keyof ParameterEnabled,
+    value: boolean
+  ) => void
   onWebSearchContextSizeChange: (value: WebSearchContextSize) => void
   onWebSearchEnabledChange: (enabled: boolean) => void
+  parameterEnabled: ParameterEnabled
   webSearchContextSize: WebSearchContextSize
   webSearchEnabled: boolean
 }
 
 export function PlaygroundInputTools({
+  config,
   disabled,
   groupValue,
   hasMessages = false,
   modelValue,
   onClearMessages,
+  onConfigChange,
+  onParameterEnabledChange,
   onWebSearchContextSizeChange,
   onWebSearchEnabledChange,
+  parameterEnabled,
   webSearchContextSize,
   webSearchEnabled,
 }: PlaygroundInputToolsProps) {
@@ -208,6 +227,14 @@ export function PlaygroundInputTools({
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <PlaygroundParameterPanel
+          config={config}
+          disabled={disabled}
+          onConfigChange={onConfigChange}
+          onParameterEnabledChange={onParameterEnabledChange}
+          parameterEnabled={parameterEnabled}
+        />
 
         <Tooltip>
           <TooltipTrigger

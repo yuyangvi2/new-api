@@ -125,6 +125,11 @@ func formatUserLogs(logs []*Log, startIdx int) {
 			delete(otherMap, "audit_info")
 			// delete(otherMap, "reject_reason")
 			delete(otherMap, "stream_status")
+			// Strip channel identity that may exist on historical error logs
+			// (newer writers nest these under admin_info instead).
+			delete(otherMap, "channel_id")
+			delete(otherMap, "channel_name")
+			delete(otherMap, "channel_type")
 		}
 		logs[i].Other = common.MapToJsonStr(otherMap)
 	}

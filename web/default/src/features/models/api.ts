@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { api } from '@/lib/api'
+import { api, type ApiRequestConfig } from '@/lib/api'
 
 import type {
   GetModelsParams,
@@ -37,6 +37,16 @@ import type {
   DeploymentSettingsResponse,
   ListDeploymentsResponse,
 } from './types'
+
+// Callers handle success:false toasts themselves; skip the global interceptor
+// so business failures are not toasted twice.
+const modelsActionConfig = (
+  config: ApiRequestConfig = {}
+): ApiRequestConfig => ({
+  ...config,
+  skipBusinessError: true,
+  skipErrorHandler: true,
+})
 
 // ============================================================================
 // Model CRUD Operations
@@ -76,7 +86,7 @@ export async function getModel(id: number): Promise<GetModelResponse> {
 export async function createModel(
   data: Partial<Model>
 ): Promise<{ success: boolean; message?: string; data?: Model }> {
-  const res = await api.post('/api/models/', data)
+  const res = await api.post('/api/models/', data, modelsActionConfig())
   return res.data
 }
 
@@ -86,7 +96,7 @@ export async function createModel(
 export async function updateModel(
   data: Partial<Model> & { id: number }
 ): Promise<{ success: boolean; message?: string; data?: Model }> {
-  const res = await api.put('/api/models/', data)
+  const res = await api.put('/api/models/', data, modelsActionConfig())
   return res.data
 }
 
@@ -97,7 +107,11 @@ export async function updateModelStatus(
   id: number,
   status: number
 ): Promise<{ success: boolean; message?: string }> {
-  const res = await api.put('/api/models/?status_only=true', { id, status })
+  const res = await api.put(
+    '/api/models/?status_only=true',
+    { id, status },
+    modelsActionConfig()
+  )
   return res.data
 }
 
@@ -107,7 +121,7 @@ export async function updateModelStatus(
 export async function deleteModel(
   id: number
 ): Promise<{ success: boolean; message?: string }> {
-  const res = await api.delete(`/api/models/${id}`)
+  const res = await api.delete(`/api/models/${id}`, modelsActionConfig())
   return res.data
 }
 
@@ -154,7 +168,7 @@ export async function getVendor(id: number): Promise<GetVendorResponse> {
 export async function createVendor(
   data: Partial<Vendor>
 ): Promise<{ success: boolean; message?: string; data?: Vendor }> {
-  const res = await api.post('/api/vendors/', data)
+  const res = await api.post('/api/vendors/', data, modelsActionConfig())
   return res.data
 }
 
@@ -164,7 +178,7 @@ export async function createVendor(
 export async function updateVendor(
   data: Partial<Vendor> & { id: number }
 ): Promise<{ success: boolean; message?: string; data?: Vendor }> {
-  const res = await api.put('/api/vendors/', data)
+  const res = await api.put('/api/vendors/', data, modelsActionConfig())
   return res.data
 }
 
@@ -174,7 +188,7 @@ export async function updateVendor(
 export async function deleteVendor(
   id: number
 ): Promise<{ success: boolean; message?: string }> {
-  const res = await api.delete(`/api/vendors/${id}`)
+  const res = await api.delete(`/api/vendors/${id}`, modelsActionConfig())
   return res.data
 }
 
@@ -190,7 +204,11 @@ export async function syncUpstream(params?: {
   source?: SyncSource
   overwrite?: SyncOverwritePayload[]
 }): Promise<SyncUpstreamResponse> {
-  const res = await api.post('/api/models/sync_upstream', params)
+  const res = await api.post(
+    '/api/models/sync_upstream',
+    params,
+    modelsActionConfig()
+  )
   return res.data
 }
 
@@ -212,7 +230,7 @@ export async function previewUpstreamDiff(params?: {
   const url = queryString
     ? `/api/models/sync_upstream/preview?${queryString}`
     : '/api/models/sync_upstream/preview'
-  const res = await api.get(url)
+  const res = await api.get(url, modelsActionConfig())
   return res.data
 }
 
@@ -260,7 +278,7 @@ export async function createPrefillGroup(data: {
   items: string | string[]
   description?: string
 }): Promise<{ success: boolean; message?: string }> {
-  const res = await api.post('/api/prefill_group', data)
+  const res = await api.post('/api/prefill_group', data, modelsActionConfig())
   return res.data
 }
 
@@ -274,7 +292,7 @@ export async function updatePrefillGroup(data: {
   items?: string | string[]
   description?: string
 }): Promise<{ success: boolean; message?: string }> {
-  const res = await api.put('/api/prefill_group', data)
+  const res = await api.put('/api/prefill_group', data, modelsActionConfig())
   return res.data
 }
 
@@ -284,7 +302,10 @@ export async function updatePrefillGroup(data: {
 export async function deletePrefillGroup(
   id: number
 ): Promise<{ success: boolean; message?: string }> {
-  const res = await api.delete(`/api/prefill_group/${id}`)
+  const res = await api.delete(
+    `/api/prefill_group/${id}`,
+    modelsActionConfig()
+  )
   return res.data
 }
 

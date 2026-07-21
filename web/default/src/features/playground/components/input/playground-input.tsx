@@ -30,12 +30,15 @@ import { getSubmittableInputText } from '../../lib'
 import type {
   ModelOption,
   GroupOption,
+  ParameterEnabled,
+  PlaygroundConfig,
   WebSearchContextSize,
 } from '../../types'
 import { PlaygroundInputControls } from './playground-input-controls'
 import { PlaygroundInputTools } from './playground-input-tools'
 
 interface PlaygroundInputProps {
+  config: PlaygroundConfig
   onSubmit: (text: string) => void
   onStop?: () => void
   disabled?: boolean
@@ -49,6 +52,15 @@ interface PlaygroundInputProps {
   onGroupChange: (value: string) => void
   hasMessages?: boolean
   onClearMessages?: () => void
+  onConfigChange: <K extends keyof PlaygroundConfig>(
+    key: K,
+    value: PlaygroundConfig[K]
+  ) => void
+  onParameterEnabledChange: (
+    key: keyof ParameterEnabled,
+    value: boolean
+  ) => void
+  parameterEnabled: ParameterEnabled
   webSearchEnabled: boolean
   webSearchContextSize: WebSearchContextSize
   onWebSearchEnabledChange: (enabled: boolean) => void
@@ -56,6 +68,7 @@ interface PlaygroundInputProps {
 }
 
 export function PlaygroundInput({
+  config,
   onSubmit,
   onStop,
   disabled,
@@ -69,6 +82,9 @@ export function PlaygroundInput({
   onGroupChange,
   hasMessages = false,
   onClearMessages,
+  onConfigChange,
+  onParameterEnabledChange,
+  parameterEnabled,
   webSearchEnabled,
   webSearchContextSize,
   onWebSearchEnabledChange,
@@ -119,13 +135,17 @@ export function PlaygroundInput({
             text={text}
             tools={
               <PlaygroundInputTools
+                config={config}
                 disabled={disabled}
                 groupValue={groupValue}
                 hasMessages={hasMessages}
                 modelValue={modelValue}
                 onClearMessages={onClearMessages}
+                onConfigChange={onConfigChange}
+                onParameterEnabledChange={onParameterEnabledChange}
                 onWebSearchContextSizeChange={onWebSearchContextSizeChange}
                 onWebSearchEnabledChange={onWebSearchEnabledChange}
+                parameterEnabled={parameterEnabled}
                 webSearchContextSize={webSearchContextSize}
                 webSearchEnabled={webSearchEnabled}
               />

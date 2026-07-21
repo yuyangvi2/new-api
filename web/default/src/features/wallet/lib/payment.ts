@@ -52,6 +52,7 @@ export function submitPaymentForm(
   // Don't open in new tab for Safari
   if (!isSafariBrowser()) {
     form.target = '_blank'
+    form.rel = 'noopener noreferrer'
   }
 
   // Add form parameters
@@ -66,6 +67,60 @@ export function submitPaymentForm(
   document.body.appendChild(form)
   form.submit()
   document.body.removeChild(form)
+}
+
+/**
+ * Reject non-navigable schemes (e.g. javascript:, data:) and relative URLs.
+ * Only http/https are allowed for backend-provided payment redirect targets.
+ */
+export function isSafeHttpPaymentUrl(value: string): boolean {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return false
+  }
+  try {
+    const url = new URL(trimmed)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Navigate to a payment checkout URL.
+ *
+ * Defaults to same-tab (`sameTab: true`) for hosted-checkout flows (e.g. Pancake)
+ * where leaving the app is expected and popups are unreliable after `await`.
+ *
+ * Callers that previously used `window.open` (Stripe / Creem / Waffo pay links)
+ * should pass `{ sameTab: false }`. If the popup is blocked, we fall back to
+ * same-tab navigation so checkout still proceeds. New tabs open with
+ * `noopener,noreferrer` so the checkout page cannot access `window.opener`.
+ */
+export function openPaymentCheckoutUrl(
+  url: string,
+  options: { sameTab?: boolean } = {}
+): boolean {
+  if (!isSafeHttpPaymentUrl(url)) {
+    return false
+  }
+
+  const sameTab = options.sameTab ?? true
+  if (sameTab || typeof window === 'undefined') {
+    window.location.assign(url)
+    return true
+  }
+
+  const popup = window.open(url, '_blank', 'noopener,noreferrer')
+  if (popup) {
+    // Some browsers ignore the feature string; clear opener explicitly.
+    popup.opener = null
+    return true
+  }
+
+  // Popup blocked — fall back to same-tab navigation.
+  window.location.assign(url)
+  return true
 }
 
 /**

@@ -21,6 +21,7 @@ import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
 
 import { requestWaffoPancakePayment, isApiSuccess } from '../api'
+import { openPaymentCheckoutUrl } from '../lib/payment'
 
 function getCheckoutUrl(data: unknown): string | null {
   if (!data || typeof data !== 'object') {
@@ -34,23 +35,6 @@ function getCheckoutUrl(data: unknown): string | null {
   return null
 }
 
-/**
- * Reject non-navigable schemes (e.g. javascript:, data:) and relative URLs.
- * Only http/https are allowed for backend-provided redirect targets.
- */
-function isSafeHttpCheckoutUrl(value: string): boolean {
-  const trimmed = value.trim()
-  if (!trimmed) {
-    return false
-  }
-  try {
-    const u = new URL(trimmed)
-    return u.protocol === 'http:' || u.protocol === 'https:'
-  } catch {
-    return false
-  }
-}
-
 function getErrorMessage(message: string | undefined, data: unknown): string {
   if (typeof data === 'string' && data.trim()) {
     return data
@@ -62,8 +46,8 @@ function getErrorMessage(message: string | undefined, data: unknown): string {
 /**
  * Hook for the Waffo Pancake hosted-checkout flow.
  *
- * Same-tab redirect (window.location.href) rather than window.open: the
- * user-gesture context is lost across the await, so popups get blocked.
+ * Same-tab redirect (openPaymentCheckoutUrl default): user-gesture context is
+ * lost across the await, so popups are unreliable for this hosted checkout.
  */
 export function useWaffoPancakePayment() {
   const [processing, setProcessing] = useState(false)
@@ -81,12 +65,11 @@ export function useWaffoPancakePayment() {
           const checkoutUrl = getCheckoutUrl(response.data)
 
           if (checkoutUrl) {
-            if (!isSafeHttpCheckoutUrl(checkoutUrl)) {
+            if (!openPaymentCheckoutUrl(checkoutUrl)) {
               toast.error(i18next.t('Invalid payment redirect URL'))
               return false
             }
             toast.success(i18next.t('Redirecting to payment page...'))
-            window.location.href = checkoutUrl
             return true
           }
         }
