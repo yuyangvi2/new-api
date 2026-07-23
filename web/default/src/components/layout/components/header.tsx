@@ -30,7 +30,7 @@ export function Header({ className, children, ...props }: HeaderProps) {
       )}
       {...props}
     >
-      <div className='tokone-surface flex h-[calc(100%-0.25rem)] items-center gap-1.5 rounded-lg border px-2 sm:gap-2 sm:px-3'>
+      <div className='tokone-surface flex h-[calc(100%-0.25rem)] items-center gap-1.5 rounded-xl border px-2 sm:gap-2 sm:px-3'>
         <SidebarTrigger variant='ghost' className='size-8' />
         {children}
       </div>
