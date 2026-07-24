@@ -48,6 +48,18 @@ import { PublicLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
@@ -57,11 +69,20 @@ import {
   getDynamicDisplayGroupRatio,
   getDynamicPricingSummary,
 } from '../pricing/lib/dynamic-price'
-import { isTokenBasedModel } from '../pricing/lib/model-helpers'
-import { formatPrice, formatRequestPrice } from '../pricing/lib/price'
+import {
+  getDisplayGroupRatio,
+  isTokenBasedModel,
+} from '../pricing/lib/model-helpers'
+import {
+  formatFixedPrice,
+  formatGroupPrice,
+  formatPrice,
+  formatRequestPrice,
+} from '../pricing/lib/price'
 import {
   FALLBACK_MODELS,
   inferKind,
+  marketKindLabelKey,
   splitTags,
   toModelGuideSlug,
   type MarketKind,
@@ -80,6 +101,15 @@ const MODEL_TYPES: Array<{
 ]
 
 const MARKET_PAGE_SIZE = 18
+
+type MarketSortOption = 'recommended' | 'name' | 'price-low' | 'context-high'
+
+const MARKET_SORT_OPTIONS: Array<{ value: MarketSortOption; label: string }> = [
+  { value: 'recommended', label: 'Recommended' },
+  { value: 'name', label: 'Name' },
+  { value: 'price-low', label: 'Price: Low to High' },
+  { value: 'context-high', label: 'Context' },
+]
 
 type MarketTask = {
   value: string
@@ -167,6 +197,100 @@ const CHAT_ENDPOINTS = new Set([
 type IndexedMarketModel = MarketModel & {
   marketKind: MarketKind
   searchText: string
+}
+
+const MODEL_SORT_COLLATOR = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: 'base',
+})
+
+function compareOptionalText(left?: string, right?: string): number {
+  if (left && !right) return -1
+  if (!left && right) return 1
+  return MODEL_SORT_COLLATOR.compare(left ?? '', right ?? '')
+}
+
+function compareMarketModels(
+  left: IndexedMarketModel,
+  right: IndexedMarketModel
+): number {
+  const vendorCompare = compareOptionalText(left.vendor_name, right.vendor_name)
+  if (vendorCompare !== 0) return vendorCompare
+
+  const nameCompare = MODEL_SORT_COLLATOR.compare(
+    left.model_name ?? '',
+    right.model_name ?? ''
+  )
+  if (nameCompare !== 0) return nameCompare
+
+  return (left.id ?? 0) - (right.id ?? 0)
+}
+
+function getMarketSortPrice(model: IndexedMarketModel): number {
+  const groupRatio = getDisplayGroupRatio(model)
+
+  if (model.billing_mode === 'tiered_expr' && model.billing_expr) {
+    const summary = getDynamicPricingSummary(model, {
+      tokenUnit: DEFAULT_TOKEN_UNIT,
+      groupRatioMultiplier: groupRatio,
+    })
+    const primaryPrice =
+      summary?.primaryEntries[0]?.value ?? summary?.entries[0]?.value
+    if (
+      typeof primaryPrice === 'number' &&
+      Number.isFinite(primaryPrice) &&
+      primaryPrice > 0
+    ) {
+      return primaryPrice * groupRatio
+    }
+  }
+
+  if (isTokenBasedModel(model)) {
+    return model.model_ratio * 2 * groupRatio
+  }
+
+  return (model.model_price ?? Number.POSITIVE_INFINITY) * groupRatio
+}
+
+function sortMarketModels(
+  models: IndexedMarketModel[],
+  sortBy: MarketSortOption
+): IndexedMarketModel[] {
+  const sorted = [...models]
+
+  if (sortBy === 'price-low') {
+    sorted.sort((left, right) => {
+      const priceCompare = getMarketSortPrice(left) - getMarketSortPrice(right)
+      if (priceCompare !== 0) return priceCompare
+      return compareMarketModels(left, right)
+    })
+    return sorted
+  }
+
+  if (sortBy === 'context-high') {
+    sorted.sort((left, right) => {
+      const contextCompare =
+        Number(right.context_length ?? 0) - Number(left.context_length ?? 0)
+      if (contextCompare !== 0) return contextCompare
+      return compareMarketModels(left, right)
+    })
+    return sorted
+  }
+
+  if (sortBy === 'name') {
+    sorted.sort((left, right) => {
+      const nameCompare = MODEL_SORT_COLLATOR.compare(
+        left.model_name ?? '',
+        right.model_name ?? ''
+      )
+      if (nameCompare !== 0) return nameCompare
+      return compareMarketModels(left, right)
+    })
+    return sorted
+  }
+
+  sorted.sort(compareMarketModels)
+  return sorted
 }
 
 function modelSignals(model: MarketModel): string[] {
@@ -361,24 +485,52 @@ function modelMatchesTask(model: IndexedMarketModel, task: string): boolean {
   return false
 }
 
-function MarketModelCard(props: {
+type MarketPriceEntry = {
+  key: string
+  labelKey: string
+  formatted: string
+  unit: 'M' | 'request'
+  direction?: 'in' | 'out'
+}
+
+function formatCompactTokenCount(value?: number): string | null {
+  const numericValue = Number(value ?? 0)
+  if (!Number.isFinite(numericValue) || numericValue <= 0) return null
+
+  if (numericValue >= 1_000_000) {
+    const compactValue = numericValue / 1_000_000
+    const formatted = Number.isInteger(compactValue)
+      ? compactValue.toFixed(0)
+      : compactValue.toFixed(1).replace(/\.0$/, '')
+    return `${formatted}M`
+  }
+
+  if (numericValue >= 1_000) {
+    return `${Math.round(numericValue / 1_000)}K`
+  }
+
+  return Math.round(numericValue).toString()
+}
+
+function getSavingPercent(groupRatio: number): number | null {
+  if (!Number.isFinite(groupRatio) || groupRatio <= 0 || groupRatio >= 0.995) {
+    return null
+  }
+
+  return Math.max(1, Math.round((1 - groupRatio) * 100))
+}
+
+function MarketPricePanel(props: {
   model: MarketModel
   priceRate: number
   usdExchangeRate: number
 }) {
   const { t } = useTranslation()
   const model = props.model
-  const vendor = model.vendor_name || t('Unknown provider')
-  const tags = splitTags(model.tags).slice(0, 4)
-  const endpoints = (model.supported_endpoint_types ?? []).slice(0, 2)
-  const groups = (model.enable_groups ?? []).slice(0, 2)
-  const detailHref = `/model-guide/${toModelGuideSlug(model.model_name)}`
-  const modelIconKey = model.icon || model.vendor_icon
-  const modelIcon = modelIconKey ? getLobeIcon(modelIconKey, 28) : null
-  const initial = model.model_name?.charAt(0).toUpperCase() || '?'
+  const displayGroupRatio = getDisplayGroupRatio(model)
+  const savingPercent = getSavingPercent(displayGroupRatio)
   const isDynamicPricing =
     model.billing_mode === 'tiered_expr' && Boolean(model.billing_expr)
-  const hasCachedPrice = isTokenBasedModel(model) && model.cache_ratio != null
   const dynamicSummary = isDynamicPricing
     ? getDynamicPricingSummary(model, {
         tokenUnit: DEFAULT_TOKEN_UNIT,
@@ -388,183 +540,500 @@ function MarketModelCard(props: {
         groupRatioMultiplier: getDynamicDisplayGroupRatio(model),
       })
     : null
-  const dynamicPriceEntries = dynamicSummary
-    ? [
-        ...dynamicSummary.primaryEntries,
-        ...dynamicSummary.entries.filter(
-          (entry) => entry.field === 'cacheReadPrice'
-        ),
-      ]
-    : []
 
-  let priceSummary: ReactNode
+  const primaryEntries: MarketPriceEntry[] = []
+  const extraEntries: MarketPriceEntry[] = []
+  const officialEntries: MarketPriceEntry[] = []
+  let primaryFallback: ReactNode | null = null
+  let secondaryFallback: ReactNode | null = null
+
   if (dynamicSummary?.isSpecialExpression) {
-    priceSummary = t('Special billing expression')
-  } else if (dynamicSummary && dynamicPriceEntries.length > 0) {
-    priceSummary = dynamicPriceEntries.map((entry) => (
-      <span key={entry.key} className='whitespace-nowrap'>
-        {t(entry.shortLabel)}{' '}
-        <span className='font-mono font-semibold'>{entry.formatted}</span>/1M
-      </span>
-    ))
+    primaryFallback = t('Special billing expression')
+    secondaryFallback = t('Dynamic Pricing')
   } else if (dynamicSummary) {
-    priceSummary = t('Dynamic Pricing')
-  } else if (isTokenBasedModel(model)) {
-    priceSummary = (
-      <>
-        <span className='whitespace-nowrap'>
-          {t('Input')}{' '}
-          <span className='font-mono font-semibold'>
-            {formatPrice(
-              model,
-              'input',
-              DEFAULT_TOKEN_UNIT,
-              false,
-              props.priceRate,
-              props.usdExchangeRate
-            )}
-          </span>
-          /1M
-        </span>
-        <span className='whitespace-nowrap'>
-          {t('Output')}{' '}
-          <span className='font-mono font-semibold'>
-            {formatPrice(
-              model,
-              'output',
-              DEFAULT_TOKEN_UNIT,
-              false,
-              props.priceRate,
-              props.usdExchangeRate
-            )}
-          </span>
-          /1M
-        </span>
-        {hasCachedPrice && (
-          <span className='whitespace-nowrap'>
-            {t('Cache Read')}{' '}
-            <span className='font-mono font-semibold'>
-              {formatPrice(
-                model,
-                'cache',
-                DEFAULT_TOKEN_UNIT,
-                false,
-                props.priceRate,
-                props.usdExchangeRate
-              )}
-            </span>
-            /1M
-          </span>
-        )}
-      </>
+    const visibleDynamicEntries = dynamicSummary.primaryEntries.length
+      ? dynamicSummary.primaryEntries
+      : dynamicSummary.entries.slice(0, 2)
+    const visibleDynamicKeys = new Set(
+      visibleDynamicEntries.map((entry) => entry.key)
     )
-  } else {
-    priceSummary = (
-      <span className='whitespace-nowrap'>
-        <span className='font-mono font-semibold'>
-          {formatRequestPrice(
+
+    for (const entry of visibleDynamicEntries) {
+      primaryEntries.push({
+        key: entry.key,
+        labelKey: entry.shortLabel,
+        formatted: entry.formatted,
+        unit: 'M',
+        direction:
+          entry.field === 'inputPrice'
+            ? 'in'
+            : entry.field === 'outputPrice'
+              ? 'out'
+              : undefined,
+      })
+    }
+
+    for (const entry of dynamicSummary.entries) {
+      if (visibleDynamicKeys.has(entry.key)) continue
+      extraEntries.push({
+        key: entry.key,
+        labelKey: entry.shortLabel,
+        formatted: entry.formatted,
+        unit: 'M',
+      })
+    }
+
+    if (primaryEntries.length === 0) {
+      primaryFallback = t('Dynamic Pricing')
+    }
+
+    if (savingPercent !== null) {
+      const officialSummary = getDynamicPricingSummary(model, {
+        tokenUnit: DEFAULT_TOKEN_UNIT,
+        showRechargePrice: false,
+        priceRate: props.priceRate,
+        usdExchangeRate: props.usdExchangeRate,
+        groupRatioMultiplier: 1,
+      })
+      const officialDynamicEntries = officialSummary?.primaryEntries.length
+        ? officialSummary.primaryEntries
+        : (officialSummary?.entries.slice(0, 2) ?? [])
+
+      for (const entry of officialDynamicEntries.slice(0, 2)) {
+        officialEntries.push({
+          key: `official-${entry.key}`,
+          labelKey: entry.shortLabel,
+          formatted: entry.formatted,
+          unit: 'M',
+        })
+      }
+    }
+  } else if (isTokenBasedModel(model)) {
+    primaryEntries.push(
+      {
+        key: 'input',
+        labelKey: 'Input',
+        formatted: formatPrice(
+          model,
+          'input',
+          DEFAULT_TOKEN_UNIT,
+          false,
+          props.priceRate,
+          props.usdExchangeRate
+        ),
+        unit: 'M',
+        direction: 'in',
+      },
+      {
+        key: 'output',
+        labelKey: 'Output',
+        formatted: formatPrice(
+          model,
+          'output',
+          DEFAULT_TOKEN_UNIT,
+          false,
+          props.priceRate,
+          props.usdExchangeRate
+        ),
+        unit: 'M',
+        direction: 'out',
+      }
+    )
+
+    if (model.cache_ratio != null) {
+      extraEntries.push({
+        key: 'cache-read',
+        labelKey: 'Cache Read',
+        formatted: formatPrice(
+          model,
+          'cache',
+          DEFAULT_TOKEN_UNIT,
+          false,
+          props.priceRate,
+          props.usdExchangeRate
+        ),
+        unit: 'M',
+      })
+    }
+
+    if (model.create_cache_ratio != null) {
+      extraEntries.push({
+        key: 'cache-write',
+        labelKey: 'Cache Write',
+        formatted: formatPrice(
+          model,
+          'create_cache',
+          DEFAULT_TOKEN_UNIT,
+          false,
+          props.priceRate,
+          props.usdExchangeRate
+        ),
+        unit: 'M',
+      })
+    }
+
+    if (model.image_ratio != null) {
+      extraEntries.push({
+        key: 'image-input',
+        labelKey: 'Image In',
+        formatted: formatPrice(
+          model,
+          'image',
+          DEFAULT_TOKEN_UNIT,
+          false,
+          props.priceRate,
+          props.usdExchangeRate
+        ),
+        unit: 'M',
+      })
+    }
+
+    if (model.audio_ratio != null) {
+      extraEntries.push({
+        key: 'audio-input',
+        labelKey: 'Audio In',
+        formatted: formatPrice(
+          model,
+          'audio_input',
+          DEFAULT_TOKEN_UNIT,
+          false,
+          props.priceRate,
+          props.usdExchangeRate
+        ),
+        unit: 'M',
+      })
+    }
+
+    if (model.audio_ratio != null && model.audio_completion_ratio != null) {
+      extraEntries.push({
+        key: 'audio-output',
+        labelKey: 'Audio Out',
+        formatted: formatPrice(
+          model,
+          'audio_output',
+          DEFAULT_TOKEN_UNIT,
+          false,
+          props.priceRate,
+          props.usdExchangeRate
+        ),
+        unit: 'M',
+      })
+    }
+
+    if (savingPercent !== null) {
+      officialEntries.push(
+        {
+          key: 'official-input',
+          labelKey: 'Input',
+          formatted: formatGroupPrice(
             model,
+            '__base',
+            'input',
+            DEFAULT_TOKEN_UNIT,
             false,
             props.priceRate,
-            props.usdExchangeRate
-          )}
-        </span>{' '}
-        / {t('request')}
-      </span>
-    )
+            props.usdExchangeRate,
+            { __base: 1 }
+          ),
+          unit: 'M',
+        },
+        {
+          key: 'official-output',
+          labelKey: 'Output',
+          formatted: formatGroupPrice(
+            model,
+            '__base',
+            'output',
+            DEFAULT_TOKEN_UNIT,
+            false,
+            props.priceRate,
+            props.usdExchangeRate,
+            { __base: 1 }
+          ),
+          unit: 'M',
+        }
+      )
+    }
+  } else {
+    primaryEntries.push({
+      key: 'request',
+      labelKey: 'Per Request',
+      formatted: formatRequestPrice(
+        model,
+        false,
+        props.priceRate,
+        props.usdExchangeRate
+      ),
+      unit: 'request',
+    })
+    secondaryFallback = t('per request')
+
+    if (savingPercent !== null) {
+      officialEntries.push({
+        key: 'official-request',
+        labelKey: 'Per Request',
+        formatted: formatFixedPrice(
+          model,
+          '__base',
+          false,
+          props.priceRate,
+          props.usdExchangeRate,
+          { __base: 1 }
+        ),
+        unit: 'request',
+      })
+    }
   }
 
+  const firstExtraEntry = extraEntries[0]
+  const secondExtraEntry = extraEntries[1]
+  const visibleExtraEntry =
+    officialEntries.length > 0 ? firstExtraEntry : secondExtraEntry
+  const inlineExtraEntry = officialEntries.length > 0 ? null : firstExtraEntry
+  const consumedExtraCount = [visibleExtraEntry, inlineExtraEntry].filter(
+    Boolean
+  ).length
+  const extraMoreCount = Math.max(0, extraEntries.length - consumedExtraCount)
+  const detailEntries = [...primaryEntries, ...extraEntries]
+
+  const renderUnit = (entry: MarketPriceEntry) => {
+    if (entry.unit === 'request') {
+      return `/ ${t('request')}`
+    }
+
+    if (entry.direction) {
+      return `/M ${entry.direction}`
+    }
+
+    return '/M'
+  }
+
+  const renderPriceEntry = (entry: MarketPriceEntry) => (
+    <span key={entry.key} className='min-w-0 whitespace-nowrap'>
+      <span className='text-foreground font-mono font-semibold'>
+        {entry.formatted}
+      </span>{' '}
+      <span className='text-muted-foreground font-medium'>
+        {renderUnit(entry)}
+      </span>
+    </span>
+  )
+
+  const primaryLine = primaryFallback ?? (
+    <div className='flex min-w-0 items-baseline gap-1.5 overflow-hidden text-sm leading-5'>
+      {primaryEntries.slice(0, 2).map((entry, index) => (
+        <span
+          key={entry.key}
+          className='inline-flex min-w-0 items-baseline gap-1.5'
+        >
+          {index > 0 && <span className='text-muted-foreground'>·</span>}
+          {renderPriceEntry(entry)}
+        </span>
+      ))}
+    </div>
+  )
+
+  const officialLine = officialEntries.length > 0 && savingPercent !== null
+  const extraLineEntry = officialLine ? firstExtraEntry : inlineExtraEntry
+  const bottomExtraEntry = visibleExtraEntry
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <div className='bg-muted/30 hover:bg-muted/45 min-h-[104px] rounded-2xl border p-3 text-left transition-colors' />
+        }
+      >
+        <div className='min-h-5 min-w-0 overflow-hidden'>{primaryLine}</div>
+
+        <div className='mt-2 flex min-h-5 items-center justify-between gap-2 text-xs'>
+          {officialLine ? (
+            <>
+              <span className='text-muted-foreground min-w-0 truncate'>
+                {t('Official')}{' '}
+                {officialEntries.map((entry) => entry.formatted).join(' / ')}
+              </span>
+              <span className='shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/35 dark:text-emerald-300'>
+                {t('Save {{percent}}%', { percent: savingPercent })}
+              </span>
+            </>
+          ) : extraLineEntry ? (
+            <div className='text-muted-foreground min-w-0 truncate'>
+              {t(extraLineEntry.labelKey)} {renderPriceEntry(extraLineEntry)}
+            </div>
+          ) : secondaryFallback ? (
+            <span className='text-muted-foreground truncate'>
+              {secondaryFallback}
+            </span>
+          ) : null}
+        </div>
+
+        <div className='text-muted-foreground mt-1.5 flex min-h-5 items-center gap-2 text-xs'>
+          {bottomExtraEntry ? (
+            <span className='min-w-0 truncate'>
+              {t(bottomExtraEntry.labelKey)} {renderPriceEntry(bottomExtraEntry)}
+            </span>
+          ) : null}
+          {extraMoreCount > 0 ? (
+            <span className='shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium'>
+              {t('+{{count}} more', { count: extraMoreCount })}
+            </span>
+          ) : null}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent className='block max-w-sm text-left' side='top'>
+        <div className='space-y-2'>
+          <div className='font-semibold'>{t('Price')}</div>
+          <div className='space-y-1'>
+            {detailEntries.length > 0 ? (
+              detailEntries.map((entry) => (
+                <div
+                  key={entry.key}
+                  className='flex items-center justify-between gap-4'
+                >
+                  <span>{t(entry.labelKey)}</span>
+                  <span className='font-mono'>
+                    {entry.formatted} {renderUnit(entry)}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div>{primaryFallback}</div>
+            )}
+          </div>
+          {officialLine ? (
+            <div className='border-background/25 space-y-1 border-t pt-2'>
+              <div className='font-semibold'>{t('Official')}</div>
+              {officialEntries.map((entry) => (
+                <div
+                  key={entry.key}
+                  className='flex items-center justify-between gap-4'
+                >
+                  <span>{t(entry.labelKey)}</span>
+                  <span className='font-mono'>
+                    {entry.formatted} {renderUnit(entry)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+function MarketModelCard(props: {
+  model: MarketModel
+  priceRate: number
+  usdExchangeRate: number
+}) {
+  const { t } = useTranslation()
+  const model = props.model
+  const vendor = model.vendor_name || t('Unknown provider')
+  const tags = splitTags(model.tags)
+  const endpoints = model.supported_endpoint_types ?? []
+  const groups = model.enable_groups ?? []
+  const detailHref = `/model-guide/${toModelGuideSlug(model.model_name)}`
+  const modelIconKey = model.icon || model.vendor_icon
+  const modelIcon = modelIconKey ? getLobeIcon(modelIconKey, 28) : null
+  const initial = model.model_name?.charAt(0).toUpperCase() || '?'
+  const contextSize = formatCompactTokenCount(model.context_length)
+  const badgeValues = [...new Set([...tags, ...endpoints])]
+  const visibleTags = badgeValues.slice(0, 3)
+  const hiddenTagCount = Math.max(0, badgeValues.length - visibleTags.length)
+
   const handleCopy = async (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
     event.stopPropagation()
     await navigator.clipboard.writeText(model.model_name)
     toast.success(t('Copied'))
   }
 
   return (
-    <article className='group bg-card overflow-hidden rounded-2xl border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md'>
-      <Link
-        to={detailHref}
-        className='focus-visible:ring-ring block focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none'
-        aria-label={t('Open {{model}} model guide', {
-          model: model.model_name,
-        })}
-      >
-        <div
-          className={cn(
-            'relative flex aspect-[1.75] items-center justify-center overflow-hidden bg-gradient-to-br',
-            model.coverTone || 'from-slate-900 via-slate-700 to-orange-300'
-          )}
-        >
-          <div className='absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgb(255_255_255/0.22)_48%,transparent_100%)] opacity-60' />
-          <div className='relative flex flex-col items-center gap-3 px-5 text-center text-white drop-shadow-sm sm:px-6'>
-            <div className='flex size-12 items-center justify-center rounded-2xl bg-white/14 ring-1 ring-white/20 backdrop-blur'>
-              {modelIcon || (
-                <span className='text-lg font-black'>{initial}</span>
-              )}
-            </div>
-            <div className='text-xl font-bold tracking-tight break-all sm:text-2xl'>
-              {model.model_name}
-            </div>
-          </div>
-        </div>
-      </Link>
-      <div className='space-y-3 p-4'>
-        <div className='min-w-0'>
-          <div className='flex min-w-0 items-center gap-2'>
-            <h3 className='min-w-0 truncate font-mono text-base font-bold'>
-              <Link to={detailHref} className='hover:text-brand'>
-                {model.model_name}
-              </Link>
-            </h3>
-            <button
-              type='button'
-              onClick={handleCopy}
-              className='text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 rounded-md border p-1 transition-colors'
-              aria-label={t('Copy model name')}
-            >
-              <Copy className='size-3.5' />
-            </button>
-          </div>
-          <p className='text-muted-foreground mt-1 text-xs'>{vendor}</p>
-          <div className='mt-2 border-y py-2'>
-            <div className='text-muted-foreground text-[10px] leading-none font-semibold tracking-[0.16em] uppercase'>
-              {t('Price')}
-            </div>
-            <div className='text-muted-foreground mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs leading-5'>
-              {priceSummary}
-            </div>
-          </div>
-        </div>
-        <p className='text-muted-foreground line-clamp-2 min-h-10 text-xs leading-5'>
-          {model.description || t('No description available.')}
-        </p>
-        <div className='flex flex-wrap gap-2'>
-          {tags.map((tag) => (
-            <Badge
-              key={tag}
-              variant='outline'
-              className='bg-background/70 text-foreground/80 text-[11px]'
-            >
-              {t(tag)}
-            </Badge>
-          ))}
-          {endpoints.map((endpoint) => (
-            <Badge key={endpoint} variant='secondary' className='text-[11px]'>
-              {endpoint}
-            </Badge>
-          ))}
-        </div>
-        <div className='flex items-center justify-between gap-3'>
-          <div className='text-muted-foreground truncate text-xs'>
-            {groups.length > 0 ? groups.join(', ') : t('Default group')}
-          </div>
-          <Link
-            to={detailHref}
-            className='text-muted-foreground hover:text-foreground shrink-0 text-xs font-semibold'
+    <article className='group bg-card flex h-full min-h-[342px] flex-col rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md'>
+      <div className='flex items-start justify-between gap-3'>
+        <div className='flex min-w-0 items-start gap-3'>
+          <div
+            className={cn(
+              'flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-sm ring-1 ring-border/60',
+              model.coverTone || 'from-slate-900 via-slate-700 to-orange-300'
+            )}
           >
-            {t('View model guide')}
-          </Link>
+            {modelIcon || <span className='text-lg font-black'>{initial}</span>}
+          </div>
+          <div className='min-w-0'>
+            <div className='flex min-w-0 items-center gap-1.5'>
+              <h3 className='min-w-0 truncate font-mono text-base font-bold'>
+                <Link to={detailHref} className='hover:text-brand'>
+                  {model.model_name}
+                </Link>
+              </h3>
+              <button
+                type='button'
+                onClick={handleCopy}
+                className='text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 rounded-md border p-1 transition-colors'
+                aria-label={t('Copy model name')}
+              >
+                <Copy className='size-3.5' />
+              </button>
+            </div>
+            <p className='text-muted-foreground mt-1 truncate text-xs'>
+              {vendor} · {t(marketKindLabelKey(inferKind(model)))}
+            </p>
+          </div>
         </div>
+        {contextSize ? (
+          <Badge
+            variant='outline'
+            className='shrink-0 border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/35 dark:text-blue-300'
+          >
+            {t('{{size}} context', { size: contextSize })}
+          </Badge>
+        ) : null}
+      </div>
+
+      <div className='mt-4'>
+        <MarketPricePanel
+          model={model}
+          priceRate={props.priceRate}
+          usdExchangeRate={props.usdExchangeRate}
+        />
+      </div>
+
+      <div className='mt-3 flex min-h-8 flex-wrap gap-2 overflow-hidden'>
+        {visibleTags.map((tag) => (
+          <Badge
+            key={tag}
+            variant='outline'
+            className='bg-background/70 text-foreground/80 max-w-full truncate text-[11px]'
+          >
+            {t(tag)}
+          </Badge>
+        ))}
+        {hiddenTagCount > 0 ? (
+          <Badge variant='secondary' className='text-[11px]'>
+            {t('+{{count}} more', { count: hiddenTagCount })}
+          </Badge>
+        ) : null}
+      </div>
+
+      <p className='text-muted-foreground mt-3 line-clamp-2 min-h-10 text-xs leading-5'>
+        {model.description || t('No description available.')}
+      </p>
+
+      <div className='mt-auto flex items-center justify-between gap-3 pt-4'>
+        <div className='text-muted-foreground min-w-0 truncate text-xs'>
+          {groups.length > 0
+            ? groups.slice(0, 2).join(', ')
+            : t('Default group')}
+        </div>
+        <Link
+          to={detailHref}
+          className='text-muted-foreground group-hover:text-brand shrink-0 text-xs font-semibold transition-colors'
+        >
+          {t('View model guide')} →
+        </Link>
       </div>
     </article>
   )
@@ -721,20 +1190,23 @@ export function Market() {
   const [activeKind, setActiveKind] = useState<MarketKind>('text')
   const [activeTask, setActiveTask] = useState('all')
   const [activeVendor, setActiveVendor] = useState('all')
+  const [sortBy, setSortBy] = useState<MarketSortOption>('recommended')
   const [page, setPage] = useState(1)
   const pricing = usePricingData()
 
   const models = useMemo<IndexedMarketModel[]>(() => {
     const source = pricing.models.length > 0 ? pricing.models : FALLBACK_MODELS
 
-    return source.map((model) => {
-      const marketKind = inferKind(model)
-      return {
-        ...model,
-        marketKind,
-        searchText: modelSignals(model).join(' ').toLowerCase(),
-      }
-    })
+    return source
+      .map((model) => {
+        const marketKind = inferKind(model)
+        return {
+          ...model,
+          marketKind,
+          searchText: modelSignals(model).join(' ').toLowerCase(),
+        }
+      })
+      .sort(compareMarketModels)
   }, [pricing.models])
 
   const marketSummary = useMemo(() => {
@@ -787,7 +1259,11 @@ export function Market() {
           count: info.count,
           icon: info.icon,
         }))
-        .sort((left, right) => right.count - left.count),
+        .sort((left, right) => {
+          const countCompare = right.count - left.count
+          if (countCompare !== 0) return countCompare
+          return MODEL_SORT_COLLATOR.compare(left.name, right.name)
+        }),
       tasks: activeTasks.map((task) => ({
         ...task,
         count: taskCounts.get(task.value) ?? 0,
@@ -800,7 +1276,7 @@ export function Market() {
 
   const filteredModels = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase()
-    return models.filter((model) => {
+    const result = models.filter((model) => {
       if (model.marketKind !== activeKind) return false
       if (!modelMatchesTask(model, activeTask)) return false
       if (activeVendor !== 'all' && model.vendor_name !== activeVendor) {
@@ -809,7 +1285,9 @@ export function Market() {
       if (!normalizedQuery) return true
       return model.searchText.includes(normalizedQuery)
     })
-  }, [activeKind, activeTask, activeVendor, deferredQuery, models])
+
+    return sortMarketModels(result, sortBy)
+  }, [activeKind, activeTask, activeVendor, deferredQuery, models, sortBy])
 
   const totalPages = Math.max(
     1,
@@ -831,7 +1309,7 @@ export function Market() {
 
   useEffect(() => {
     setPage(1)
-  }, [activeKind, activeTask, activeVendor, deferredQuery])
+  }, [activeKind, activeTask, activeVendor, deferredQuery, sortBy])
 
   useEffect(() => {
     if (activeTask === 'all') return
@@ -891,22 +1369,36 @@ export function Market() {
 
           <div className='bg-card/92 rounded-2xl border p-3 shadow-sm sm:rounded-3xl sm:p-4 md:p-5'>
             <div className='bg-background/65 space-y-4 rounded-2xl border p-3 sm:p-4'>
-              <div>
+              <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
                 <h2 className='text-lg font-bold'>{t('Available models')}</h2>
-                <p className='text-muted-foreground mt-1 text-sm'>
-                  {t('Choose a text, image, video, or audio model first.')}
-                </p>
-                <div className='mt-3 flex flex-wrap gap-2'>
-                  <Badge variant='outline'>
-                    {t('Models')}: {models.length}
-                  </Badge>
-                  <Badge variant='outline'>
-                    {t('Showing')}: {filteredModels.length}
-                  </Badge>
-                  <Badge variant='outline'>
-                    {t('Providers')}: {marketSummary.vendors.length}
-                  </Badge>
-                </div>
+                <Select
+                  value={sortBy}
+                  onValueChange={(value) => {
+                    if (value !== null) {
+                      setSortBy(value as MarketSortOption)
+                    }
+                  }}
+                >
+                  <SelectTrigger
+                    className='bg-card h-9 w-full rounded-full sm:w-[190px]'
+                    aria-label={t('Sort')}
+                  >
+                    <SelectValue>
+                      {t(
+                        MARKET_SORT_OPTIONS.find(
+                          (option) => option.value === sortBy
+                        )?.label ?? 'Recommended'
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    {MARKET_SORT_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {t(option.label)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className='relative'>
