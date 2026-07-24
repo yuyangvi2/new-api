@@ -269,6 +269,8 @@ distributor.invalid_playground_request: "Invalid model debugging request: {{.Err
 distributor.group_access_denied: "No permission to access this group"
 distributor.get_channel_failed: "Failed to get available channel for model {{.Model}} under group {{.Group}} (distributor): {{.Error}}"
 distributor.no_available_channel: "No available channel for model {{.Model}} under group {{.Group}} (distributor)"
+distributor.model_not_available: "The requested model is not available. Please check the model name or choose a supported model."
+distributor.route_failed: "The requested model is temporarily unavailable. Please try again later or choose another model."
 distributor.invalid_midjourney_request: "Invalid Midjourney request: {{.Error}}"
 distributor.invalid_request_parse_model: "Invalid request, unable to parse model"
 
