@@ -39,6 +39,18 @@ interface HeroProps {
 
 const HERO_SLIDES = [
   {
+    eyebrow: 'Frontier Reasoning',
+    title: 'Claude Opus 5',
+    description:
+      'Frontier intelligence near Fable 5 at half the price, making top-tier coding and complex reasoning your everyday workhorse.',
+    primary: 'View model',
+    secondary: 'API docs',
+    href: '/market',
+    tone: 'from-orange-100 via-amber-50 to-stone-100',
+    backgroundImage: '/images/hero/tokone-hero-slide-1.webp',
+    tags: ['Claude Opus 5', 'Advanced reasoning', 'Coding', 'Agents'],
+  },
+  {
     eyebrow: 'Flagship',
     title: 'GPT 5.6',
     description:
@@ -46,21 +58,9 @@ const HERO_SLIDES = [
     primary: 'View model',
     secondary: 'API docs',
     href: '/market',
-    tone: 'from-orange-100 via-amber-50 to-stone-100',
-    backgroundImage: '/images/hero/tokone-hero-slide-1.webp',
-    tags: ['GPT 5.6 Sol', 'GPT 5.6 Terra', 'GPT 5.6 Luna'],
-  },
-  {
-    eyebrow: 'Reasoning',
-    title: 'Gemini 3.5 Flash',
-    description:
-      'Low-latency multimodal reasoning for chat, vision, and agent workflows.',
-    primary: 'View model',
-    secondary: 'API docs',
-    href: '/market',
     tone: 'from-blue-100 via-cyan-50 to-stone-100',
     backgroundImage: '/images/hero/tokone-hero-slide-2.webp',
-    tags: ['Fast response', 'Vision', 'Function calling', 'OpenAI compatible'],
+    tags: ['GPT 5.6 Sol', 'GPT 5.6 Terra', 'GPT 5.6 Luna'],
   },
   {
     eyebrow: 'Creative',
