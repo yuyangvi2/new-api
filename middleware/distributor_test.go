@@ -106,3 +106,33 @@ func TestDistributeNoAvailableChannelReturnsSanitizedModelNotFound(t *testing.T)
 	assert.NotContains(t, body.Error.Message, "channel")
 	assert.NotContains(t, body.Error.Message, "distributor")
 }
+
+func TestDistributeInvalidJSONMessageIsNotDoubleWrapped(t *testing.T) {
+	setupDistributorTestDB(t)
+	require.NoError(t, i18n.Init())
+
+	router := gin.New()
+	router.POST("/v1/chat/completions", Distribute(), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/chat/completions",
+		strings.NewReader(`{"model":"gpt-5.4-mini","messages":[`),
+	)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Accept-Language", "zh-CN")
+	router.ServeHTTP(recorder, request)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+
+	var body struct {
+		Error types.OpenAIError `json:"error"`
+	}
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &body))
+	assert.Contains(t, body.Error.Message, "无效的请求：invalid JSON request body")
+	assert.NotContains(t, body.Error.Message, "无效的请求：无效的请求")
+	assert.NotContains(t, body.Error.Message, "无效的请求，无效的请求")
+}
