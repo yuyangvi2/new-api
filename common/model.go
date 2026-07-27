@@ -16,6 +16,12 @@ var (
 		"prefix:imagen-",
 		"flux-",
 		"flux.1-",
+		"exact:grok-imagine",
+		"grok-imagine-image",
+		"grok-2-image",
+	}
+	OpenAIVideoGenerationModels = []string{
+		"grok-imagine-video",
 	}
 	OpenAITextModels = []string{
 		"gpt-",
@@ -36,12 +42,30 @@ func IsOpenAIResponseOnlyModel(modelName string) bool {
 }
 
 func IsImageGenerationModel(modelName string) bool {
+	return matchesModelPattern(modelName, ImageGenerationModels)
+}
+
+func IsOpenAIVideoGenerationModel(modelName string) bool {
+	return matchesModelPattern(modelName, OpenAIVideoGenerationModels)
+}
+
+func matchesModelPattern(modelName string, patterns []string) bool {
 	modelName = strings.ToLower(modelName)
-	for _, m := range ImageGenerationModels {
-		if strings.Contains(modelName, m) {
-			return true
+	for _, pattern := range patterns {
+		pattern = strings.ToLower(pattern)
+		if strings.HasPrefix(pattern, "exact:") {
+			if modelName == strings.TrimPrefix(pattern, "exact:") {
+				return true
+			}
+			continue
 		}
-		if strings.HasPrefix(m, "prefix:") && strings.HasPrefix(modelName, strings.TrimPrefix(m, "prefix:")) {
+		if strings.HasPrefix(pattern, "prefix:") {
+			if strings.HasPrefix(modelName, strings.TrimPrefix(pattern, "prefix:")) {
+				return true
+			}
+			continue
+		}
+		if strings.Contains(modelName, pattern) {
 			return true
 		}
 	}

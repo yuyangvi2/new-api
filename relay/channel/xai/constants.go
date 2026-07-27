@@ -2,6 +2,10 @@ package xai
 
 var ModelList = []string{
 	// language models
+	"grok-4.20-non-reasoning",
+	"grok-4.20-reasoning",
+	"grok-4.3",
+	"grok-4.5",
 	"grok-4-1-fast-reasoning",
 	"grok-4-1-fast-non-reasoning",
 	"grok-code-fast-1",
@@ -22,11 +26,14 @@ var ModelList = []string{
 	// grok-3-mini reasoning effort variants
 	"grok-3-mini-high", "grok-3-mini-low",
 	// image generation models
+	"grok-imagine",
 	"grok-imagine-image-pro",
 	"grok-imagine-image",
+	"grok-imagine-image-quality",
 	"grok-2-image-1212",
-	// video generation model
+	// video generation models
 	"grok-imagine-video",
+	"grok-imagine-video-1.5",
 }
 
 var ChannelName = "xai"
