@@ -336,10 +336,10 @@ var defaultModelRatio = map[string]float64{
 	"llama-3-sonar-large-32k-chat":   1 / 1000 * USD,
 	"llama-3-sonar-large-32k-online": 1 / 1000 * USD,
 	// grok
-	"grok-4.20-non-reasoning": 1.0,
-	"grok-4.20-reasoning":     1.0,
-	"grok-4.3":                1.0,
-	"grok-4.5":                1.0, // $2 / 1M input tokens
+	"grok-4.20-non-reasoning": 0.625 / 0.6, // official $1.25 / 1M input tokens after xAI 6折 group ratio
+	"grok-4.20-reasoning":     0.625 / 0.6, // official $1.25 / 1M input tokens after xAI 6折 group ratio
+	"grok-4.3":                0.625 / 0.6, // official $1.25 / 1M input tokens after xAI 6折 group ratio
+	"grok-4.5":                1.0 / 0.6,   // official $2 / 1M input tokens after xAI 6折 group ratio
 	"grok-3-beta":             1.5,
 	"grok-3-mini-beta":        0.15,
 	"grok-2":                  1,
@@ -367,10 +367,10 @@ var defaultModelPrice = map[string]float64{
 	"dall-e-3":                       0.04,
 	"imagen-3.0-generate-002":        0.03,
 	"black-forest-labs/flux-1.1-pro": 0.04,
-	"grok-imagine":                   0.5,
-	"grok-imagine-image":             0.5,
-	"grok-imagine-image-pro":         0.5,
-	"grok-imagine-image-quality":     0.5,
+	"grok-imagine":                   0.02 / 0.6,
+	"grok-imagine-image":             0.02 / 0.6,
+	"grok-imagine-image-pro":         0.05 / 0.6,
+	"grok-imagine-image-quality":     0.05 / 0.6,
 	"gpt-4-gizmo-*":                  0.1,
 	"mj_video":                       0.8,
 	"mj_imagine":                     0.1,
@@ -392,8 +392,8 @@ var defaultModelPrice = map[string]float64{
 	"mj_upload":                      0.05,
 	"sora-2":                         0.3,
 	"sora-2-pro":                     0.5,
-	"grok-imagine-video":             0.5,
-	"grok-imagine-video-1.5":         0.5,
+	"grok-imagine-video":             0.05 / 0.6,
+	"grok-imagine-video-1.5":         0.08 / 0.6,
 	"gpt-4o-mini-tts":                0.3,
 	"veo-3.0-generate-001":           0.4,
 	"veo-3.0-fast-generate-001":      0.15,
@@ -426,10 +426,10 @@ var modelRatioMap = types.NewRWMap[string, float64]()
 var completionRatioMap = types.NewRWMap[string, float64]()
 
 var defaultCompletionRatio = map[string]float64{
-	"grok-4.20-non-reasoning": 3,
-	"grok-4.20-reasoning":     3,
-	"grok-4.3":                3,
-	"grok-4.5":                3, // $6 / 1M output tokens vs $2 / 1M input tokens
+	"grok-4.20-non-reasoning": 2, // official $2.50 / 1M output tokens vs $1.25 / 1M input tokens
+	"grok-4.20-reasoning":     2,
+	"grok-4.3":                2,
+	"grok-4.5":                3, // official $6 / 1M output tokens vs $2 / 1M input tokens
 	"gpt-4-gizmo-*":           2,
 	"gpt-4o-gizmo-*":          3,
 	"gpt-4-all":               2,
