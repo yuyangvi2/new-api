@@ -336,14 +336,18 @@ var defaultModelRatio = map[string]float64{
 	"llama-3-sonar-large-32k-chat":   1 / 1000 * USD,
 	"llama-3-sonar-large-32k-online": 1 / 1000 * USD,
 	// grok
-	"grok-3-beta":           1.5,
-	"grok-3-mini-beta":      0.15,
-	"grok-2":                1,
-	"grok-2-vision":         1,
-	"grok-beta":             2.5,
-	"grok-vision-beta":      2.5,
-	"grok-3-fast-beta":      2.5,
-	"grok-3-mini-fast-beta": 0.3,
+	"grok-4.20-non-reasoning": 1.0,
+	"grok-4.20-reasoning":     1.0,
+	"grok-4.3":                1.0,
+	"grok-4.5":                1.0, // $2 / 1M input tokens
+	"grok-3-beta":             1.5,
+	"grok-3-mini-beta":        0.15,
+	"grok-2":                  1,
+	"grok-2-vision":           1,
+	"grok-beta":               2.5,
+	"grok-vision-beta":        2.5,
+	"grok-3-fast-beta":        2.5,
+	"grok-3-mini-fast-beta":   0.3,
 	// submodel
 	"NousResearch/Hermes-4-405B-FP8":          0.8,
 	"Qwen/Qwen3-235B-A22B-Thinking-2507":      0.6,
@@ -363,6 +367,10 @@ var defaultModelPrice = map[string]float64{
 	"dall-e-3":                       0.04,
 	"imagen-3.0-generate-002":        0.03,
 	"black-forest-labs/flux-1.1-pro": 0.04,
+	"grok-imagine":                   0.5,
+	"grok-imagine-image":             0.5,
+	"grok-imagine-image-pro":         0.5,
+	"grok-imagine-image-quality":     0.5,
 	"gpt-4-gizmo-*":                  0.1,
 	"mj_video":                       0.8,
 	"mj_imagine":                     0.1,
@@ -384,6 +392,8 @@ var defaultModelPrice = map[string]float64{
 	"mj_upload":                      0.05,
 	"sora-2":                         0.3,
 	"sora-2-pro":                     0.5,
+	"grok-imagine-video":             0.5,
+	"grok-imagine-video-1.5":         0.5,
 	"gpt-4o-mini-tts":                0.3,
 	"veo-3.0-generate-001":           0.4,
 	"veo-3.0-fast-generate-001":      0.15,
@@ -416,10 +426,14 @@ var modelRatioMap = types.NewRWMap[string, float64]()
 var completionRatioMap = types.NewRWMap[string, float64]()
 
 var defaultCompletionRatio = map[string]float64{
-	"gpt-4-gizmo-*":  2,
-	"gpt-4o-gizmo-*": 3,
-	"gpt-4-all":      2,
-	"gpt-image-1":    8,
+	"grok-4.20-non-reasoning": 3,
+	"grok-4.20-reasoning":     3,
+	"grok-4.3":                3,
+	"grok-4.5":                3, // $6 / 1M output tokens vs $2 / 1M input tokens
+	"gpt-4-gizmo-*":           2,
+	"gpt-4o-gizmo-*":          3,
+	"gpt-4-all":               2,
+	"gpt-image-1":             8,
 }
 
 // InitRatioSettings initializes all model related settings maps
@@ -761,7 +775,12 @@ func ModelRatio2JSONString() string {
 }
 
 var defaultImageRatio = map[string]float64{
-	"gpt-image-1": 2,
+	"gpt-image-1":                2,
+	"grok-imagine":               1,
+	"grok-imagine-image":         1,
+	"grok-imagine-image-pro":     1,
+	"grok-imagine-image-quality": 1,
+	"grok-2-image-1212":          1,
 }
 var imageRatioMap = types.NewRWMap[string, float64]()
 var audioRatioMap = types.NewRWMap[string, float64]()
