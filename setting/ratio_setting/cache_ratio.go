@@ -5,6 +5,9 @@ import (
 )
 
 var defaultCacheRatio = map[string]float64{
+	"grok-4.20-non-reasoning":             0.16,
+	"grok-4.20-reasoning":                 0.16,
+	"grok-4.3":                            0.16,
 	"grok-4.5":                            0.15,
 	"gemini-3-flash-preview":              0.1,
 	"gemini-3-pro-preview":                0.1,
