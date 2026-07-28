@@ -18,18 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
 import {
-  Brain,
   ChevronLeft,
   ChevronRight,
-  Code2,
   Copy,
   FileText,
   ImageIcon,
   Layers3,
-  MessageSquareText,
   Music2,
   Search,
-  Sparkles,
   Video,
 } from 'lucide-react'
 import {
@@ -118,89 +114,6 @@ const MARKET_SORT_OPTIONS: Array<{ value: MarketSortOption; label: string }> = [
   { value: 'price-low', label: 'Price: Low to High' },
   { value: 'context-high', label: 'Context' },
 ]
-
-type MarketTask = {
-  value: string
-  label: string
-  kinds: MarketKind[]
-  icon: ComponentType<{ className?: string }>
-}
-
-const TASKS: MarketTask[] = [
-  {
-    value: 'chat',
-    label: 'Chat',
-    kinds: ['text'],
-    icon: MessageSquareText,
-  },
-  {
-    value: 'reasoning',
-    label: 'Reasoning',
-    kinds: ['text'],
-    icon: Brain,
-  },
-  {
-    value: 'coding',
-    label: 'Coding',
-    kinds: ['text'],
-    icon: Code2,
-  },
-  {
-    value: 'long-context',
-    label: 'Long context',
-    kinds: ['text'],
-    icon: FileText,
-  },
-  {
-    value: 'vision',
-    label: 'Vision',
-    kinds: ['text'],
-    icon: ImageIcon,
-  },
-  {
-    value: 'text-to-image',
-    label: 'Text to Image',
-    kinds: ['image'],
-    icon: Sparkles,
-  },
-  {
-    value: 'image-edit',
-    label: 'Image edit',
-    kinds: ['image'],
-    icon: ImageIcon,
-  },
-  {
-    value: 'text-to-video',
-    label: 'Text to Video',
-    kinds: ['video'],
-    icon: Video,
-  },
-  {
-    value: 'image-to-video',
-    label: 'Image to Video',
-    kinds: ['video'],
-    icon: ImageIcon,
-  },
-  {
-    value: 'text-to-speech',
-    label: 'Text to Speech',
-    kinds: ['audio'],
-    icon: Music2,
-  },
-  {
-    value: 'speech-to-text',
-    label: 'Speech to Text',
-    kinds: ['audio'],
-    icon: Music2,
-  },
-]
-const CHAT_ENDPOINTS = new Set([
-  'openai',
-  'openai-response',
-  'openai-response-compact',
-  'anthropic',
-  'gemini',
-])
 
 type IndexedMarketModel = MarketModel & {
   marketKind: MarketKind
@@ -314,185 +227,6 @@ function modelSignals(model: MarketModel): string[] {
   ].filter(Boolean) as string[]
 }
 
-function hasSignal(model: IndexedMarketModel, signals: string[]): boolean {
-  return signals.some((signal) => model.searchText.includes(signal))
-}
-
-function modelHasEndpoint(
-  model: IndexedMarketModel,
-  endpoint: string
-): boolean {
-  return (model.supported_endpoint_types ?? []).some(
-    (item) => item.toLowerCase() === endpoint
-  )
-}
-
-function modelHasModality(
-  model: IndexedMarketModel,
-  direction: 'input' | 'output',
-  modality: string
-): boolean {
-  const values =
-    direction === 'input'
-      ? (model.input_modalities ?? [])
-      : (model.output_modalities ?? [])
-  return values.some((item) => item.toLowerCase() === modality)
-}
-
-function modelIsVision(model: IndexedMarketModel): boolean {
-  return (
-    modelHasModality(model, 'input', 'image') ||
-    modelHasModality(model, 'input', 'video') ||
-    hasSignal(model, ['vision', 'visual', 'multimodal', 'multi-modal', '-vl'])
-  )
-}
-
-function modelIsReasoning(model: IndexedMarketModel): boolean {
-  return (
-    (model.capabilities ?? []).includes('reasoning') ||
-    hasSignal(model, [
-      'reasoning',
-      'reasoner',
-      'thinking',
-      'think',
-      'qwq',
-      'qvq',
-      'r1',
-      'o1',
-      'o3',
-      'o4',
-    ])
-  )
-}
-
-function modelIsCoding(model: IndexedMarketModel): boolean {
-  return hasSignal(model, [
-    'code',
-    'coder',
-    'coding',
-    'codex',
-    'codestral',
-    'devstral',
-    'programming',
-    'software',
-  ])
-}
-
-function modelIsLongContext(model: IndexedMarketModel): boolean {
-  const contextLength = Number(model.context_length ?? 0)
-  return (
-    contextLength >= 128000 ||
-    hasSignal(model, [
-      'long context',
-      'long-context',
-      'long',
-      '128k',
-      '200k',
-      '256k',
-      '1m',
-    ])
-  )
-}
-
-function modelSupportsChat(model: IndexedMarketModel): boolean {
-  if (model.marketKind !== 'text') return false
-  return (model.supported_endpoint_types ?? []).some((endpoint) =>
-    CHAT_ENDPOINTS.has(endpoint.toLowerCase())
-  )
-}
-
-function modelMatchesTask(model: IndexedMarketModel, task: string): boolean {
-  if (task === 'all') return true
-
-  if (task === 'chat') {
-    return (
-      modelSupportsChat(model) &&
-      !modelIsReasoning(model) &&
-      !modelIsCoding(model) &&
-      !modelIsLongContext(model) &&
-      !modelIsVision(model)
-    )
-  }
-
-  if (task === 'reasoning') {
-    return model.marketKind === 'text' && modelIsReasoning(model)
-  }
-  if (task === 'coding') {
-    return model.marketKind === 'text' && modelIsCoding(model)
-  }
-  if (task === 'long-context') {
-    return model.marketKind === 'text' && modelIsLongContext(model)
-  }
-  if (task === 'vision') {
-    return model.marketKind === 'text' && modelIsVision(model)
-  }
-
-  if (task === 'text-to-image') {
-    return (
-      modelHasEndpoint(model, 'image-generation') ||
-      (modelHasModality(model, 'input', 'text') &&
-        modelHasModality(model, 'output', 'image')) ||
-      model.searchText.includes('text to image') ||
-      model.searchText.includes('text-to-image')
-    )
-  }
-
-  if (task === 'image-edit') {
-    return (
-      model.marketKind === 'image' &&
-      (model.searchText.includes('image edit') ||
-        model.searchText.includes('image-edit') ||
-        model.searchText.includes('edit image') ||
-        model.searchText.includes('image variation'))
-    )
-  }
-
-  if (task === 'text-to-video') {
-    return (
-      model.marketKind === 'video' &&
-      (modelHasEndpoint(model, 'openai-video') ||
-        modelHasModality(model, 'output', 'video') ||
-        model.searchText.includes('text to video') ||
-        model.searchText.includes('text-to-video') ||
-        model.searchText.includes('t2v'))
-    )
-  }
-
-  if (task === 'image-to-video') {
-    return (
-      model.marketKind === 'video' &&
-      (modelHasModality(model, 'input', 'image') ||
-        model.searchText.includes('image to video') ||
-        model.searchText.includes('image-to-video') ||
-        model.searchText.includes('i2v') ||
-        model.searchText.includes('vision'))
-    )
-  }
-
-  if (task === 'text-to-speech') {
-    return (
-      model.marketKind === 'audio' &&
-      (model.searchText.includes('tts') ||
-        model.searchText.includes('text to speech') ||
-        model.searchText.includes('speech synthesis') ||
-        model.searchText.includes('voice'))
-    )
-  }
-
-  if (task === 'speech-to-text') {
-    return (
-      model.marketKind === 'audio' &&
-      (model.searchText.includes('stt') ||
-        model.searchText.includes('speech to text') ||
-        model.searchText.includes('asr') ||
-        model.searchText.includes('transcription') ||
-        model.searchText.includes('whisper'))
-    )
-  }
-
-  return false
-}
-
 type MarketPriceEntry = {
   key: string
   labelKey: string
@@ -530,6 +264,30 @@ function getSavingPercent(groupRatio: number): number | null {
 function isMutedPriceEntry(entry: MarketPriceEntry): boolean {
   const normalizedLabel = entry.labelKey.toLowerCase()
   return entry.key.includes('cache') || normalizedLabel.includes('cache')
+}
+
+function formatMarketPriceValue(formatted: string): string {
+  const match = formatted.match(/^([^\d-]*)([-\d,]+(?:\.\d+)?)(.*)$/)
+  if (!match) return formatted
+
+  const [, prefix, rawNumber, suffix] = match
+  const numericValue = Number(rawNumber.replaceAll(',', ''))
+  if (!Number.isFinite(numericValue)) return formatted
+
+  const absValue = Math.abs(numericValue)
+  let fractionDigits = 2
+  if (absValue > 0 && absValue < 0.0001) {
+    fractionDigits = 6
+  } else if (absValue > 0 && absValue < 1) {
+    fractionDigits = 4
+  }
+
+  const rounded = numericValue
+    .toFixed(fractionDigits)
+    .replace(/\.0+$/, '')
+    .replace(/(\.\d*?)0+$/, '$1')
+
+  return `${prefix}${rounded}${suffix}`
 }
 
 function MarketPricePanel(props: {
@@ -787,7 +545,7 @@ function MarketPricePanel(props: {
   }
 
   const detailEntries = [...primaryEntries, ...extraEntries]
-  const visibleEntries = detailEntries.slice(0, 4)
+  const visibleEntries = detailEntries.slice(0, 3)
   const extraMoreCount = Math.max(
     0,
     detailEntries.length - visibleEntries.length
@@ -823,7 +581,7 @@ function MarketPricePanel(props: {
               muted ? 'text-muted-foreground' : 'text-foreground'
             )}
           >
-            {entry.formatted}
+            {formatMarketPriceValue(entry.formatted)}
           </span>{' '}
           <span className='text-muted-foreground text-xs font-semibold'>
             {renderUnit(entry)}
@@ -837,7 +595,7 @@ function MarketPricePanel(props: {
     <Tooltip>
       <TooltipTrigger
         render={
-          <div className='bg-muted/30 hover:bg-muted/40 min-h-[108px] rounded-2xl border p-3 text-left transition-colors' />
+          <div className='bg-muted/30 hover:bg-muted/40 h-[124px] overflow-hidden rounded-2xl border p-3 text-left transition-colors' />
         }
       >
         {primaryFallback ? (
@@ -849,19 +607,6 @@ function MarketPricePanel(props: {
             {visibleEntries.map(renderPriceRow)}
           </div>
         )}
-
-        {officialLine ? (
-          <div className='mt-2 flex items-center justify-between gap-2 border-t pt-2 text-xs'>
-            <span className='text-muted-foreground min-w-0 truncate'>
-              {t('Official')}{' '}
-              {officialEntries.map((entry) => entry.formatted).join(' / ')}
-            </span>
-            <span className='shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/35 dark:text-emerald-300'>
-              {t('Save {{percent}}%', { percent: savingPercent })}
-            </span>
-          </div>
-        ) : null}
-
         {extraMoreCount > 0 ? (
           <div className='text-muted-foreground mt-2 text-right text-[11px] font-medium'>
             {t('+{{count}} more', { count: extraMoreCount })}
@@ -923,9 +668,6 @@ function MarketModelCard(props: {
   const detailHref = `/model-guide/${toModelGuideSlug(model.model_name)}`
   const modelIconKey = model.icon || model.vendor_icon
   const modelIcon = modelIconKey ? getLobeIcon(modelIconKey, 32) : null
-  const vendorIcon = model.vendor_icon
-    ? getLobeIcon(model.vendor_icon, 16)
-    : null
   const initial = model.model_name?.charAt(0).toUpperCase() || '?'
   const contextSize = formatCompactTokenCount(model.context_length)
   const badgeValues = [...new Set([...tags, ...endpoints])]
@@ -971,14 +713,7 @@ function MarketModelCard(props: {
           </div>
 
           <div className='text-muted-foreground mt-[7px] flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs'>
-            <span className='inline-flex min-w-0 items-center gap-1.5'>
-              {vendorIcon ? (
-                <span className='inline-flex size-4 shrink-0 items-center justify-center'>
-                  {vendorIcon}
-                </span>
-              ) : null}
-              <span className='truncate'>{vendor}</span>
-            </span>
+            <span className='min-w-0 truncate'>{vendor}</span>
             <span aria-hidden='true'>·</span>
             <span>{t(marketKindLabelKey(inferKind(model)))}</span>
             {contextSize ? (
@@ -1026,15 +761,10 @@ function MarketModelCard(props: {
 function MarketSidebar(props: {
   kindCounts: Map<MarketKind, number>
   vendors: Array<{ name: string; count: number; icon?: string }>
-  tasks: Array<MarketTask & { count: number }>
-  kindLabel: string
-  kindCount: number
   providerScopeCount: number
-  activeTask: string
   activeVendor: string
   activeKind: MarketKindFilter
   onKindChange: (kind: MarketKindFilter) => void
-  onTaskChange: (task: string) => void
   onVendorChange: (vendor: string) => void
 }) {
   const { t } = useTranslation()
@@ -1072,55 +802,6 @@ function MarketSidebar(props: {
                     <span className='truncate'>{t(item.label)}</span>
                   </span>
                   <span className='font-mono'>{count}</span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div>
-          <div className='flex items-center justify-between gap-2'>
-            <div className='text-sm font-semibold'>{t('Tasks')}</div>
-            <Badge variant='outline' className='text-[11px]'>
-              {t(props.kindLabel)} · {props.kindCount}
-            </Badge>
-          </div>
-          <div className='mt-3 grid gap-2'>
-            <button
-              type='button'
-              onClick={() => props.onTaskChange('all')}
-              className={cn(
-                'flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs transition-colors',
-                props.activeTask === 'all'
-                  ? 'bg-foreground text-background'
-                  : 'bg-background text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <span className='inline-flex min-w-0 items-center gap-2'>
-                <Layers3 className='size-3.5 shrink-0' />
-                <span className='truncate'>{t('All tasks')}</span>
-              </span>
-              <span className='font-mono'>{props.kindCount}</span>
-            </button>
-            {props.tasks.map((task) => {
-              const TaskIcon = task.icon
-              return (
-                <button
-                  key={task.value}
-                  type='button'
-                  onClick={() => props.onTaskChange(task.value)}
-                  className={cn(
-                    'flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs transition-colors',
-                    props.activeTask === task.value
-                      ? 'bg-foreground text-background'
-                      : 'bg-background text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  <span className='inline-flex min-w-0 items-center gap-2'>
-                    <TaskIcon className='size-3.5 shrink-0' />
-                    <span className='truncate'>{t(task.label)}</span>
-                  </span>
-                  <span className='font-mono'>{task.count}</span>
                 </button>
               )
             })}
@@ -1178,7 +859,6 @@ export function Market() {
   const [query, setQuery] = useState('')
   const deferredQuery = useDeferredValue(query)
   const [activeKind, setActiveKind] = useState<MarketKindFilter>('all')
-  const [activeTask, setActiveTask] = useState('all')
   const [activeVendor, setActiveVendor] = useState('all')
   const [sortBy, setSortBy] = useState<MarketSortOption>('recommended')
   const [page, setPage] = useState(1)
@@ -1201,13 +881,6 @@ export function Market() {
 
   const marketSummary = useMemo(() => {
     const vendorInfo = new Map<string, { count: number; icon?: string }>()
-    const activeTasks =
-      activeKind === 'all'
-        ? TASKS
-        : TASKS.filter((task) => task.kinds.includes(activeKind))
-    const taskCounts = new Map<string, number>(
-      activeTasks.map((task) => [task.value, 0])
-    )
     const kindCounts = new Map<MarketKind, number>(
       MODEL_TYPES.map((item) => [item.value, 0])
     )
@@ -1225,16 +898,6 @@ export function Market() {
       }
 
       kindCount += 1
-      for (const task of activeTasks) {
-        if (modelMatchesTask(model, task.value)) {
-          taskCounts.set(task.value, (taskCounts.get(task.value) ?? 0) + 1)
-        }
-      }
-
-      if (!modelMatchesTask(model, activeTask)) {
-        continue
-      }
-
       providerScopeCount += 1
       if (model.vendor_name) {
         const existing = vendorInfo.get(model.vendor_name)
@@ -1257,21 +920,16 @@ export function Market() {
           if (countCompare !== 0) return countCompare
           return MODEL_SORT_COLLATOR.compare(left.name, right.name)
         }),
-      tasks: activeTasks.map((task) => ({
-        ...task,
-        count: taskCounts.get(task.value) ?? 0,
-      })),
       kindCounts,
       kindCount,
       providerScopeCount,
     }
-  }, [activeKind, activeTask, models])
+  }, [activeKind, models])
 
   const filteredModels = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase()
     const result = models.filter((model) => {
       if (activeKind !== 'all' && model.marketKind !== activeKind) return false
-      if (!modelMatchesTask(model, activeTask)) return false
       if (activeVendor !== 'all' && model.vendor_name !== activeVendor) {
         return false
       }
@@ -1280,7 +938,7 @@ export function Market() {
     })
 
     return sortMarketModels(result, sortBy)
-  }, [activeKind, activeTask, activeVendor, deferredQuery, models, sortBy])
+  }, [activeKind, activeVendor, deferredQuery, models, sortBy])
 
   const totalPages = Math.max(
     1,
@@ -1302,17 +960,7 @@ export function Market() {
 
   useEffect(() => {
     setPage(1)
-  }, [activeKind, activeTask, activeVendor, deferredQuery, sortBy])
-
-  useEffect(() => {
-    if (activeTask === 'all') return
-    const taskStillVisible = marketSummary.tasks.some(
-      (task) => task.value === activeTask
-    )
-    if (!taskStillVisible) {
-      setActiveTask('all')
-    }
-  }, [activeTask, marketSummary.tasks])
+  }, [activeKind, activeVendor, deferredQuery, sortBy])
 
   useEffect(() => {
     if (activeVendor === 'all') return
@@ -1342,21 +990,10 @@ export function Market() {
           <MarketSidebar
             kindCounts={marketSummary.kindCounts}
             vendors={marketSummary.vendors}
-            tasks={marketSummary.tasks}
-            kindLabel={
-              MODEL_TYPE_FILTERS.find((item) => item.value === activeKind)
-                ?.label ?? 'All'
-            }
-            kindCount={marketSummary.kindCount}
             providerScopeCount={marketSummary.providerScopeCount}
-            activeTask={activeTask}
             activeVendor={activeVendor}
             activeKind={activeKind}
-            onKindChange={(kind) => {
-              setActiveKind(kind)
-              setActiveTask('all')
-            }}
-            onTaskChange={setActiveTask}
+            onKindChange={setActiveKind}
             onVendorChange={setActiveVendor}
           />
 
