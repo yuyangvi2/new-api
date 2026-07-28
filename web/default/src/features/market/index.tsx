@@ -100,6 +100,14 @@ const MODEL_TYPES: Array<{
   { value: 'audio', label: 'Audio', icon: Music2 },
 ]
 
+type MarketKindFilter = 'all' | MarketKind
+
+const MODEL_TYPE_FILTERS: Array<{
+  value: MarketKindFilter
+  label: string
+  icon: ComponentType<{ className?: string }>
+}> = [{ value: 'all', label: 'All', icon: Layers3 }, ...MODEL_TYPES]
+
 const MARKET_PAGE_SIZE = 18
 
 type MarketSortOption = 'recommended' | 'name' | 'price-low' | 'context-high'
@@ -559,17 +567,19 @@ function MarketPricePanel(props: {
     )
 
     for (const entry of visibleDynamicEntries) {
+      let direction: MarketPriceEntry['direction']
+      if (entry.field === 'inputPrice') {
+        direction = 'in'
+      } else if (entry.field === 'outputPrice') {
+        direction = 'out'
+      }
+
       primaryEntries.push({
         key: entry.key,
         labelKey: entry.shortLabel,
         formatted: entry.formatted,
         unit: 'M',
-        direction:
-          entry.field === 'inputPrice'
-            ? 'in'
-            : entry.field === 'outputPrice'
-              ? 'out'
-              : undefined,
+        direction,
       })
     }
 
@@ -836,6 +846,32 @@ function MarketPricePanel(props: {
   const officialLine = officialEntries.length > 0 && savingPercent !== null
   const extraLineEntry = officialLine ? firstExtraEntry : inlineExtraEntry
   const bottomExtraEntry = visibleExtraEntry
+  let secondaryLine: ReactNode = null
+  if (officialLine) {
+    secondaryLine = (
+      <>
+        <span className='text-muted-foreground min-w-0 truncate'>
+          {t('Official')}{' '}
+          {officialEntries.map((entry) => entry.formatted).join(' / ')}
+        </span>
+        <span className='shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/35 dark:text-emerald-300'>
+          {t('Save {{percent}}%', { percent: savingPercent })}
+        </span>
+      </>
+    )
+  } else if (extraLineEntry) {
+    secondaryLine = (
+      <div className='text-muted-foreground min-w-0 truncate'>
+        {t(extraLineEntry.labelKey)} {renderPriceEntry(extraLineEntry)}
+      </div>
+    )
+  } else if (secondaryFallback) {
+    secondaryLine = (
+      <span className='text-muted-foreground truncate'>
+        {secondaryFallback}
+      </span>
+    )
+  }
 
   return (
     <Tooltip>
@@ -847,31 +883,14 @@ function MarketPricePanel(props: {
         <div className='min-h-5 min-w-0 overflow-hidden'>{primaryLine}</div>
 
         <div className='mt-2 flex min-h-5 items-center justify-between gap-2 text-xs'>
-          {officialLine ? (
-            <>
-              <span className='text-muted-foreground min-w-0 truncate'>
-                {t('Official')}{' '}
-                {officialEntries.map((entry) => entry.formatted).join(' / ')}
-              </span>
-              <span className='shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/35 dark:text-emerald-300'>
-                {t('Save {{percent}}%', { percent: savingPercent })}
-              </span>
-            </>
-          ) : extraLineEntry ? (
-            <div className='text-muted-foreground min-w-0 truncate'>
-              {t(extraLineEntry.labelKey)} {renderPriceEntry(extraLineEntry)}
-            </div>
-          ) : secondaryFallback ? (
-            <span className='text-muted-foreground truncate'>
-              {secondaryFallback}
-            </span>
-          ) : null}
+          {secondaryLine}
         </div>
 
         <div className='text-muted-foreground mt-1.5 flex min-h-5 items-center gap-2 text-xs'>
           {bottomExtraEntry ? (
             <span className='min-w-0 truncate'>
-              {t(bottomExtraEntry.labelKey)} {renderPriceEntry(bottomExtraEntry)}
+              {t(bottomExtraEntry.labelKey)}{' '}
+              {renderPriceEntry(bottomExtraEntry)}
             </span>
           ) : null}
           {extraMoreCount > 0 ? (
@@ -951,7 +970,7 @@ function MarketModelCard(props: {
   }
 
   return (
-    <article className='group bg-card flex h-full min-h-[342px] flex-col rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md'>
+    <article className='group bg-card hover:border-brand/40 flex h-full min-h-[342px] flex-col rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md'>
       <div className='flex items-start justify-between gap-3'>
         <div className='flex min-w-0 items-start gap-3'>
           <div
@@ -962,17 +981,24 @@ function MarketModelCard(props: {
           >
             {modelIcon || <span className='text-lg font-black'>{initial}</span>}
           </div>
-          <div className='min-w-0'>
-            <div className='flex min-w-0 items-center gap-1.5'>
-              <h3 className='min-w-0 truncate font-mono text-base font-bold'>
-                <Link to={detailHref} className='hover:text-brand'>
+          <div className='min-w-0 flex-1'>
+            <div className='flex min-w-0 items-start gap-1.5'>
+              <Tooltip>
+                <TooltipTrigger render={<div className='min-w-0 flex-1' />}>
+                  <Link to={detailHref} className='hover:text-brand block'>
+                    <h3 className='line-clamp-2 min-h-10 font-mono text-base leading-5 font-bold break-all'>
+                      {model.model_name}
+                    </h3>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent className='max-w-xs font-mono break-all'>
                   {model.model_name}
-                </Link>
-              </h3>
+                </TooltipContent>
+              </Tooltip>
               <button
                 type='button'
                 onClick={handleCopy}
-                className='text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 rounded-md border p-1 transition-colors'
+                className='text-muted-foreground hover:text-foreground hover:bg-muted mt-0.5 shrink-0 rounded-md border p-1 transition-colors'
                 aria-label={t('Copy model name')}
               >
                 <Copy className='size-3.5' />
@@ -1048,12 +1074,16 @@ function MarketSidebar(props: {
   providerScopeCount: number
   activeTask: string
   activeVendor: string
-  activeKind: MarketKind
-  onKindChange: (kind: MarketKind) => void
+  activeKind: MarketKindFilter
+  onKindChange: (kind: MarketKindFilter) => void
   onTaskChange: (task: string) => void
   onVendorChange: (vendor: string) => void
 }) {
   const { t } = useTranslation()
+  const allKindCount = [...props.kindCounts.values()].reduce(
+    (sum, count) => sum + count,
+    0
+  )
 
   return (
     <aside className='bg-card/92 rounded-2xl border p-4 shadow-sm'>
@@ -1061,8 +1091,12 @@ function MarketSidebar(props: {
         <div>
           <div className='text-sm font-semibold'>{t('Model types')}</div>
           <div className='mt-3 grid gap-2'>
-            {MODEL_TYPES.map((item) => {
+            {MODEL_TYPE_FILTERS.map((item) => {
               const Icon = item.icon
+              const count =
+                item.value === 'all'
+                  ? allKindCount
+                  : (props.kindCounts.get(item.value) ?? 0)
               return (
                 <button
                   key={item.value}
@@ -1079,9 +1113,7 @@ function MarketSidebar(props: {
                     <Icon className='size-3.5 shrink-0' />
                     <span className='truncate'>{t(item.label)}</span>
                   </span>
-                  <span className='font-mono'>
-                    {props.kindCounts.get(item.value) ?? 0}
-                  </span>
+                  <span className='font-mono'>{count}</span>
                 </button>
               )
             })}
@@ -1187,7 +1219,7 @@ export function Market() {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const deferredQuery = useDeferredValue(query)
-  const [activeKind, setActiveKind] = useState<MarketKind>('text')
+  const [activeKind, setActiveKind] = useState<MarketKindFilter>('all')
   const [activeTask, setActiveTask] = useState('all')
   const [activeVendor, setActiveVendor] = useState('all')
   const [sortBy, setSortBy] = useState<MarketSortOption>('recommended')
@@ -1211,7 +1243,10 @@ export function Market() {
 
   const marketSummary = useMemo(() => {
     const vendorInfo = new Map<string, { count: number; icon?: string }>()
-    const activeTasks = TASKS.filter((task) => task.kinds.includes(activeKind))
+    const activeTasks =
+      activeKind === 'all'
+        ? TASKS
+        : TASKS.filter((task) => task.kinds.includes(activeKind))
     const taskCounts = new Map<string, number>(
       activeTasks.map((task) => [task.value, 0])
     )
@@ -1227,7 +1262,7 @@ export function Market() {
         (kindCounts.get(model.marketKind) ?? 0) + 1
       )
 
-      if (model.marketKind !== activeKind) {
+      if (activeKind !== 'all' && model.marketKind !== activeKind) {
         continue
       }
 
@@ -1277,7 +1312,7 @@ export function Market() {
   const filteredModels = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase()
     const result = models.filter((model) => {
-      if (model.marketKind !== activeKind) return false
+      if (activeKind !== 'all' && model.marketKind !== activeKind) return false
       if (!modelMatchesTask(model, activeTask)) return false
       if (activeVendor !== 'all' && model.vendor_name !== activeVendor) {
         return false
@@ -1351,8 +1386,8 @@ export function Market() {
             vendors={marketSummary.vendors}
             tasks={marketSummary.tasks}
             kindLabel={
-              MODEL_TYPES.find((item) => item.value === activeKind)?.label ??
-              'Text'
+              MODEL_TYPE_FILTERS.find((item) => item.value === activeKind)
+                ?.label ?? 'All'
             }
             kindCount={marketSummary.kindCount}
             providerScopeCount={marketSummary.providerScopeCount}
