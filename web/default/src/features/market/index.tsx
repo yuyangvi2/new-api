@@ -498,7 +498,6 @@ type MarketPriceEntry = {
   labelKey: string
   formatted: string
   unit: 'M' | 'request'
-  direction?: 'in' | 'out'
 }
 
 function formatCompactTokenCount(value?: number): string | null {
@@ -528,6 +527,11 @@ function getSavingPercent(groupRatio: number): number | null {
   return Math.max(1, Math.round((1 - groupRatio) * 100))
 }
 
+function isMutedPriceEntry(entry: MarketPriceEntry): boolean {
+  const normalizedLabel = entry.labelKey.toLowerCase()
+  return entry.key.includes('cache') || normalizedLabel.includes('cache')
+}
+
 function MarketPricePanel(props: {
   model: MarketModel
   priceRate: number
@@ -553,11 +557,9 @@ function MarketPricePanel(props: {
   const extraEntries: MarketPriceEntry[] = []
   const officialEntries: MarketPriceEntry[] = []
   let primaryFallback: ReactNode | null = null
-  let secondaryFallback: ReactNode | null = null
 
   if (dynamicSummary?.isSpecialExpression) {
     primaryFallback = t('Special billing expression')
-    secondaryFallback = t('Dynamic Pricing')
   } else if (dynamicSummary) {
     const visibleDynamicEntries = dynamicSummary.primaryEntries.length
       ? dynamicSummary.primaryEntries
@@ -567,19 +569,11 @@ function MarketPricePanel(props: {
     )
 
     for (const entry of visibleDynamicEntries) {
-      let direction: MarketPriceEntry['direction']
-      if (entry.field === 'inputPrice') {
-        direction = 'in'
-      } else if (entry.field === 'outputPrice') {
-        direction = 'out'
-      }
-
       primaryEntries.push({
         key: entry.key,
         labelKey: entry.shortLabel,
         formatted: entry.formatted,
         unit: 'M',
-        direction,
       })
     }
 
@@ -632,7 +626,6 @@ function MarketPricePanel(props: {
           props.usdExchangeRate
         ),
         unit: 'M',
-        direction: 'in',
       },
       {
         key: 'output',
@@ -646,7 +639,6 @@ function MarketPricePanel(props: {
           props.usdExchangeRate
         ),
         unit: 'M',
-        direction: 'out',
       }
     )
 
@@ -776,7 +768,6 @@ function MarketPricePanel(props: {
       ),
       unit: 'request',
     })
-    secondaryFallback = t('per request')
 
     if (savingPercent !== null) {
       officialEntries.push({
@@ -795,81 +786,50 @@ function MarketPricePanel(props: {
     }
   }
 
-  const firstExtraEntry = extraEntries[0]
-  const secondExtraEntry = extraEntries[1]
-  const visibleExtraEntry =
-    officialEntries.length > 0 ? firstExtraEntry : secondExtraEntry
-  const inlineExtraEntry = officialEntries.length > 0 ? null : firstExtraEntry
-  const consumedExtraCount = [visibleExtraEntry, inlineExtraEntry].filter(
-    Boolean
-  ).length
-  const extraMoreCount = Math.max(0, extraEntries.length - consumedExtraCount)
   const detailEntries = [...primaryEntries, ...extraEntries]
+  const visibleEntries = detailEntries.slice(0, 4)
+  const extraMoreCount = Math.max(
+    0,
+    detailEntries.length - visibleEntries.length
+  )
+  const officialLine = officialEntries.length > 0 && savingPercent !== null
 
   const renderUnit = (entry: MarketPriceEntry) => {
     if (entry.unit === 'request') {
       return `/ ${t('request')}`
     }
 
-    if (entry.direction) {
-      return `/M ${entry.direction}`
-    }
-
-    return '/M'
+    return '/ 1M'
   }
 
-  const renderPriceEntry = (entry: MarketPriceEntry) => (
-    <span key={entry.key} className='min-w-0 whitespace-nowrap'>
-      <span className='text-foreground font-mono font-semibold'>
-        {entry.formatted}
-      </span>{' '}
-      <span className='text-muted-foreground font-medium'>
-        {renderUnit(entry)}
-      </span>
-    </span>
-  )
+  const renderPriceRow = (entry: MarketPriceEntry) => {
+    const muted = isMutedPriceEntry(entry)
 
-  const primaryLine = primaryFallback ?? (
-    <div className='flex min-w-0 items-baseline gap-1.5 overflow-hidden text-sm leading-5'>
-      {primaryEntries.slice(0, 2).map((entry, index) => (
-        <span
-          key={entry.key}
-          className='inline-flex min-w-0 items-baseline gap-1.5'
-        >
-          {index > 0 && <span className='text-muted-foreground'>·</span>}
-          {renderPriceEntry(entry)}
+    return (
+      <div
+        key={entry.key}
+        className={cn(
+          'flex min-w-0 items-baseline justify-between gap-4 text-[13px] leading-5',
+          muted && 'text-muted-foreground'
+        )}
+      >
+        <span className='text-muted-foreground min-w-0 truncate text-[13px] font-bold'>
+          {t(entry.labelKey)}
         </span>
-      ))}
-    </div>
-  )
-
-  const officialLine = officialEntries.length > 0 && savingPercent !== null
-  const extraLineEntry = officialLine ? firstExtraEntry : inlineExtraEntry
-  const bottomExtraEntry = visibleExtraEntry
-  let secondaryLine: ReactNode = null
-  if (officialLine) {
-    secondaryLine = (
-      <>
-        <span className='text-muted-foreground min-w-0 truncate'>
-          {t('Official')}{' '}
-          {officialEntries.map((entry) => entry.formatted).join(' / ')}
+        <span className='shrink-0 text-right whitespace-nowrap'>
+          <span
+            className={cn(
+              'font-mono text-base font-extrabold tracking-[-0.03em] tabular-nums',
+              muted ? 'text-muted-foreground' : 'text-foreground'
+            )}
+          >
+            {entry.formatted}
+          </span>{' '}
+          <span className='text-muted-foreground text-xs font-semibold'>
+            {renderUnit(entry)}
+          </span>
         </span>
-        <span className='shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/35 dark:text-emerald-300'>
-          {t('Save {{percent}}%', { percent: savingPercent })}
-        </span>
-      </>
-    )
-  } else if (extraLineEntry) {
-    secondaryLine = (
-      <div className='text-muted-foreground min-w-0 truncate'>
-        {t(extraLineEntry.labelKey)} {renderPriceEntry(extraLineEntry)}
       </div>
-    )
-  } else if (secondaryFallback) {
-    secondaryLine = (
-      <span className='text-muted-foreground truncate'>
-        {secondaryFallback}
-      </span>
     )
   }
 
@@ -877,33 +837,41 @@ function MarketPricePanel(props: {
     <Tooltip>
       <TooltipTrigger
         render={
-          <div className='bg-muted/30 hover:bg-muted/45 min-h-[104px] rounded-2xl border p-3 text-left transition-colors' />
+          <div className='bg-muted/30 hover:bg-muted/40 min-h-[108px] rounded-2xl border p-3 text-left transition-colors' />
         }
       >
-        <div className='min-h-5 min-w-0 overflow-hidden'>{primaryLine}</div>
+        {primaryFallback ? (
+          <div className='text-foreground flex min-h-16 items-center text-sm font-semibold'>
+            {primaryFallback}
+          </div>
+        ) : (
+          <div className='space-y-1.5'>
+            {visibleEntries.map(renderPriceRow)}
+          </div>
+        )}
 
-        <div className='mt-2 flex min-h-5 items-center justify-between gap-2 text-xs'>
-          {secondaryLine}
-        </div>
+        {officialLine ? (
+          <div className='mt-2 flex items-center justify-between gap-2 border-t pt-2 text-xs'>
+            <span className='text-muted-foreground min-w-0 truncate'>
+              {t('Official')}{' '}
+              {officialEntries.map((entry) => entry.formatted).join(' / ')}
+            </span>
+            <span className='shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/35 dark:text-emerald-300'>
+              {t('Save {{percent}}%', { percent: savingPercent })}
+            </span>
+          </div>
+        ) : null}
 
-        <div className='text-muted-foreground mt-1.5 flex min-h-5 items-center gap-2 text-xs'>
-          {bottomExtraEntry ? (
-            <span className='min-w-0 truncate'>
-              {t(bottomExtraEntry.labelKey)}{' '}
-              {renderPriceEntry(bottomExtraEntry)}
-            </span>
-          ) : null}
-          {extraMoreCount > 0 ? (
-            <span className='shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium'>
-              {t('+{{count}} more', { count: extraMoreCount })}
-            </span>
-          ) : null}
-        </div>
+        {extraMoreCount > 0 ? (
+          <div className='text-muted-foreground mt-2 text-right text-[11px] font-medium'>
+            {t('+{{count}} more', { count: extraMoreCount })}
+          </div>
+        ) : null}
       </TooltipTrigger>
       <TooltipContent className='block max-w-sm text-left' side='top'>
         <div className='space-y-2'>
           <div className='font-semibold'>{t('Price')}</div>
-          <div className='space-y-1'>
+          <div className='space-y-1.5'>
             {detailEntries.length > 0 ? (
               detailEntries.map((entry) => (
                 <div
@@ -952,14 +920,16 @@ function MarketModelCard(props: {
   const vendor = model.vendor_name || t('Unknown provider')
   const tags = splitTags(model.tags)
   const endpoints = model.supported_endpoint_types ?? []
-  const groups = model.enable_groups ?? []
   const detailHref = `/model-guide/${toModelGuideSlug(model.model_name)}`
   const modelIconKey = model.icon || model.vendor_icon
-  const modelIcon = modelIconKey ? getLobeIcon(modelIconKey, 28) : null
+  const modelIcon = modelIconKey ? getLobeIcon(modelIconKey, 32) : null
+  const vendorIcon = model.vendor_icon
+    ? getLobeIcon(model.vendor_icon, 16)
+    : null
   const initial = model.model_name?.charAt(0).toUpperCase() || '?'
   const contextSize = formatCompactTokenCount(model.context_length)
   const badgeValues = [...new Set([...tags, ...endpoints])]
-  const visibleTags = badgeValues.slice(0, 3)
+  const visibleTags = badgeValues.slice(0, 4)
   const hiddenTagCount = Math.max(0, badgeValues.length - visibleTags.length)
 
   const handleCopy = async (event: MouseEvent<HTMLButtonElement>) => {
@@ -970,96 +940,84 @@ function MarketModelCard(props: {
   }
 
   return (
-    <article className='group bg-card hover:border-brand/40 flex h-full min-h-[342px] flex-col rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md'>
-      <div className='flex items-start justify-between gap-3'>
-        <div className='flex min-w-0 items-start gap-3'>
-          <div
-            className={cn(
-              'flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-sm ring-1 ring-border/60',
-              model.coverTone || 'from-slate-900 via-slate-700 to-orange-300'
-            )}
-          >
-            {modelIcon || <span className='text-lg font-black'>{initial}</span>}
+    <article className='group bg-card hover:border-brand/35 border-border/70 flex h-[360px] min-w-0 flex-col rounded-[22px] border p-4 shadow-[0_14px_36px_rgba(15,23,42,0.07)] transition-all duration-200 hover:shadow-[0_18px_44px_rgba(15,23,42,0.1)] dark:shadow-[0_14px_36px_rgba(0,0,0,0.24)] dark:hover:shadow-[0_18px_44px_rgba(0,0,0,0.32)]'>
+      <div className='flex min-w-0 items-start gap-3'>
+        <div className='text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-xl border bg-transparent'>
+          {modelIcon || <span className='text-base font-bold'>{initial}</span>}
+        </div>
+
+        <div className='min-w-0 flex-1'>
+          <div className='flex min-w-0 items-start gap-1.5'>
+            <Tooltip>
+              <TooltipTrigger render={<div className='min-w-0 flex-1' />}>
+                <Link to={detailHref} className='hover:text-brand block'>
+                  <h3 className='line-clamp-2 font-mono text-[15px] leading-[1.35] font-bold tracking-[-0.02em] break-all'>
+                    {model.model_name}
+                  </h3>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent className='max-w-xs font-mono break-all'>
+                {model.model_name}
+              </TooltipContent>
+            </Tooltip>
+            <button
+              type='button'
+              onClick={handleCopy}
+              className='text-muted-foreground hover:text-foreground hover:bg-muted mt-0.5 shrink-0 rounded-md border p-1 transition-colors'
+              aria-label={t('Copy model name')}
+            >
+              <Copy className='size-3.5' />
+            </button>
           </div>
-          <div className='min-w-0 flex-1'>
-            <div className='flex min-w-0 items-start gap-1.5'>
-              <Tooltip>
-                <TooltipTrigger render={<div className='min-w-0 flex-1' />}>
-                  <Link to={detailHref} className='hover:text-brand block'>
-                    <h3 className='line-clamp-2 min-h-10 font-mono text-base leading-5 font-bold break-all'>
-                      {model.model_name}
-                    </h3>
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent className='max-w-xs font-mono break-all'>
-                  {model.model_name}
-                </TooltipContent>
-              </Tooltip>
-              <button
-                type='button'
-                onClick={handleCopy}
-                className='text-muted-foreground hover:text-foreground hover:bg-muted mt-0.5 shrink-0 rounded-md border p-1 transition-colors'
-                aria-label={t('Copy model name')}
-              >
-                <Copy className='size-3.5' />
-              </button>
-            </div>
-            <p className='text-muted-foreground mt-1 truncate text-xs'>
-              {vendor} · {t(marketKindLabelKey(inferKind(model)))}
-            </p>
+
+          <div className='text-muted-foreground mt-[7px] flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs'>
+            <span className='inline-flex min-w-0 items-center gap-1.5'>
+              {vendorIcon ? (
+                <span className='inline-flex size-4 shrink-0 items-center justify-center'>
+                  {vendorIcon}
+                </span>
+              ) : null}
+              <span className='truncate'>{vendor}</span>
+            </span>
+            <span aria-hidden='true'>·</span>
+            <span>{t(marketKindLabelKey(inferKind(model)))}</span>
+            {contextSize ? (
+              <>
+                <span aria-hidden='true'>·</span>
+                <span>{t('{{size}} context', { size: contextSize })}</span>
+              </>
+            ) : null}
           </div>
         </div>
-        {contextSize ? (
-          <Badge
-            variant='outline'
-            className='shrink-0 border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/35 dark:text-blue-300'
-          >
-            {t('{{size}} context', { size: contextSize })}
-          </Badge>
-        ) : null}
       </div>
 
-      <div className='mt-4'>
-        <MarketPricePanel
-          model={model}
-          priceRate={props.priceRate}
-          usdExchangeRate={props.usdExchangeRate}
-        />
-      </div>
+      <p className='text-muted-foreground mt-3 line-clamp-3 min-h-[54px] text-xs leading-[18px]'>
+        {model.description || t('No description available.')}
+      </p>
 
-      <div className='mt-3 flex min-h-8 flex-wrap gap-2 overflow-hidden'>
+      <div className='mt-3 flex max-h-12 min-h-7 flex-wrap gap-1.5 overflow-hidden'>
         {visibleTags.map((tag) => (
           <Badge
             key={tag}
             variant='outline'
-            className='bg-background/70 text-foreground/80 max-w-full truncate text-[11px]'
+            className='bg-muted/30 text-muted-foreground max-w-full truncate rounded-full px-2 py-0.5 text-[11px] font-semibold'
           >
             {t(tag)}
           </Badge>
         ))}
         {hiddenTagCount > 0 ? (
-          <Badge variant='secondary' className='text-[11px]'>
+          <Badge variant='secondary' className='rounded-full text-[11px]'>
             {t('+{{count}} more', { count: hiddenTagCount })}
           </Badge>
         ) : null}
       </div>
 
-      <p className='text-muted-foreground mt-3 line-clamp-2 min-h-10 text-xs leading-5'>
-        {model.description || t('No description available.')}
-      </p>
-
-      <div className='mt-auto flex items-center justify-between gap-3 pt-4'>
-        <div className='text-muted-foreground min-w-0 truncate text-xs'>
-          {groups.length > 0
-            ? groups.slice(0, 2).join(', ')
-            : t('Default group')}
-        </div>
-        <Link
-          to={detailHref}
-          className='text-muted-foreground group-hover:text-brand shrink-0 text-xs font-semibold transition-colors'
-        >
-          {t('View model guide')} →
-        </Link>
+      <div className='mt-auto shrink-0 pt-3'>
+        <MarketPricePanel
+          model={model}
+          priceRate={props.priceRate}
+          usdExchangeRate={props.usdExchangeRate}
+        />
       </div>
     </article>
   )
@@ -1368,7 +1326,7 @@ export function Market() {
 
   return (
     <PublicLayout showMainContainer={false} showNotifications={false}>
-      <main className='mx-auto max-w-7xl px-3 pt-24 pb-12 sm:px-4 md:px-6'>
+      <main className='mx-auto max-w-[1540px] px-3 pt-24 pb-12 sm:px-4 md:px-6'>
         <section className='bg-card/92 rounded-2xl border px-4 py-8 text-center shadow-sm sm:rounded-3xl sm:px-6 md:px-10'>
           <h1 className='mx-auto max-w-4xl text-3xl leading-tight font-bold tracking-tight sm:text-4xl md:text-5xl'>
             {t('Find the right AI model, faster')}
@@ -1380,7 +1338,7 @@ export function Market() {
           </p>
         </section>
 
-        <section className='mt-5 grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]'>
+        <section className='mt-5 grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]'>
           <MarketSidebar
             kindCounts={marketSummary.kindCounts}
             vendors={marketSummary.vendors}
@@ -1449,7 +1407,7 @@ export function Market() {
               </div>
             </div>
 
-            <div className='mt-4 grid gap-5 md:grid-cols-2 xl:grid-cols-3'>
+            <div className='mt-4 grid auto-rows-fr gap-4 xl:grid-cols-2 2xl:grid-cols-3'>
               {pagedModels.map((model) => (
                 <MarketModelCard
                   key={model.model_name}
