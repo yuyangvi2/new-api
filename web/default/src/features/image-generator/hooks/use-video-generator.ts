@@ -24,6 +24,7 @@ import {
   getUsableVideoImage,
   isSeedanceVideoModel,
   isVipeakSeedanceVideoModel,
+  sanitizeVideoMetadataForModel,
   SEEDANCE_REFERENCE_AUDIO_LIMIT,
   SEEDANCE_REFERENCE_IMAGE_LIMIT,
   SEEDANCE_REFERENCE_VIDEO_LIMIT,
@@ -338,6 +339,7 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
           meta.audio_files = audioFiles
         }
       }
+      const sanitizedMeta = sanitizeVideoMetadataForModel(config.model, meta)
 
       const submit = await submitVideoTask(
         {
@@ -350,7 +352,9 @@ export function useVideoGenerator(): UseVideoGeneratorResult {
           size: config.size,
           width: preset?.width,
           height: preset?.height,
-          ...(Object.keys(meta).length > 0 ? { metadata: meta } : {}),
+          ...(Object.keys(sanitizedMeta).length > 0
+            ? { metadata: sanitizedMeta }
+            : {}),
         },
         controller.signal
       )

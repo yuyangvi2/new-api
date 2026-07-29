@@ -56,6 +56,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
@@ -150,6 +151,10 @@ function compareMarketModels(
 function getMarketSortPrice(model: IndexedMarketModel): number {
   const groupRatio = getDisplayGroupRatio(model)
 
+  if (isKlingV3MarketModel(model)) {
+    return model.model_ratio * groupRatio
+  }
+
   if (model.billing_mode === 'tiered_expr' && model.billing_expr) {
     const summary = getDynamicPricingSummary(model, {
       tokenUnit: DEFAULT_TOKEN_UNIT,
@@ -231,7 +236,35 @@ type MarketPriceEntry = {
   key: string
   labelKey: string
   formatted: string
-  unit: 'M' | 'request'
+  unit: 'M' | 'request' | 'second'
+}
+
+const KLING_V3_SECOND_PRICE_ITEMS = [
+  { key: 'std-no-sound', labelKey: 'Std no sound', multiplier: 1 },
+  { key: 'std-sound', labelKey: 'Std sound', multiplier: 1.5 },
+  { key: 'pro-no-sound', labelKey: 'Pro no sound', multiplier: 4 / 3 },
+  { key: 'pro-sound', labelKey: 'Pro sound', multiplier: 2 },
+  { key: 'std-action', labelKey: 'Std action control', multiplier: 1.5 },
+  { key: 'pro-action', labelKey: 'Pro action control', multiplier: 2 },
+] as const
+
+function isKlingV3MarketModel(model: Pick<MarketModel, 'model_name'>): boolean {
+  return model.model_name.trim().toLowerCase() === 'kling-v3'
+}
+
+function formatKlingV3SecondPrice(
+  model: MarketModel,
+  multiplier: number,
+  groupRatio: number
+): string {
+  return formatBillingCurrencyFromUSD(
+    model.model_ratio * multiplier * groupRatio,
+    {
+      digitsLarge: 4,
+      digitsSmall: 6,
+      abbreviate: false,
+    }
+  )
 }
 
 function formatCompactTokenCount(value?: number): string | null {
@@ -316,7 +349,44 @@ function MarketPricePanel(props: {
   const officialEntries: MarketPriceEntry[] = []
   let primaryFallback: ReactNode | null = null
 
-  if (dynamicSummary?.isSpecialExpression) {
+  if (isKlingV3MarketModel(model)) {
+    for (const item of KLING_V3_SECOND_PRICE_ITEMS.slice(0, 2)) {
+      primaryEntries.push({
+        key: item.key,
+        labelKey: item.labelKey,
+        formatted: formatKlingV3SecondPrice(
+          model,
+          item.multiplier,
+          displayGroupRatio
+        ),
+        unit: 'second',
+      })
+    }
+
+    for (const item of KLING_V3_SECOND_PRICE_ITEMS.slice(2)) {
+      extraEntries.push({
+        key: item.key,
+        labelKey: item.labelKey,
+        formatted: formatKlingV3SecondPrice(
+          model,
+          item.multiplier,
+          displayGroupRatio
+        ),
+        unit: 'second',
+      })
+    }
+
+    if (savingPercent !== null) {
+      for (const item of KLING_V3_SECOND_PRICE_ITEMS.slice(0, 2)) {
+        officialEntries.push({
+          key: `official-${item.key}`,
+          labelKey: item.labelKey,
+          formatted: formatKlingV3SecondPrice(model, item.multiplier, 1),
+          unit: 'second',
+        })
+      }
+    }
+  } else if (dynamicSummary?.isSpecialExpression) {
     primaryFallback = t('Special billing expression')
   } else if (dynamicSummary) {
     const visibleDynamicEntries = dynamicSummary.primaryEntries.length
@@ -553,6 +623,10 @@ function MarketPricePanel(props: {
   const officialLine = officialEntries.length > 0 && savingPercent !== null
 
   const renderUnit = (entry: MarketPriceEntry) => {
+    if (entry.unit === 'second') {
+      return '/s'
+    }
+
     if (entry.unit === 'request') {
       return `/ ${t('request')}`
     }

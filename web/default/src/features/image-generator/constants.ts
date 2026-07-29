@@ -151,6 +151,9 @@ export const SEEDANCE_VIDEO_DURATIONS = [
 ] as const
 
 export const VIDEO_DURATIONS = [5, 10] as const
+export const KLING_V3_VIDEO_DURATIONS = [
+  3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+] as const
 
 // Max input image size for upload (bytes). Larger files are rejected.
 export const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -593,6 +596,8 @@ export const VIDEO_FAILED_STATUSES = [
 const KLING_RE = /kling/i
 const VIDU_RE = /vidu/i
 const SEEDANCE_RE = /seedance|doubao-seedance/i
+const KLING_V2_RE = /kling-v2/i
+const KLING_V3_RE = /kling-v3/i
 
 export function detectModelFamily(model: string): ModelFamily {
   if (KLING_RE.test(model)) return 'kling'
@@ -768,6 +773,28 @@ export const FAMILY_PARAMS: Record<ModelFamily, FamilyParam[]> = {
       type: 'text',
       default: '',
     },
+    {
+      key: 'Sound',
+      label: 'Sound',
+      type: 'select',
+      default: 'off',
+      options: [
+        { label: 'Off', value: 'off' },
+        { label: 'On', value: 'on' },
+      ],
+    },
+    {
+      key: 'ImageTail',
+      label: 'Tail frame',
+      type: 'text',
+      default: '',
+    },
+    {
+      key: 'ExternalTaskId',
+      label: 'External task ID',
+      type: 'text',
+      default: '',
+    },
   ],
   vidu: [
     {
@@ -809,4 +836,54 @@ export const FAMILY_PARAMS: Record<ModelFamily, FamilyParam[]> = {
     },
   ],
   unknown: [],
+}
+
+export function isKlingVideoModel(model: string): boolean {
+  return KLING_RE.test(model)
+}
+
+export function isKlingV2VideoModel(model: string): boolean {
+  return KLING_V2_RE.test(model)
+}
+
+export function isKlingV3VideoModel(model: string): boolean {
+  return KLING_V3_RE.test(model)
+}
+
+export function getVideoDurationOptions(model: string): readonly number[] {
+  if (isSeedanceVideoModel(model)) return SEEDANCE_VIDEO_DURATIONS
+  if (isKlingV3VideoModel(model)) return KLING_V3_VIDEO_DURATIONS
+  return VIDEO_DURATIONS
+}
+
+export function getVideoFamilyParams(
+  family: ModelFamily,
+  model: string
+): FamilyParam[] {
+  if (family !== 'kling') return FAMILY_PARAMS[family]
+
+  return FAMILY_PARAMS.kling
+    .filter((param) => {
+      if (param.key === 'CfgScale') return !isKlingV2VideoModel(model)
+      return true
+    })
+    .map((param) => {
+      if (param.key !== 'Mode' || !isKlingV3VideoModel(model)) return param
+      return {
+        ...param,
+        options: [
+          ...(param.options ?? []),
+          { label: '4K', value: '4k' },
+        ],
+      }
+    })
+}
+
+export function sanitizeVideoMetadataForModel(
+  model: string,
+  metadata: Record<string, unknown>
+): Record<string, unknown> {
+  if (!isKlingV2VideoModel(model)) return metadata
+  const { CfgScale: _cfgScale, ...rest } = metadata
+  return rest
 }
