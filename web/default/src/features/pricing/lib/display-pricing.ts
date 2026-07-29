@@ -31,11 +31,18 @@ export type DisplayPricingEntry = {
 export type TieredSecondPricingEntry = {
   key: string
   label: string
-  firstSecondFormatted: string
-  additionalSecondFormatted: string
-  firstSecondPrice: number
-  additionalSecondPrice: number
+  steps: TieredSecondPricingStep[]
+  primaryStep?: TieredSecondPricingStep
   unit: 'second'
+}
+
+export type TieredSecondPricingStep = {
+  key: string
+  label: string
+  formatted: string
+  numericPrice: number
+  fromSecond?: number
+  toSecond?: number
 }
 
 function formatDisplayPricingValue(price: number): string {
@@ -44,6 +51,30 @@ function formatDisplayPricingValue(price: number): string {
     digitsSmall: 6,
     abbreviate: false,
   })
+}
+
+function formatSecondStepLabel(
+  step: { label?: string; from_second?: number; to_second?: number },
+  index: number
+): string {
+  if (typeof step.label === 'string' && step.label.trim()) {
+    return step.label.trim()
+  }
+
+  const fromSecond = step.from_second
+  const toSecond = step.to_second
+
+  if (Number.isFinite(fromSecond) && Number.isFinite(toSecond)) {
+    return fromSecond === toSecond
+      ? `${fromSecond}s`
+      : `${fromSecond}-${toSecond}s`
+  }
+
+  if (Number.isFinite(fromSecond)) {
+    return `${fromSecond}s+`
+  }
+
+  return `${index + 1}s`
 }
 
 export function isWeightedFactorsDisplayPricingModel(
@@ -69,15 +100,7 @@ export function isTieredSecondsDisplayPricingModel(
     config?.mode === 'tiered_seconds' &&
     config.unit === 'second' &&
     Array.isArray(config.tiers) &&
-    config.tiers.some(
-      (tier) =>
-        typeof tier.value === 'string' &&
-        typeof tier.label === 'string' &&
-        Number.isFinite(tier.first_second_price) &&
-        tier.first_second_price > 0 &&
-        Number.isFinite(tier.additional_second_price) &&
-        tier.additional_second_price > 0
-    )
+    getTieredSecondPricingEntries(model, 1).length > 0
   )
 }
 
@@ -97,7 +120,7 @@ export function formatDisplayBasePrice(
 
   if (isTieredSecondsDisplayPricingModel(model)) {
     const tier = getTieredSecondPricingEntries(model, groupRatio)[0]
-    return tier?.firstSecondFormatted ?? null
+    return tier?.primaryStep?.formatted ?? null
   }
 
   if (!isWeightedFactorsDisplayPricingModel(model)) return null
@@ -112,34 +135,37 @@ export function getTieredSecondPricingEntries(
   groupRatio: number
 ): TieredSecondPricingEntry[] {
   const config = model.display_pricing
-  if (
-    !isTieredSecondsDisplayPricingModel(model) ||
-    !config ||
-    config.mode !== 'tiered_seconds'
-  ) {
+  if (!config || config.mode !== 'tiered_seconds' || config.unit !== 'second') {
     return []
   }
 
-  return config.tiers.flatMap((tier) => {
+  const entries = config.tiers.flatMap((tier) => {
     if (
       typeof tier.value !== 'string' ||
       typeof tier.label !== 'string' ||
-      !Number.isFinite(tier.first_second_price) ||
-      tier.first_second_price <= 0 ||
-      !Number.isFinite(tier.additional_second_price) ||
-      tier.additional_second_price <= 0
+      !Array.isArray(tier.steps)
     ) {
       return []
     }
 
-    const firstSecondPrice = tier.first_second_price * groupRatio
-    const additionalSecondPrice = tier.additional_second_price * groupRatio
-    if (
-      !Number.isFinite(firstSecondPrice) ||
-      firstSecondPrice <= 0 ||
-      !Number.isFinite(additionalSecondPrice) ||
-      additionalSecondPrice <= 0
-    ) {
+    const steps = tier.steps.flatMap((step, index) => {
+      if (!Number.isFinite(step.price) || step.price <= 0) return []
+
+      const numericPrice = step.price * groupRatio
+      if (!Number.isFinite(numericPrice) || numericPrice <= 0) return []
+
+      return [
+        {
+          key: `${tier.value}:${index}`,
+          label: formatSecondStepLabel(step, index),
+          formatted: formatDisplayPricingValue(numericPrice),
+          numericPrice,
+          fromSecond: step.from_second,
+          toSecond: step.to_second,
+        },
+      ]
+    })
+    if (steps.length === 0) {
       return []
     }
 
@@ -147,16 +173,27 @@ export function getTieredSecondPricingEntries(
       {
         key: tier.value,
         label: tier.label,
-        firstSecondFormatted: formatDisplayPricingValue(firstSecondPrice),
-        additionalSecondFormatted: formatDisplayPricingValue(
-          additionalSecondPrice
-        ),
-        firstSecondPrice,
-        additionalSecondPrice,
+        steps,
+        primaryStep: steps[0],
         unit: 'second' as const,
       },
     ]
   })
+
+  if (typeof config.base_value === 'string' && config.base_value) {
+    const baseIndex = entries.findIndex(
+      (entry) => entry.key === config.base_value
+    )
+    if (baseIndex > 0) {
+      return [
+        entries[baseIndex],
+        ...entries.slice(0, baseIndex),
+        ...entries.slice(baseIndex + 1),
+      ]
+    }
+  }
+
+  return entries
 }
 
 export function getDisplayPricingEntries(
@@ -169,22 +206,15 @@ export function getDisplayPricingEntries(
   }
 
   if (isTieredSecondsDisplayPricingModel(model)) {
-    return getTieredSecondPricingEntries(model, groupRatio).flatMap((tier) => [
-      {
-        key: `${tier.key}:first`,
-        label: `${tier.label}: 1s`,
-        formatted: tier.firstSecondFormatted,
-        numericPrice: tier.firstSecondPrice,
+    return getTieredSecondPricingEntries(model, groupRatio).flatMap((tier) =>
+      tier.steps.map((step) => ({
+        key: step.key,
+        label: `${tier.label}: ${step.label}`,
+        formatted: step.formatted,
+        numericPrice: step.numericPrice,
         unit: tier.unit,
-      },
-      {
-        key: `${tier.key}:additional`,
-        label: `${tier.label}: 2s+`,
-        formatted: tier.additionalSecondFormatted,
-        numericPrice: tier.additionalSecondPrice,
-        unit: tier.unit,
-      },
-    ])
+      }))
+    )
   }
 
   if (!isWeightedFactorsDisplayPricingModel(model)) {

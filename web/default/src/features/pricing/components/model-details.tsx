@@ -673,33 +673,25 @@ function PriceSection(props: {
 
   if (tieredSecondEntries.length > 0) {
     const entry = tieredSecondEntries[0]
+    const visibleSteps = entry.steps.slice(0, 3)
 
     return (
       <section>
         <SectionTitle>{t('Base Price')}</SectionTitle>
-        <div className='grid grid-cols-2 gap-2'>
-          <div className='bg-muted/20 rounded-lg border p-3'>
-            <div className='text-muted-foreground text-xs'>
-              {entry.label} · {t('First second')}
+        <div className='grid grid-cols-1 gap-2 sm:grid-cols-3'>
+          {visibleSteps.map((step) => (
+            <div key={step.key} className='bg-muted/20 rounded-lg border p-3'>
+              <div className='text-muted-foreground text-xs'>
+                {entry.label} · {step.label}
+              </div>
+              <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
+                {step.formatted}
+                <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
+                  /s
+                </span>
+              </div>
             </div>
-            <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
-              {entry.firstSecondFormatted}
-              <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
-                /s
-              </span>
-            </div>
-          </div>
-          <div className='bg-muted/20 rounded-lg border p-3'>
-            <div className='text-muted-foreground text-xs'>
-              {entry.label} · {t('Additional second')}
-            </div>
-            <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
-              {entry.additionalSecondFormatted}
-              <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
-                /s
-              </span>
-            </div>
-          </div>
+          ))}
         </div>
       </section>
     )
@@ -893,6 +885,14 @@ function DisplayPricingTieredSecondsSection(props: { model: PricingModel }) {
 
   if (entries.length === 0) return null
 
+  const rows = entries.flatMap((entry) =>
+    entry.steps.map((step) => ({
+      key: `${entry.key}:${step.key}`,
+      profile: entry.label,
+      step,
+    }))
+  )
+
   return (
     <section>
       <SectionTitle>{t('Second tiers')}</SectionTitle>
@@ -900,8 +900,8 @@ function DisplayPricingTieredSecondsSection(props: { model: PricingModel }) {
         className='-mx-4 rounded-none border-0 sm:mx-0'
         tableClassName='text-sm'
         headerRowClassName='hover:bg-transparent'
-        data={entries}
-        getRowKey={(entry) => entry.key}
+        data={rows}
+        getRowKey={(row) => row.key}
         columns={[
           {
             id: 'profile',
@@ -909,23 +909,23 @@ function DisplayPricingTieredSecondsSection(props: { model: PricingModel }) {
             className:
               'text-muted-foreground py-2 text-[10px] font-medium tracking-wider uppercase',
             cellClassName: 'py-2.5',
-            cell: (entry) => entry.label,
+            cell: (row) => row.profile,
           },
           {
-            id: 'first-second',
-            header: t('First second'),
+            id: 'duration',
+            header: t('Duration'),
+            className:
+              'text-muted-foreground py-2 text-[10px] font-medium tracking-wider uppercase',
+            cellClassName: 'py-2.5',
+            cell: (row) => row.step.label,
+          },
+          {
+            id: 'price',
+            header: t('Price'),
             className:
               'text-muted-foreground py-2 text-right text-[10px] font-medium tracking-wider uppercase',
             cellClassName: 'py-2.5 text-right font-mono',
-            cell: (entry) => `${entry.firstSecondFormatted} /s`,
-          },
-          {
-            id: 'additional-second',
-            header: t('Additional second'),
-            className:
-              'text-muted-foreground py-2 text-right text-[10px] font-medium tracking-wider uppercase',
-            cellClassName: 'py-2.5 text-right font-mono',
-            cell: (entry) => `${entry.additionalSecondFormatted} /s`,
+            cell: (row) => `${row.step.formatted} /s`,
           },
         ]}
       />
@@ -1272,6 +1272,8 @@ function GroupPricingSection(props: {
   }
 
   if (tieredSecondEntries.length > 0) {
+    const primaryTier = tieredSecondEntries[0]
+
     return (
       <section>
         <SectionTitle>{t('Pricing by Group')}</SectionTitle>
@@ -1297,9 +1299,9 @@ function GroupPricingSection(props: {
               cellClassName: 'text-muted-foreground py-2.5 font-mono',
               cell: (group) => `${props.groupRatio[group] || 1}x`,
             },
-            {
-              id: 'first-second',
-              header: t('First second'),
+            ...primaryTier.steps.map((step, stepIndex) => ({
+              id: step.key,
+              header: step.label,
               className: `${thClass} text-right`,
               cellClassName: 'py-2.5 text-right font-mono',
               cell: (group: string) =>
@@ -1307,22 +1309,9 @@ function GroupPricingSection(props: {
                   getTieredSecondPricingEntries(
                     props.model,
                     props.groupRatio[group] || 1
-                  )[0]?.firstSecondFormatted ?? '-'
+                  )[0]?.steps[stepIndex]?.formatted ?? '-'
                 } /s`,
-            },
-            {
-              id: 'additional-second',
-              header: t('Additional second'),
-              className: `${thClass} text-right`,
-              cellClassName: 'py-2.5 text-right font-mono',
-              cell: (group: string) =>
-                `${
-                  getTieredSecondPricingEntries(
-                    props.model,
-                    props.groupRatio[group] || 1
-                  )[0]?.additionalSecondFormatted ?? '-'
-                } /s`,
-            },
+            })),
           ]}
         />
         <p className='text-muted-foreground/40 mt-1.5 text-[10px]'>

@@ -96,17 +96,22 @@ export type DisplayPricingWeightedFactors = {
   factors: DisplayPricingFactor[]
 }
 
-export type DisplayPricingSecondTier = {
-  value: string
-  label: string
-  first_second_price: number
-  additional_second_price: number
+export type DisplayPricingSecondStep = {
+  label?: string
+  from_second?: number
+  to_second?: number
+  price: number
 }
 
 export type DisplayPricingTieredSeconds = {
   mode: 'tiered_seconds'
   unit: 'second'
-  tiers: DisplayPricingSecondTier[]
+  base_value?: string
+  tiers: {
+    value: string
+    label: string
+    steps: DisplayPricingSecondStep[]
+  }[]
 }
 
 export type DisplayPricing =
