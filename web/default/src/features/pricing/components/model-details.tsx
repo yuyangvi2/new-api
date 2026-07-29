@@ -38,6 +38,7 @@ import { StaticDataTable } from '@/components/data-table'
 import { sideDrawerContentClassName } from '@/components/drawer-layout'
 import { GroupBadge } from '@/components/group-badge'
 import { PublicLayout } from '@/components/layout'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -60,7 +61,11 @@ import { cn } from '@/lib/utils'
 
 import { DEFAULT_TOKEN_UNIT } from '../constants'
 import { usePricingData } from '../hooks/use-pricing-data'
-import { getDisplayPricingEntries } from '../lib/display-pricing'
+import {
+  formatDisplayBaseSecondPrice,
+  getDisplayPricingEntries,
+  isDisplayPricingModel,
+} from '../lib/display-pricing'
 import {
   getDynamicPriceEntries,
   getDynamicPricingSummary,
@@ -647,47 +652,22 @@ function PriceSection(props: {
   const displayPricingEntries = getDisplayPricingEntries(props.model, 1)
 
   if (displayPricingEntries.length > 0) {
-    const primaryEntries = displayPricingEntries.slice(0, 2)
-    const secondaryEntries = displayPricingEntries.slice(2)
+    const basePrice = formatDisplayBaseSecondPrice(props.model, 1)
 
     return (
       <section>
         <SectionTitle>{t('Base Price')}</SectionTitle>
-        <div className='grid grid-cols-2 gap-2'>
-          {primaryEntries.map((entry) => (
-            <div key={entry.key} className='bg-muted/20 rounded-lg border p-3'>
-              <div className='text-muted-foreground text-xs'>{entry.label}</div>
-              <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
-                {entry.formatted}
-                <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
-                  /s
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-        {secondaryEntries.length > 0 && (
-          <div className='bg-muted/20 mt-3 rounded-lg border px-3 py-2.5'>
-            <div className='space-y-1.5'>
-              {secondaryEntries.map((entry) => (
-                <div
-                  key={entry.key}
-                  className='flex items-baseline justify-between gap-4'
-                >
-                  <span className='text-muted-foreground/70 text-sm'>
-                    {entry.label}
-                  </span>
-                  <span className='text-muted-foreground font-mono text-sm tabular-nums'>
-                    {entry.formatted}
-                    <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
-                      /s
-                    </span>
-                  </span>
-                </div>
-              ))}
-            </div>
+        <div className='bg-muted/20 rounded-lg border p-3'>
+          <div className='text-muted-foreground text-xs'>
+            {t('Default combination')}
           </div>
-        )}
+          <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
+            {basePrice}
+            <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
+              /s
+            </span>
+          </div>
+        </div>
       </section>
     )
   }
@@ -845,6 +825,95 @@ function PriceSection(props: {
           </div>
         </div>
       )}
+    </section>
+  )
+}
+
+function DisplayPricingFactorsSection(props: { model: PricingModel }) {
+  const { t } = useTranslation()
+  const config = props.model.display_pricing
+
+  if (!isDisplayPricingModel(props.model) || !config) return null
+
+  const factors = config.factors.filter(
+    (factor) =>
+      typeof factor.field === 'string' &&
+      typeof factor.label === 'string' &&
+      Array.isArray(factor.values) &&
+      factor.values.length > 0
+  )
+
+  if (factors.length === 0) return null
+
+  return (
+    <section>
+      <SectionTitle>{t('Field multipliers')}</SectionTitle>
+      <p className='text-muted-foreground mb-3 text-sm'>
+        {t(
+          "Each field's multiplier is independent. The displayed second price uses the default combination price and the selected value's relative multiplier."
+        )}
+      </p>
+      <div className='space-y-3'>
+        {factors.map((factor) => {
+          const defaultValue = config.base_values[factor.field] || '-'
+
+          return (
+            <div
+              key={factor.field}
+              className='bg-muted/10 overflow-hidden rounded-lg border'
+            >
+              <div className='space-y-2 px-3 py-3'>
+                <div className='text-foreground text-sm font-semibold'>
+                  {factor.label || factor.field}
+                </div>
+                <div className='flex flex-wrap gap-2'>
+                  <Badge variant='outline' className='text-[11px]'>
+                    {t('Type: string')}
+                  </Badge>
+                  <Badge variant='secondary' className='text-[11px]'>
+                    {t('Default: {{value}}', { value: defaultValue })}
+                  </Badge>
+                </div>
+              </div>
+              <StaticDataTable
+                className='rounded-none border-x-0 border-b-0'
+                tableClassName='text-sm'
+                headerRowClassName='hover:bg-transparent'
+                data={factor.values.filter(
+                  (value) =>
+                    typeof value.value === 'string' &&
+                    typeof value.label === 'string' &&
+                    Number.isFinite(value.weight) &&
+                    value.weight > 0
+                )}
+                getRowKey={(value) => value.value}
+                columns={[
+                  {
+                    id: 'value',
+                    header: t('Field value'),
+                    className:
+                      'text-muted-foreground py-2 text-[10px] font-medium tracking-wider uppercase',
+                    cellClassName: 'py-2.5',
+                    cell: (value) => value.label || value.value,
+                  },
+                  {
+                    id: 'weight',
+                    header: t('Multiplier'),
+                    className:
+                      'text-muted-foreground py-2 text-right text-[10px] font-medium tracking-wider uppercase',
+                    cellClassName: 'py-2.5 text-right',
+                    cell: (value) => (
+                      <span className='rounded-full bg-amber-500 px-2 py-0.5 font-mono text-xs font-semibold text-white dark:bg-amber-400 dark:text-amber-950'>
+                        ×{value.weight}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
+            </div>
+          )
+        })}
+      </div>
     </section>
   )
 }
@@ -1117,17 +1186,19 @@ function GroupPricingSection(props: {
               cellClassName: 'text-muted-foreground py-2.5 font-mono',
               cell: (group) => `${props.groupRatio[group] || 1}x`,
             },
-            ...displayPricingEntries.map((entry) => ({
-              id: entry.key,
-              header: entry.label,
+            {
+              id: 'base-price',
+              header: t('Default combination'),
               className: `${thClass} text-right`,
               cellClassName: 'py-2.5 text-right font-mono',
               cell: (group: string) =>
-                getDisplayPricingEntries(
-                  props.model,
-                  props.groupRatio[group] || 1
-                ).find((item) => item.key === entry.key)?.formatted ?? '-',
-            })),
+                `${
+                  formatDisplayBaseSecondPrice(
+                    props.model,
+                    props.groupRatio[group] || 1
+                  ) ?? '-'
+                } /s`,
+            },
           ]}
         />
         <p className='text-muted-foreground/40 mt-1.5 text-[10px]'>
@@ -1295,6 +1366,7 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
               tokenUnit={props.tokenUnit}
               showRechargePrice={showRechargePrice}
             />
+            <DisplayPricingFactorsSection model={props.model} />
             {isDynamic && (
               <DynamicPricingBreakdown billingExpr={props.model.billing_expr} />
             )}

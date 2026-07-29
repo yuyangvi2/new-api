@@ -36,20 +36,36 @@ function formatDisplayPricingValue(price: number): string {
   })
 }
 
+export function isDisplayPricingModel(model: PricingModel): boolean {
+  const config = model.display_pricing
+  return (
+    config?.mode === 'weighted_factors' &&
+    config.unit === 'second' &&
+    Number.isFinite(config.base_price) &&
+    config.base_price > 0 &&
+    Boolean(config.base_values) &&
+    Array.isArray(config.factors) &&
+    config.factors.length > 0
+  )
+}
+
+export function formatDisplayBaseSecondPrice(
+  model: PricingModel,
+  groupRatio: number
+): string | null {
+  const config = model.display_pricing
+  if (!isDisplayPricingModel(model) || !config) return null
+  const price = config.base_price * groupRatio
+  if (!Number.isFinite(price) || price <= 0) return null
+  return formatDisplayPricingValue(price)
+}
+
 export function getDisplayPricingEntries(
   model: PricingModel,
   groupRatio: number
 ): DisplayPricingEntry[] {
   const config = model.display_pricing
-  if (
-    config?.mode !== 'weighted_factors' ||
-    config.unit !== 'second' ||
-    !Number.isFinite(config.base_price) ||
-    config.base_price <= 0 ||
-    !config.base_values ||
-    !Array.isArray(config.factors) ||
-    config.factors.length === 0
-  ) {
+  if (!isDisplayPricingModel(model) || !config) {
     return []
   }
 

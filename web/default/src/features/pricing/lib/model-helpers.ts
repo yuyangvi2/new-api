@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { EXCLUDED_GROUPS, FILTER_ALL, QUOTA_TYPE_VALUES } from '../constants'
 import type { PricingModel } from '../types'
+import { isDisplayPricingModel } from './display-pricing'
 
 // ----------------------------------------------------------------------------
 // Model Helper Utilities
@@ -109,10 +110,7 @@ export function isTokenBasedModel(model: PricingModel): boolean {
 }
 
 export function getDisplayBillingUnitLabelKey(model: PricingModel): string {
-  if (
-    model.display_pricing?.mode === 'weighted_factors' &&
-    model.display_pricing.unit === 'second'
-  ) {
+  if (isDisplayPricingModel(model)) {
     return 'Per Second'
   }
 
