@@ -56,12 +56,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
 import { DEFAULT_TOKEN_UNIT } from '../pricing/constants'
 import { usePricingData } from '../pricing/hooks/use-pricing-data'
+import { getDisplayPricingEntries } from '../pricing/lib/display-pricing'
 import {
   getDynamicDisplayGroupRatio,
   getDynamicPricingSummary,
@@ -240,78 +240,6 @@ type MarketPriceEntry = {
   formatted: string
   unit: 'M' | 'request' | 'second'
   numericPrice?: number
-}
-
-function formatDisplayPricingValue(price: number): string {
-  return formatBillingCurrencyFromUSD(price, {
-    digitsLarge: 4,
-    digitsSmall: 6,
-    abbreviate: false,
-  })
-}
-
-function getDisplayPricingEntries(
-  model: MarketModel,
-  groupRatio: number
-): MarketPriceEntry[] {
-  const config = model.display_pricing
-  if (
-    config?.mode !== 'weighted_factors' ||
-    config.unit !== 'second' ||
-    !Number.isFinite(config.base_price) ||
-    config.base_price <= 0 ||
-    !config.base_values ||
-    !Array.isArray(config.factors) ||
-    config.factors.length === 0
-  ) {
-    return []
-  }
-
-  const baseWeights = new Map<string, number>()
-  for (const factor of config.factors) {
-    if (
-      typeof factor.field !== 'string' ||
-      typeof factor.label !== 'string' ||
-      !Array.isArray(factor.values)
-    ) {
-      return []
-    }
-    const baseValue = config.base_values[factor.field]
-    const option = factor.values.find((value) => value.value === baseValue)
-    if (!option || !Number.isFinite(option.weight) || option.weight <= 0) {
-      return []
-    }
-    baseWeights.set(factor.field, option.weight)
-  }
-
-  const baseWeight = [...baseWeights.values()].reduce(
-    (product, weight) => product * weight,
-    1
-  )
-  if (!Number.isFinite(baseWeight) || baseWeight <= 0) return []
-
-  const entries: MarketPriceEntry[] = []
-  for (const factor of config.factors) {
-    for (const option of factor.values) {
-      if (!Number.isFinite(option.weight) || option.weight <= 0) continue
-      const factorBaseWeight = baseWeights.get(factor.field)
-      if (!factorBaseWeight) continue
-
-      const selectedWeight = (baseWeight / factorBaseWeight) * option.weight
-      const numericPrice =
-        (config.base_price * selectedWeight * groupRatio) / baseWeight
-      if (!Number.isFinite(numericPrice) || numericPrice <= 0) continue
-
-      entries.push({
-        key: `${factor.field}:${option.value}`,
-        label: `${factor.label}: ${option.label} ×${option.weight}`,
-        formatted: formatDisplayPricingValue(numericPrice),
-        unit: 'second',
-        numericPrice,
-      })
-    }
-  }
-  return entries
 }
 
 function formatCompactTokenCount(value?: number): string | null {

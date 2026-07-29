@@ -3722,6 +3722,7 @@
     "Price: High to Low": "価格：高い順",
     "Price: Low to High": "価格：低い順",
     "Prices shown per": "価格表示単位",
+    "Prices shown per second": "価格は秒単位で表示されます",
     "Prices synced successfully": "価格が正常に同期されました",
     "Prices vary by usage tier and request conditions": "価格は利用ティアとリクエスト条件で変動します",
     "Pricing": "価格設定",
