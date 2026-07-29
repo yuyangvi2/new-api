@@ -1615,6 +1615,7 @@
     "e.g., us-central1 or JSON format for model-specific regions": "par ex., us-central1 ou format JSON pour les régions spécifiques au modèle",
     "e.g., v2.1": "par ex., v2.1",
     "Each backup code can only be used once.": "Chaque code de sauvegarde ne peut être utilisé qu'une seule fois.",
+    "Each field's multiplier is independent. The displayed price uses the default combination price and the selected value's relative multiplier.": "Le multiplicateur de chaque champ est indépendant. Le prix affiché utilise le prix de la combinaison par défaut et le multiplicateur relatif de la valeur sélectionnée.",
     "Each field's multiplier is independent. The displayed second price uses the default combination price and the selected value's relative multiplier.": "Le multiplicateur de chaque champ est indépendant. Le prix par seconde affiché utilise le prix de la combinaison par défaut et le multiplicateur relatif de la valeur choisie.",
     "Each item must be an object with a single key-value pair.": "Chaque élément doit être un objet avec une seule paire clé-valeur.",
     "Each item must have exactly one key-value pair.": "Chaque élément doit avoir exactement une paire clé-valeur.",

@@ -1615,6 +1615,7 @@
     "e.g., us-central1 or JSON format for model-specific regions": "e.g., us-central1 or JSON format for model-specific regions",
     "e.g., v2.1": "e.g., v2.1",
     "Each backup code can only be used once.": "Each backup code can only be used once.",
+    "Each field's multiplier is independent. The displayed price uses the default combination price and the selected value's relative multiplier.": "Each field's multiplier is independent. The displayed price uses the default combination price and the selected value's relative multiplier.",
     "Each field's multiplier is independent. The displayed second price uses the default combination price and the selected value's relative multiplier.": "Each field's multiplier is independent. The displayed second price uses the default combination price and the selected value's relative multiplier.",
     "Each item must be an object with a single key-value pair.": "Each item must be an object with a single key-value pair.",
     "Each item must have exactly one key-value pair.": "Each item must have exactly one key-value pair.",

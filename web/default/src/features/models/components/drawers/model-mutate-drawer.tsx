@@ -929,7 +929,6 @@ export function ModelMutateDrawer({
                         value={field.value || ''}
                         onChange={field.onChange}
                         keyPlaceholder='display_pricing'
-                        valuePlaceholder='{"mode":"weighted_factors","unit":"second","base_price":0.0834}'
                         template={{
                           mode: 'weighted_factors',
                           unit: 'second',

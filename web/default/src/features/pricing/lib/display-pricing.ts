@@ -18,14 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 
-import type { PricingModel } from '../types'
+import type { DisplayPricing, PricingModel } from '../types'
 
 export type DisplayPricingEntry = {
   key: string
   label: string
   formatted: string
   numericPrice: number
-  unit: 'second'
+  unit: DisplayPricing['unit']
 }
 
 function formatDisplayPricingValue(price: number): string {
@@ -40,7 +40,7 @@ export function isDisplayPricingModel(model: PricingModel): boolean {
   const config = model.display_pricing
   return (
     config?.mode === 'weighted_factors' &&
-    config.unit === 'second' &&
+    (config.unit === 'second' || config.unit === 'request') &&
     Number.isFinite(config.base_price) &&
     config.base_price > 0 &&
     Boolean(config.base_values) &&
@@ -49,7 +49,7 @@ export function isDisplayPricingModel(model: PricingModel): boolean {
   )
 }
 
-export function formatDisplayBaseSecondPrice(
+export function formatDisplayBasePrice(
   model: PricingModel,
   groupRatio: number
 ): string | null {
@@ -109,7 +109,7 @@ export function getDisplayPricingEntries(
         label: `${factor.label}: ${option.label} ×${option.weight}`,
         formatted: formatDisplayPricingValue(numericPrice),
         numericPrice,
-        unit: 'second',
+        unit: config.unit,
       })
     }
   }

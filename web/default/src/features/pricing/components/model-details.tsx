@@ -62,7 +62,7 @@ import { cn } from '@/lib/utils'
 import { DEFAULT_TOKEN_UNIT } from '../constants'
 import { usePricingData } from '../hooks/use-pricing-data'
 import {
-  formatDisplayBaseSecondPrice,
+  formatDisplayBasePrice,
   getDisplayPricingEntries,
   isDisplayPricingModel,
 } from '../lib/display-pricing'
@@ -80,6 +80,7 @@ import {
 } from '../lib/model-helpers'
 import { formatFixedPrice, formatGroupPrice } from '../lib/price'
 import type {
+  DisplayPricing,
   ModelCapability,
   PriceType,
   PricingModel,
@@ -127,6 +128,23 @@ const MODALITY_LABEL_KEYS: Record<string, string> = {
 const TOKEN_FORMAT = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 1,
 })
+
+type DisplayPricingUnit = DisplayPricing['unit']
+
+function getDisplayPricingUnitSuffix(
+  unit: DisplayPricingUnit,
+  t: (key: string) => string
+): string {
+  return unit === 'second' ? '/s' : `/ ${t('request')}`
+}
+
+function getDisplayPricingFootnote(
+  unit: DisplayPricingUnit,
+  t: (key: string) => string
+): string {
+  if (unit === 'second') return t('Prices shown per second')
+  return `${t('Prices shown per')} ${t('request')}`
+}
 
 function formatCatalogTokenCount(tokens: number): string {
   if (!Number.isFinite(tokens) || tokens <= 0) return ''
@@ -652,7 +670,11 @@ function PriceSection(props: {
   const displayPricingEntries = getDisplayPricingEntries(props.model, 1)
 
   if (displayPricingEntries.length > 0) {
-    const basePrice = formatDisplayBaseSecondPrice(props.model, 1)
+    const basePrice = formatDisplayBasePrice(props.model, 1)
+    const unitSuffix = getDisplayPricingUnitSuffix(
+      displayPricingEntries[0].unit,
+      t
+    )
 
     return (
       <section>
@@ -664,7 +686,7 @@ function PriceSection(props: {
           <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
             {basePrice}
             <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
-              /s
+              {unitSuffix}
             </span>
           </div>
         </div>
@@ -850,7 +872,7 @@ function DisplayPricingFactorsSection(props: { model: PricingModel }) {
       <SectionTitle>{t('Field multipliers')}</SectionTitle>
       <p className='text-muted-foreground mb-3 text-sm'>
         {t(
-          "Each field's multiplier is independent. The displayed second price uses the default combination price and the selected value's relative multiplier."
+          "Each field's multiplier is independent. The displayed price uses the default combination price and the selected value's relative multiplier."
         )}
       </p>
       <div className='space-y-3'>
@@ -1161,6 +1183,12 @@ function GroupPricingSection(props: {
   }
 
   if (displayPricingEntries.length > 0) {
+    const unitSuffix = getDisplayPricingUnitSuffix(
+      displayPricingEntries[0].unit,
+      t
+    )
+    const footnote = getDisplayPricingFootnote(displayPricingEntries[0].unit, t)
+
     return (
       <section>
         <SectionTitle>{t('Pricing by Group')}</SectionTitle>
@@ -1193,16 +1221,16 @@ function GroupPricingSection(props: {
               cellClassName: 'py-2.5 text-right font-mono',
               cell: (group: string) =>
                 `${
-                  formatDisplayBaseSecondPrice(
+                  formatDisplayBasePrice(
                     props.model,
                     props.groupRatio[group] || 1
                   ) ?? '-'
-                } /s`,
+                } ${unitSuffix}`,
             },
           ]}
         />
         <p className='text-muted-foreground/40 mt-1.5 text-[10px]'>
-          {t('Prices shown per second')}
+          {footnote}
         </p>
       </section>
     )

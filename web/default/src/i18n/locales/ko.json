@@ -1615,6 +1615,7 @@
     "e.g., us-central1 or JSON format for model-specific regions": "e.g., us-central1 or JSON format for model-specific regions",
     "e.g., v2.1": "e.g., v2.1",
     "Each backup code can only be used once.": "Each backup code can only be used once.",
+    "Each field's multiplier is independent. The displayed price uses the default combination price and the selected value's relative multiplier.": "각 필드의 배율은 독립적입니다. 표시 가격은 기본 조합 가격과 선택한 값의 상대 배율을 사용합니다.",
     "Each field's multiplier is independent. The displayed second price uses the default combination price and the selected value's relative multiplier.": "각 필드의 배율은 서로 독립적입니다. 표시되는 초당 가격은 기본 조합 가격을 기준으로 선택한 값의 상대 배율을 적용합니다.",
     "Each item must be an object with a single key-value pair.": "Each item must be an object with a single key-value pair.",
     "Each item must have exactly one key-value pair.": "Each item must have exactly one key-value pair.",

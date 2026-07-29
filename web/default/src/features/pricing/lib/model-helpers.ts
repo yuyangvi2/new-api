@@ -111,7 +111,9 @@ export function isTokenBasedModel(model: PricingModel): boolean {
 
 export function getDisplayBillingUnitLabelKey(model: PricingModel): string {
   if (isDisplayPricingModel(model)) {
-    return 'Per Second'
+    return model.display_pricing?.unit === 'second'
+      ? 'Per Second'
+      : 'Per Request'
   }
 
   return isTokenBasedModel(model) ? 'Token-based' : 'Per Request'

@@ -1615,6 +1615,7 @@
     "e.g., us-central1 or JSON format for model-specific regions": "например, us-central1 или формат JSON для регионов, специфичных для модели",
     "e.g., v2.1": "например, v2.1",
     "Each backup code can only be used once.": "Каждый код восстановления можно использовать только один раз.",
+    "Each field's multiplier is independent. The displayed price uses the default combination price and the selected value's relative multiplier.": "Множитель каждого поля независим. Отображаемая цена рассчитывается из цены комбинации по умолчанию и относительного множителя выбранного значения.",
     "Each field's multiplier is independent. The displayed second price uses the default combination price and the selected value's relative multiplier.": "Множитель каждого поля независим. Отображаемая цена за секунду рассчитывается от цены комбинации по умолчанию и относительного множителя выбранного значения.",
     "Each item must be an object with a single key-value pair.": "Каждый элемент должен быть объектом с одной парой ключ-значение.",
     "Each item must have exactly one key-value pair.": "Каждый элемент должен иметь ровно одну пару ключ-значение.",

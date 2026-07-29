@@ -1615,6 +1615,7 @@
     "e.g., us-central1 or JSON format for model-specific regions": "例: us-central1 またはモデル固有のリージョンを示す JSON 形式",
     "e.g., v2.1": "例: v2.1",
     "Each backup code can only be used once.": "各バックアップコードは1回しか使用できません。",
+    "Each field's multiplier is independent. The displayed price uses the default combination price and the selected value's relative multiplier.": "各フィールドの倍率は独立しています。表示価格はデフォルトの組み合わせ価格と選択値の相対倍率を使用します。",
     "Each field's multiplier is independent. The displayed second price uses the default combination price and the selected value's relative multiplier.": "各フィールドの倍率は独立しています。表示される秒単価はデフォルト組み合わせ価格を基準に、選択値の相対倍率で換算されます。",
     "Each item must be an object with a single key-value pair.": "各項目は単一のキーと値のペアを持つオブジェクトでなければなりません。",
     "Each item must have exactly one key-value pair.": "各項目には正確に 1 つのキーと値のペアが必要です。",

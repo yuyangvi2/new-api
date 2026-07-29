@@ -1615,6 +1615,7 @@
     "e.g., us-central1 or JSON format for model-specific regions": "例如，us-central1 或模型特定区域的 JSON 格式",
     "e.g., v2.1": "例如，v2.1",
     "Each backup code can only be used once.": "每个備份代碼只能使用一次。",
+    "Each field's multiplier is independent. The displayed price uses the default combination price and the selected value's relative multiplier.": "每個欄位的倍率相互獨立。顯示價格使用預設組合價格和所選值的相對倍率。",
     "Each field's multiplier is independent. The displayed second price uses the default combination price and the selected value's relative multiplier.": "每個欄位的倍率相互獨立。展示的按秒價格以預設組合價格為基準，並按所選欄位值的相對倍率折算。",
     "Each item must be an object with a single key-value pair.": "每个條目必须是包含單个键值对的对象。",
     "Each item must have exactly one key-value pair.": "每个條目必须恰好包含一个键值对。",

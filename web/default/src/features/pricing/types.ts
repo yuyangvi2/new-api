@@ -88,7 +88,7 @@ export type DisplayPricingFactor = {
 
 export type DisplayPricing = {
   mode: 'weighted_factors'
-  unit: 'second'
+  unit: 'second' | 'request'
   base_price: number
   base_values: Record<string, string>
   factors: DisplayPricingFactor[]
