@@ -151,8 +151,9 @@ function compareMarketModels(
 function getMarketSortPrice(model: IndexedMarketModel): number {
   const groupRatio = getDisplayGroupRatio(model)
 
-  if (isKlingV3MarketModel(model)) {
-    return model.model_ratio * groupRatio
+  const displayPricingEntries = getDisplayPricingEntries(model, groupRatio)
+  if (displayPricingEntries.length > 0) {
+    return displayPricingEntries[0]?.numericPrice ?? Number.POSITIVE_INFINITY
   }
 
   if (model.billing_mode === 'tiered_expr' && model.billing_expr) {
@@ -234,37 +235,83 @@ function modelSignals(model: MarketModel): string[] {
 
 type MarketPriceEntry = {
   key: string
-  labelKey: string
+  label?: string
+  labelKey?: string
   formatted: string
   unit: 'M' | 'request' | 'second'
+  numericPrice?: number
 }
 
-const KLING_V3_SECOND_PRICE_ITEMS = [
-  { key: 'std-no-sound', labelKey: 'Std no sound', multiplier: 1 },
-  { key: 'std-sound', labelKey: 'Std sound', multiplier: 1.5 },
-  { key: 'pro-no-sound', labelKey: 'Pro no sound', multiplier: 4 / 3 },
-  { key: 'pro-sound', labelKey: 'Pro sound', multiplier: 2 },
-  { key: 'std-action', labelKey: 'Std action control', multiplier: 1.5 },
-  { key: 'pro-action', labelKey: 'Pro action control', multiplier: 2 },
-] as const
-
-function isKlingV3MarketModel(model: Pick<MarketModel, 'model_name'>): boolean {
-  return model.model_name.trim().toLowerCase() === 'kling-v3'
+function formatDisplayPricingValue(price: number): string {
+  return formatBillingCurrencyFromUSD(price, {
+    digitsLarge: 4,
+    digitsSmall: 6,
+    abbreviate: false,
+  })
 }
 
-function formatKlingV3SecondPrice(
+function getDisplayPricingEntries(
   model: MarketModel,
-  multiplier: number,
   groupRatio: number
-): string {
-  return formatBillingCurrencyFromUSD(
-    model.model_ratio * multiplier * groupRatio,
-    {
-      digitsLarge: 4,
-      digitsSmall: 6,
-      abbreviate: false,
+): MarketPriceEntry[] {
+  const config = model.display_pricing
+  if (
+    config?.mode !== 'weighted_factors' ||
+    config.unit !== 'second' ||
+    !Number.isFinite(config.base_price) ||
+    config.base_price <= 0 ||
+    !config.base_values ||
+    !Array.isArray(config.factors) ||
+    config.factors.length === 0
+  ) {
+    return []
+  }
+
+  const baseWeights = new Map<string, number>()
+  for (const factor of config.factors) {
+    if (
+      typeof factor.field !== 'string' ||
+      typeof factor.label !== 'string' ||
+      !Array.isArray(factor.values)
+    ) {
+      return []
     }
+    const baseValue = config.base_values[factor.field]
+    const option = factor.values.find((value) => value.value === baseValue)
+    if (!option || !Number.isFinite(option.weight) || option.weight <= 0) {
+      return []
+    }
+    baseWeights.set(factor.field, option.weight)
+  }
+
+  const baseWeight = [...baseWeights.values()].reduce(
+    (product, weight) => product * weight,
+    1
   )
+  if (!Number.isFinite(baseWeight) || baseWeight <= 0) return []
+
+  const entries: MarketPriceEntry[] = []
+  for (const factor of config.factors) {
+    for (const option of factor.values) {
+      if (!Number.isFinite(option.weight) || option.weight <= 0) continue
+      const factorBaseWeight = baseWeights.get(factor.field)
+      if (!factorBaseWeight) continue
+
+      const selectedWeight = (baseWeight / factorBaseWeight) * option.weight
+      const numericPrice =
+        (config.base_price * selectedWeight * groupRatio) / baseWeight
+      if (!Number.isFinite(numericPrice) || numericPrice <= 0) continue
+
+      entries.push({
+        key: `${factor.field}:${option.value}`,
+        label: `${factor.label}: ${option.label} ×${option.weight}`,
+        formatted: formatDisplayPricingValue(numericPrice),
+        unit: 'second',
+        numericPrice,
+      })
+    }
+  }
+  return entries
 }
 
 function formatCompactTokenCount(value?: number): string | null {
@@ -295,7 +342,7 @@ function getSavingPercent(groupRatio: number): number | null {
 }
 
 function isMutedPriceEntry(entry: MarketPriceEntry): boolean {
-  const normalizedLabel = entry.labelKey.toLowerCase()
+  const normalizedLabel = (entry.labelKey ?? entry.label ?? '').toLowerCase()
   return entry.key.includes('cache') || normalizedLabel.includes('cache')
 }
 
@@ -349,42 +396,24 @@ function MarketPricePanel(props: {
   const officialEntries: MarketPriceEntry[] = []
   let primaryFallback: ReactNode | null = null
 
-  if (isKlingV3MarketModel(model)) {
-    for (const item of KLING_V3_SECOND_PRICE_ITEMS.slice(0, 2)) {
-      primaryEntries.push({
-        key: item.key,
-        labelKey: item.labelKey,
-        formatted: formatKlingV3SecondPrice(
-          model,
-          item.multiplier,
-          displayGroupRatio
-        ),
-        unit: 'second',
-      })
-    }
+  const displayPricingEntries = getDisplayPricingEntries(
+    model,
+    displayGroupRatio
+  )
 
-    for (const item of KLING_V3_SECOND_PRICE_ITEMS.slice(2)) {
-      extraEntries.push({
-        key: item.key,
-        labelKey: item.labelKey,
-        formatted: formatKlingV3SecondPrice(
-          model,
-          item.multiplier,
-          displayGroupRatio
-        ),
-        unit: 'second',
-      })
-    }
+  if (displayPricingEntries.length > 0) {
+    primaryEntries.push(...displayPricingEntries.slice(0, 2))
+    extraEntries.push(...displayPricingEntries.slice(2))
 
     if (savingPercent !== null) {
-      for (const item of KLING_V3_SECOND_PRICE_ITEMS.slice(0, 2)) {
-        officialEntries.push({
-          key: `official-${item.key}`,
-          labelKey: item.labelKey,
-          formatted: formatKlingV3SecondPrice(model, item.multiplier, 1),
-          unit: 'second',
-        })
-      }
+      officialEntries.push(
+        ...getDisplayPricingEntries(model, 1)
+          .slice(0, 2)
+          .map((entry) => ({
+            ...entry,
+            key: `official-${entry.key}`,
+          }))
+      )
     }
   } else if (dynamicSummary?.isSpecialExpression) {
     primaryFallback = t('Special billing expression')
@@ -646,7 +675,7 @@ function MarketPricePanel(props: {
         )}
       >
         <span className='text-muted-foreground min-w-0 truncate text-[13px] font-bold'>
-          {t(entry.labelKey)}
+          {entry.labelKey ? t(entry.labelKey) : entry.label}
         </span>
         <span className='shrink-0 text-right whitespace-nowrap'>
           <span
@@ -697,7 +726,9 @@ function MarketPricePanel(props: {
                   key={entry.key}
                   className='flex items-center justify-between gap-4'
                 >
-                  <span>{t(entry.labelKey)}</span>
+                  <span>
+                    {entry.labelKey ? t(entry.labelKey) : entry.label}
+                  </span>
                   <span className='font-mono'>
                     {entry.formatted} {renderUnit(entry)}
                   </span>
@@ -715,7 +746,9 @@ function MarketPricePanel(props: {
                   key={entry.key}
                   className='flex items-center justify-between gap-4'
                 >
-                  <span>{t(entry.labelKey)}</span>
+                  <span>
+                    {entry.labelKey ? t(entry.labelKey) : entry.label}
+                  </span>
                   <span className='font-mono'>
                     {entry.formatted} {renderUnit(entry)}
                   </span>

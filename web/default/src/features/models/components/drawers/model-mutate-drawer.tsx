@@ -95,6 +95,7 @@ const extendedModelFormSchema = z.object({
   tags: z.array(z.string()),
   vendor_id: z.number().optional(),
   endpoints: z.string(),
+  display_pricing: z.string(),
   name_rule: z.number(),
   status: z.boolean(),
   sync_official: z.boolean(),
@@ -234,6 +235,7 @@ export function ModelMutateDrawer({
       tags: [],
       vendor_id: undefined,
       endpoints: '',
+      display_pricing: '',
       name_rule: 0,
       status: true,
       sync_official: true,
@@ -294,6 +296,7 @@ export function ModelMutateDrawer({
         tags: parseModelTags(model.tags),
         vendor_id: model.vendor_id,
         endpoints: model.endpoints || '',
+        display_pricing: model.display_pricing || '',
         name_rule: model.name_rule || 0,
         status: model.status === 1,
         sync_official: model.sync_official === 1,
@@ -398,6 +401,7 @@ export function ModelMutateDrawer({
         tags: [],
         vendor_id: undefined,
         endpoints: '',
+        display_pricing: '',
         name_rule: 0,
         status: true,
         sync_official: true,
@@ -649,6 +653,7 @@ export function ModelMutateDrawer({
       oldModelName,
       modelSettings,
       updateOption,
+      t,
     ]
   )
 
@@ -907,6 +912,76 @@ export function ModelMutateDrawer({
                     </FormControl>
                     <FormDescription>
                       {t('Define API endpoints for this model (JSON format)')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='display_pricing'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Display pricing')}</FormLabel>
+                    <FormControl>
+                      <JsonEditor
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        keyPlaceholder='display_pricing'
+                        valuePlaceholder='{"mode":"weighted_factors","unit":"second","base_price":0.0834}'
+                        template={{
+                          mode: 'weighted_factors',
+                          unit: 'second',
+                          base_price: 0.0834,
+                          base_values: {
+                            Mode: 'std',
+                            Feature: 'none',
+                          },
+                          factors: [
+                            {
+                              field: 'Mode',
+                              label: 'Generation mode',
+                              values: [
+                                { value: 'std', label: 'std', weight: 3 },
+                                { value: 'pro', label: 'pro', weight: 4 },
+                              ],
+                            },
+                            {
+                              field: 'Feature',
+                              label: 'Feature',
+                              values: [
+                                {
+                                  value: 'none',
+                                  label: 'No sound',
+                                  weight: 2,
+                                },
+                                {
+                                  value: 'sound',
+                                  label: 'Sound',
+                                  weight: 3,
+                                },
+                                {
+                                  value: 'action_control',
+                                  label: 'Action control',
+                                  weight: 3,
+                                },
+                              ],
+                            },
+                          ],
+                        }}
+                        keyLabel='Field'
+                        valueLabel='Configuration'
+                        valueType='any'
+                        emptyMessage={t(
+                          'No display pricing configured. Switch to JSON mode to define display-only pricing.'
+                        )}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Define display-only pricing for the model catalog. This does not affect billing.'
+                      )}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

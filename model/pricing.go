@@ -36,6 +36,7 @@ type Pricing struct {
 	SupportedEndpointTypes []constant.EndpointType `json:"supported_endpoint_types"`
 	BillingMode            string                  `json:"billing_mode,omitempty"`
 	BillingExpr            string                  `json:"billing_expr,omitempty"`
+	DisplayPricing         map[string]interface{}  `json:"display_pricing,omitempty"`
 	PricingVersion         string                  `json:"pricing_version,omitempty"`
 }
 
@@ -316,6 +317,12 @@ func updatePricing() {
 			pricing.Icon = meta.Icon
 			pricing.Tags = meta.Tags
 			pricing.VendorID = meta.VendorID
+			if strings.TrimSpace(meta.DisplayPricing) != "" {
+				var displayPricing map[string]interface{}
+				if err := common.UnmarshalJsonStr(meta.DisplayPricing, &displayPricing); err == nil {
+					pricing.DisplayPricing = displayPricing
+				}
+			}
 		}
 		modelPrice, findPrice := ratio_setting.GetModelPrice(model, false)
 		if findPrice {

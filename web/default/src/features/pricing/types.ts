@@ -55,6 +55,7 @@ export type PricingModel = {
   billing_mode?: string
   /** Raw expression describing dynamic / tiered billing */
   billing_expr?: string
+  display_pricing?: DisplayPricing
   /** Pricing version returned by backend, useful for cache busting */
   pricing_version?: string
   /**
@@ -71,6 +72,26 @@ export type PricingModel = {
   capabilities?: ModelCapability[]
   cover_thumb_url?: string
   yesterday_request_count?: number
+}
+
+export type DisplayPricingFactorValue = {
+  value: string
+  label: string
+  weight: number
+}
+
+export type DisplayPricingFactor = {
+  field: string
+  label: string
+  values: DisplayPricingFactorValue[]
+}
+
+export type DisplayPricing = {
+  mode: 'weighted_factors'
+  unit: 'second'
+  base_price: number
+  base_values: Record<string, string>
+  factors: DisplayPricingFactor[]
 }
 
 /** Input/output modalities supported by a model. */
