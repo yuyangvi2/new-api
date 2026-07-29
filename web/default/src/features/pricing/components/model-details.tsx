@@ -64,7 +64,8 @@ import { usePricingData } from '../hooks/use-pricing-data'
 import {
   formatDisplayBasePrice,
   getDisplayPricingEntries,
-  isDisplayPricingModel,
+  getTieredSecondPricingEntries,
+  isWeightedFactorsDisplayPricingModel,
 } from '../lib/display-pricing'
 import {
   getDynamicPriceEntries,
@@ -668,6 +669,41 @@ function PriceSection(props: {
     },
   ]
   const displayPricingEntries = getDisplayPricingEntries(props.model, 1)
+  const tieredSecondEntries = getTieredSecondPricingEntries(props.model, 1)
+
+  if (tieredSecondEntries.length > 0) {
+    const entry = tieredSecondEntries[0]
+
+    return (
+      <section>
+        <SectionTitle>{t('Base Price')}</SectionTitle>
+        <div className='grid grid-cols-2 gap-2'>
+          <div className='bg-muted/20 rounded-lg border p-3'>
+            <div className='text-muted-foreground text-xs'>
+              {entry.label} · {t('First second')}
+            </div>
+            <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
+              {entry.firstSecondFormatted}
+              <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
+                /s
+              </span>
+            </div>
+          </div>
+          <div className='bg-muted/20 rounded-lg border p-3'>
+            <div className='text-muted-foreground text-xs'>
+              {entry.label} · {t('Additional second')}
+            </div>
+            <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
+              {entry.additionalSecondFormatted}
+              <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
+                /s
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   if (displayPricingEntries.length > 0) {
     const basePrice = formatDisplayBasePrice(props.model, 1)
@@ -851,11 +887,63 @@ function PriceSection(props: {
   )
 }
 
+function DisplayPricingTieredSecondsSection(props: { model: PricingModel }) {
+  const { t } = useTranslation()
+  const entries = getTieredSecondPricingEntries(props.model, 1)
+
+  if (entries.length === 0) return null
+
+  return (
+    <section>
+      <SectionTitle>{t('Second tiers')}</SectionTitle>
+      <StaticDataTable
+        className='-mx-4 rounded-none border-0 sm:mx-0'
+        tableClassName='text-sm'
+        headerRowClassName='hover:bg-transparent'
+        data={entries}
+        getRowKey={(entry) => entry.key}
+        columns={[
+          {
+            id: 'profile',
+            header: t('Profile'),
+            className:
+              'text-muted-foreground py-2 text-[10px] font-medium tracking-wider uppercase',
+            cellClassName: 'py-2.5',
+            cell: (entry) => entry.label,
+          },
+          {
+            id: 'first-second',
+            header: t('First second'),
+            className:
+              'text-muted-foreground py-2 text-right text-[10px] font-medium tracking-wider uppercase',
+            cellClassName: 'py-2.5 text-right font-mono',
+            cell: (entry) => `${entry.firstSecondFormatted} /s`,
+          },
+          {
+            id: 'additional-second',
+            header: t('Additional second'),
+            className:
+              'text-muted-foreground py-2 text-right text-[10px] font-medium tracking-wider uppercase',
+            cellClassName: 'py-2.5 text-right font-mono',
+            cell: (entry) => `${entry.additionalSecondFormatted} /s`,
+          },
+        ]}
+      />
+    </section>
+  )
+}
+
 function DisplayPricingFactorsSection(props: { model: PricingModel }) {
   const { t } = useTranslation()
   const config = props.model.display_pricing
 
-  if (!isDisplayPricingModel(props.model) || !config) return null
+  if (
+    !isWeightedFactorsDisplayPricingModel(props.model) ||
+    !config ||
+    config.mode !== 'weighted_factors'
+  ) {
+    return null
+  }
 
   const factors = config.factors.filter(
     (factor) =>
@@ -1030,6 +1118,7 @@ function GroupPricingSection(props: {
   const isTokenBased = isTokenBasedModel(props.model)
   const tokenUnitLabel = props.tokenUnit === 'K' ? '1K' : '1M'
   const displayPricingEntries = getDisplayPricingEntries(props.model, 1)
+  const tieredSecondEntries = getTieredSecondPricingEntries(props.model, 1)
 
   const extraPriceTypes = useMemo(() => {
     const types: { label: string; type: PriceType }[] = []
@@ -1178,6 +1267,67 @@ function GroupPricingSection(props: {
             {t('Prices shown per')} {tokenUnitLabel} tokens
           </p>
         </div>
+      </section>
+    )
+  }
+
+  if (tieredSecondEntries.length > 0) {
+    return (
+      <section>
+        <SectionTitle>{t('Pricing by Group')}</SectionTitle>
+        <AutoGroupChain model={props.model} autoGroups={props.autoGroups} />
+        <StaticDataTable
+          className='-mx-4 rounded-none border-0 sm:mx-0'
+          tableClassName='text-sm'
+          headerRowClassName='hover:bg-transparent'
+          data={availableGroups}
+          getRowKey={(group) => group}
+          columns={[
+            {
+              id: 'group',
+              header: t('Group'),
+              className: thClass,
+              cellClassName: 'py-2.5',
+              cell: (group) => <GroupBadge group={group} size='sm' />,
+            },
+            {
+              id: 'ratio',
+              header: t('Ratio'),
+              className: thClass,
+              cellClassName: 'text-muted-foreground py-2.5 font-mono',
+              cell: (group) => `${props.groupRatio[group] || 1}x`,
+            },
+            {
+              id: 'first-second',
+              header: t('First second'),
+              className: `${thClass} text-right`,
+              cellClassName: 'py-2.5 text-right font-mono',
+              cell: (group: string) =>
+                `${
+                  getTieredSecondPricingEntries(
+                    props.model,
+                    props.groupRatio[group] || 1
+                  )[0]?.firstSecondFormatted ?? '-'
+                } /s`,
+            },
+            {
+              id: 'additional-second',
+              header: t('Additional second'),
+              className: `${thClass} text-right`,
+              cellClassName: 'py-2.5 text-right font-mono',
+              cell: (group: string) =>
+                `${
+                  getTieredSecondPricingEntries(
+                    props.model,
+                    props.groupRatio[group] || 1
+                  )[0]?.additionalSecondFormatted ?? '-'
+                } /s`,
+            },
+          ]}
+        />
+        <p className='text-muted-foreground/40 mt-1.5 text-[10px]'>
+          {t('Prices shown per second')}
+        </p>
       </section>
     )
   }
@@ -1394,6 +1544,7 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
               tokenUnit={props.tokenUnit}
               showRechargePrice={showRechargePrice}
             />
+            <DisplayPricingTieredSecondsSection model={props.model} />
             <DisplayPricingFactorsSection model={props.model} />
             {isDynamic && (
               <DynamicPricingBreakdown billingExpr={props.model.billing_expr} />

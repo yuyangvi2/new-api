@@ -86,13 +86,32 @@ export type DisplayPricingFactor = {
   values: DisplayPricingFactorValue[]
 }
 
-export type DisplayPricing = {
+export type DisplayPricingUnit = 'second' | 'request'
+
+export type DisplayPricingWeightedFactors = {
   mode: 'weighted_factors'
-  unit: 'second' | 'request'
+  unit: DisplayPricingUnit
   base_price: number
   base_values: Record<string, string>
   factors: DisplayPricingFactor[]
 }
+
+export type DisplayPricingSecondTier = {
+  value: string
+  label: string
+  first_second_price: number
+  additional_second_price: number
+}
+
+export type DisplayPricingTieredSeconds = {
+  mode: 'tiered_seconds'
+  unit: 'second'
+  tiers: DisplayPricingSecondTier[]
+}
+
+export type DisplayPricing =
+  | DisplayPricingWeightedFactors
+  | DisplayPricingTieredSeconds
 
 /** Input/output modalities supported by a model. */
 export type Modality = 'text' | 'image' | 'audio' | 'video' | 'file'

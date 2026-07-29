@@ -18,14 +18,24 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 
-import type { DisplayPricing, PricingModel } from '../types'
+import type { DisplayPricingUnit, PricingModel } from '../types'
 
 export type DisplayPricingEntry = {
   key: string
   label: string
   formatted: string
   numericPrice: number
-  unit: DisplayPricing['unit']
+  unit: DisplayPricingUnit
+}
+
+export type TieredSecondPricingEntry = {
+  key: string
+  label: string
+  firstSecondFormatted: string
+  additionalSecondFormatted: string
+  firstSecondPrice: number
+  additionalSecondPrice: number
+  unit: 'second'
 }
 
 function formatDisplayPricingValue(price: number): string {
@@ -36,7 +46,9 @@ function formatDisplayPricingValue(price: number): string {
   })
 }
 
-export function isDisplayPricingModel(model: PricingModel): boolean {
+export function isWeightedFactorsDisplayPricingModel(
+  model: PricingModel
+): boolean {
   const config = model.display_pricing
   return (
     config?.mode === 'weighted_factors' &&
@@ -49,15 +61,102 @@ export function isDisplayPricingModel(model: PricingModel): boolean {
   )
 }
 
+export function isTieredSecondsDisplayPricingModel(
+  model: PricingModel
+): boolean {
+  const config = model.display_pricing
+  return (
+    config?.mode === 'tiered_seconds' &&
+    config.unit === 'second' &&
+    Array.isArray(config.tiers) &&
+    config.tiers.some(
+      (tier) =>
+        typeof tier.value === 'string' &&
+        typeof tier.label === 'string' &&
+        Number.isFinite(tier.first_second_price) &&
+        tier.first_second_price > 0 &&
+        Number.isFinite(tier.additional_second_price) &&
+        tier.additional_second_price > 0
+    )
+  )
+}
+
+export function isDisplayPricingModel(model: PricingModel): boolean {
+  return (
+    isWeightedFactorsDisplayPricingModel(model) ||
+    isTieredSecondsDisplayPricingModel(model)
+  )
+}
+
 export function formatDisplayBasePrice(
   model: PricingModel,
   groupRatio: number
 ): string | null {
   const config = model.display_pricing
-  if (!isDisplayPricingModel(model) || !config) return null
+  if (!config) return null
+
+  if (isTieredSecondsDisplayPricingModel(model)) {
+    const tier = getTieredSecondPricingEntries(model, groupRatio)[0]
+    return tier?.firstSecondFormatted ?? null
+  }
+
+  if (!isWeightedFactorsDisplayPricingModel(model)) return null
+  if (config.mode !== 'weighted_factors') return null
   const price = config.base_price * groupRatio
   if (!Number.isFinite(price) || price <= 0) return null
   return formatDisplayPricingValue(price)
+}
+
+export function getTieredSecondPricingEntries(
+  model: PricingModel,
+  groupRatio: number
+): TieredSecondPricingEntry[] {
+  const config = model.display_pricing
+  if (
+    !isTieredSecondsDisplayPricingModel(model) ||
+    !config ||
+    config.mode !== 'tiered_seconds'
+  ) {
+    return []
+  }
+
+  return config.tiers.flatMap((tier) => {
+    if (
+      typeof tier.value !== 'string' ||
+      typeof tier.label !== 'string' ||
+      !Number.isFinite(tier.first_second_price) ||
+      tier.first_second_price <= 0 ||
+      !Number.isFinite(tier.additional_second_price) ||
+      tier.additional_second_price <= 0
+    ) {
+      return []
+    }
+
+    const firstSecondPrice = tier.first_second_price * groupRatio
+    const additionalSecondPrice = tier.additional_second_price * groupRatio
+    if (
+      !Number.isFinite(firstSecondPrice) ||
+      firstSecondPrice <= 0 ||
+      !Number.isFinite(additionalSecondPrice) ||
+      additionalSecondPrice <= 0
+    ) {
+      return []
+    }
+
+    return [
+      {
+        key: tier.value,
+        label: tier.label,
+        firstSecondFormatted: formatDisplayPricingValue(firstSecondPrice),
+        additionalSecondFormatted: formatDisplayPricingValue(
+          additionalSecondPrice
+        ),
+        firstSecondPrice,
+        additionalSecondPrice,
+        unit: 'second' as const,
+      },
+    ]
+  })
 }
 
 export function getDisplayPricingEntries(
@@ -65,7 +164,33 @@ export function getDisplayPricingEntries(
   groupRatio: number
 ): DisplayPricingEntry[] {
   const config = model.display_pricing
-  if (!isDisplayPricingModel(model) || !config) {
+  if (!config) {
+    return []
+  }
+
+  if (isTieredSecondsDisplayPricingModel(model)) {
+    return getTieredSecondPricingEntries(model, groupRatio).flatMap((tier) => [
+      {
+        key: `${tier.key}:first`,
+        label: `${tier.label}: 1s`,
+        formatted: tier.firstSecondFormatted,
+        numericPrice: tier.firstSecondPrice,
+        unit: tier.unit,
+      },
+      {
+        key: `${tier.key}:additional`,
+        label: `${tier.label}: 2s+`,
+        formatted: tier.additionalSecondFormatted,
+        numericPrice: tier.additionalSecondPrice,
+        unit: tier.unit,
+      },
+    ])
+  }
+
+  if (!isWeightedFactorsDisplayPricingModel(model)) {
+    return []
+  }
+  if (config.mode !== 'weighted_factors') {
     return []
   }
 
