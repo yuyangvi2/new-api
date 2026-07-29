@@ -36,6 +36,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ModelDetailsContent } from '@/features/pricing/components/model-details'
 import { DEFAULT_TOKEN_UNIT } from '@/features/pricing/constants'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
+import { getDisplayBillingUnitLabelKey } from '@/features/pricing/lib/model-helpers'
 import type { PricingModel } from '@/features/pricing/types'
 import { cn } from '@/lib/utils'
 
@@ -213,7 +214,7 @@ function ModelHero(props: {
               variant='secondary'
               className='rounded-full px-3 py-1 shadow-sm'
             >
-              {model.quota_type === 0 ? t('Token-based') : t('Per Request')}
+              {t(getDisplayBillingUnitLabelKey(model))}
             </Badge>
           </div>
         </div>
@@ -228,7 +229,7 @@ function ModelHero(props: {
           <ModelStat
             icon={Database}
             label={t('Billing')}
-            value={model.quota_type === 0 ? t('Token-based') : t('Per Request')}
+            value={t(getDisplayBillingUnitLabelKey(model))}
           />
           <ModelStat
             icon={ShieldCheck}

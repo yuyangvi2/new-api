@@ -107,3 +107,14 @@ export function replaceModelInPath(path: string, modelName: string): string {
 export function isTokenBasedModel(model: PricingModel): boolean {
   return model.quota_type === QUOTA_TYPE_VALUES.TOKEN
 }
+
+export function getDisplayBillingUnitLabelKey(model: PricingModel): string {
+  if (
+    model.display_pricing?.mode === 'weighted_factors' &&
+    model.display_pricing.unit === 'second'
+  ) {
+    return 'Per Second'
+  }
+
+  return isTokenBasedModel(model) ? 'Token-based' : 'Per Request'
+}
