@@ -5081,6 +5081,7 @@
     "Type the confirmation text here": "Type the confirmation text here",
     "Type-Specific Settings": "Type-Specific Settings",
     "Type:": "Type:",
+    "Type: {{type}}": "유형: {{type}}",
     "Type: string": "유형: string",
     "UI granularity only &mdash; data is still aggregated hourly": "UI granularity only &mdash; data is still aggregated hourly",
     "Ultra-low latency": "Ultra-low latency",

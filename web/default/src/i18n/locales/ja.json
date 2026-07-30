@@ -5081,6 +5081,7 @@
     "Type the confirmation text here": "確認テキストをここに入力",
     "Type-Specific Settings": "タイプ固有の設定",
     "Type:": "タイプ:",
+    "Type: {{type}}": "型: {{type}}",
     "Type: string": "型: string",
     "UI granularity only &mdash; data is still aggregated hourly": "UIの粒度のみ &mdash; データは引き続き時間単位で集計されます",
     "Ultra-low latency": "超低レイテンシ",

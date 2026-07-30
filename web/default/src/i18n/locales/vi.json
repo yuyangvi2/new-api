@@ -5081,6 +5081,7 @@
     "Type the confirmation text here": "Nhập văn bản xác nhận tại đây",
     "Type-Specific Settings": "Cài đặt theo loại",
     "Type:": "Loại:",
+    "Type: {{type}}": "Kiểu: {{type}}",
     "Type: string": "Kiểu: string",
     "UI granularity only &mdash; data is still aggregated hourly": "Chỉ là độ chi tiết UI &mdash; dữ liệu vẫn được tổng hợp theo giờ",
     "Ultra-low latency": "Độ trễ cực thấp",

@@ -83,6 +83,7 @@ export type DisplayPricingFactorValue = {
 export type DisplayPricingFactor = {
   field: string
   label: string
+  type?: string
   values: DisplayPricingFactorValue[]
 }
 

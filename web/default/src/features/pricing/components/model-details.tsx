@@ -966,6 +966,10 @@ function DisplayPricingFactorsSection(props: { model: PricingModel }) {
       <div className='space-y-3'>
         {factors.map((factor) => {
           const defaultValue = config.base_values[factor.field] || '-'
+          const fieldType =
+            typeof factor.type === 'string' && factor.type.trim()
+              ? factor.type.trim()
+              : 'string'
 
           return (
             <div
@@ -978,7 +982,7 @@ function DisplayPricingFactorsSection(props: { model: PricingModel }) {
                 </div>
                 <div className='flex flex-wrap gap-2'>
                   <Badge variant='outline' className='text-[11px]'>
-                    {t('Type: string')}
+                    {t('Type: {{type}}', { type: fieldType })}
                   </Badge>
                   <Badge variant='secondary' className='text-[11px]'>
                     {t('Default: {{value}}', { value: defaultValue })}

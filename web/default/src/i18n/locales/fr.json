@@ -5081,6 +5081,7 @@
     "Type the confirmation text here": "Saisissez ici le texte de confirmation",
     "Type-Specific Settings": "Paramètres spécifiques au type",
     "Type:": "Type :",
+    "Type: {{type}}": "Type : {{type}}",
     "Type: string": "Type : string",
     "UI granularity only &mdash; data is still aggregated hourly": "Granularité de l'interface uniquement &mdash; les données sont toujours agrégées par heure",
     "Ultra-low latency": "Latence ultra-faible",

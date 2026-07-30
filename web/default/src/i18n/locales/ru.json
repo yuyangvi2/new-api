@@ -5081,6 +5081,7 @@
     "Type the confirmation text here": "Введите текст подтверждения здесь",
     "Type-Specific Settings": "Настройки для конкретного типа",
     "Type:": "Тип:",
+    "Type: {{type}}": "Тип: {{type}}",
     "Type: string": "Тип: string",
     "UI granularity only &mdash; data is still aggregated hourly": "Только детализация пользовательского интерфейса &mdash; данные по-прежнему агрегируются ежечасно",
     "Ultra-low latency": "Сверхнизкая задержка",

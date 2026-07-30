@@ -5081,6 +5081,7 @@
     "Type the confirmation text here": "在此输入确认文本",
     "Type-Specific Settings": "特定类型设置",
     "Type:": "类型：",
+    "Type: {{type}}": "类型：{{type}}",
     "Type: string": "类型：string",
     "UI granularity only &mdash; data is still aggregated hourly": "仅 UI 粒度 &mdash; 数据仍按小时汇总",
     "Ultra-low latency": "极速低延迟",
