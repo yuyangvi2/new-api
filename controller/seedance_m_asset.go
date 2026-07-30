@@ -114,7 +114,7 @@ func proxySeedanceMAssetRequest(c *gin.Context, method string, path string, hasB
 func getSelectedSeedanceMAssetSettings(c *gin.Context) (*dto.SeedanceMSettings, string, bool) {
 	channelType := common.GetContextKeyInt(c, constant.ContextKeyChannelType)
 	if channelType != constant.ChannelTypeSeedanceM {
-		common.ApiErrorMsg(c, "selected channel is not Seedance-M")
+		common.ApiErrorMsg(c, "selected channel is not Seedance")
 		return nil, "", false
 	}
 	channelID := common.GetContextKeyInt(c, constant.ContextKeyChannelId)

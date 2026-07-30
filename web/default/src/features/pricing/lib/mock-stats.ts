@@ -315,8 +315,7 @@ export function buildGroupPerformance(model: PricingModel): GroupPerformance[] {
   const spec = PROFILE_SPECS[profile]
   const baseSeed = hashStringToSeed(model.model_name)
 
-  return targets
-    .slice()
+  return [...targets]
     .sort((a, b) => a.localeCompare(b))
     .map<GroupPerformance>((group) => {
       const rand = seededRandom(baseSeed ^ hashStringToSeed(group))
@@ -763,7 +762,142 @@ const VIDEO_PARAMS: SupportedParameter[] = [
   },
 ]
 
+const SEEDANCE_VIDEO_PARAMS: SupportedParameter[] = [
+  {
+    name: 'model',
+    type: 'string',
+    required: true,
+    descriptionKey: 'Model name to use for video generation',
+  },
+  {
+    name: 'content',
+    type: 'array',
+    required: true,
+    descriptionKey: 'Ordered text, image, video, and audio content items',
+  },
+  {
+    name: 'content[].type',
+    type: 'enum',
+    enumValues: ['text', 'image_url', 'video_url', 'audio_url'],
+    descriptionKey: 'Content item type',
+  },
+  {
+    name: 'content[].text',
+    type: 'string',
+    descriptionKey: 'Text content for text items',
+  },
+  {
+    name: 'content[].image_url.url',
+    type: 'string',
+    descriptionKey: 'Image URL for image content items',
+  },
+  {
+    name: 'content[].video_url.url',
+    type: 'string',
+    descriptionKey: 'Video URL for video content items',
+  },
+  {
+    name: 'content[].audio_url.url',
+    type: 'string',
+    descriptionKey: 'Audio URL for audio content items',
+  },
+  {
+    name: 'content[].role',
+    type: 'string',
+    descriptionKey: 'Media role such as first frame, last frame, or reference media',
+  },
+  {
+    name: 'generate_audio',
+    type: 'boolean',
+    defaultValue: true,
+    descriptionKey: 'Generate audio for the output video',
+  },
+  {
+    name: 'ratio',
+    type: 'enum',
+    enumValues: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+    defaultValue: '16:9',
+    descriptionKey: 'Output aspect ratio',
+  },
+  {
+    name: 'resolution',
+    type: 'enum',
+    enumValues: ['480p', '720p', '1080p', '4k'],
+    defaultValue: '720p',
+    descriptionKey: 'Output video resolution',
+  },
+  {
+    name: 'duration',
+    type: 'integer',
+    range: '-1 or 4 ~ 15',
+    descriptionKey: 'Output video duration in seconds',
+  },
+  {
+    name: 'watermark',
+    type: 'boolean',
+    defaultValue: false,
+    descriptionKey: 'Whether to add a watermark to the output',
+  },
+  {
+    name: 'return_last_frame',
+    type: 'boolean',
+    descriptionKey: 'Return the final frame image URL when available',
+  },
+  {
+    name: 'callback_url',
+    type: 'string',
+    descriptionKey: 'Callback URL for asynchronous task updates',
+  },
+  {
+    name: 'service_tier',
+    type: 'string',
+    descriptionKey: 'Service tier requested for task execution',
+  },
+  {
+    name: 'execution_expires_after',
+    type: 'integer',
+    range: '3600 ~ 259200',
+    descriptionKey: 'Task expiration time in seconds',
+  },
+  {
+    name: 'draft',
+    type: 'boolean',
+    descriptionKey: 'Generate a draft preview when supported',
+  },
+  {
+    name: 'seed',
+    type: 'integer',
+    range: '-1 or 0 ~ 4294967295',
+    descriptionKey: 'Deterministic generation seed',
+  },
+  {
+    name: 'camera_fixed',
+    type: 'boolean',
+    descriptionKey: 'Keep the camera movement fixed when supported',
+  },
+  {
+    name: 'frames',
+    type: 'integer',
+    range: '>= 0',
+    descriptionKey: 'Requested frame count when supported',
+  },
+  {
+    name: 'tools',
+    type: 'array',
+    descriptionKey: 'Tool declarations for generation features',
+  },
+  {
+    name: 'safety_identifier',
+    type: 'string',
+    descriptionKey: 'End-user identifier for abuse monitoring',
+  },
+]
+
 type ApiCategory = 'reasoning' | 'embedding' | 'image' | 'video' | 'chat'
+
+function isSeedanceVideoModel(model: PricingModel): boolean {
+  return /seedance|doubao-seedance/i.test(model.model_name)
+}
 
 /**
  * Refine the broad PROFILE_BY_NAME bucket into an API-shape category. The
@@ -772,10 +906,13 @@ type ApiCategory = 'reasoning' | 'embedding' | 'image' | 'video' | 'chat'
  * need to distinguish them so the request-parameter table is accurate.
  */
 function apiCategoryOf(model: PricingModel): ApiCategory {
+  if ((model.supported_endpoint_types ?? []).includes('openai-video')) {
+    return 'video'
+  }
   const profile = PROFILE_BY_NAME(model.model_name)
   if (profile === 'embedding' || profile === 'reasoning') return profile
   if (profile === 'image') {
-    return /sora|veo|kling|pika|video|wan-|hunyuanvideo/i.test(model.model_name)
+    return /sora|veo|kling|pika|video|wan-|hunyuanvideo|seedance/i.test(model.model_name)
       ? 'video'
       : 'image'
   }
@@ -791,10 +928,21 @@ export function buildSupportedParameters(
   model: PricingModel
 ): SupportedParameter[] {
   const cat = apiCategoryOf(model)
-  if (cat === 'reasoning') return REASONING_PARAMS
-  if (cat === 'embedding') return EMBEDDING_PARAMS
-  if (cat === 'image') return IMAGE_PARAMS
-  if (cat === 'video') return VIDEO_PARAMS
+  if (cat === 'reasoning') {
+    return REASONING_PARAMS
+  }
+  if (cat === 'embedding') {
+    return EMBEDDING_PARAMS
+  }
+  if (cat === 'image') {
+    return IMAGE_PARAMS
+  }
+  if (cat === 'video' && isSeedanceVideoModel(model)) {
+    return SEEDANCE_VIDEO_PARAMS
+  }
+  if (cat === 'video') {
+    return VIDEO_PARAMS
+  }
   return COMMON_CHAT_PARAMS
 }
 
@@ -813,12 +961,20 @@ export function buildRateLimits(model: PricingModel): RateLimit[] {
   const baseSeed = hashStringToSeed(`${model.model_name}:rl`)
   const isHeavy = cat === 'image' || cat === 'video'
   const isLight = cat === 'embedding'
-  const baseRpm = isHeavy ? 60 : isLight ? 5_000 : 500
-  const baseTpm = isHeavy ? 0 : isLight ? 1_000_000 : 200_000
-  const baseRpd = isHeavy ? 1_000 : isLight ? 100_000 : 10_000
+  let baseRpm = 500
+  let baseTpm = 200_000
+  let baseRpd = 10_000
+  if (isHeavy) {
+    baseRpm = 60
+    baseTpm = 0
+    baseRpd = 1_000
+  } else if (isLight) {
+    baseRpm = 5_000
+    baseTpm = 1_000_000
+    baseRpd = 100_000
+  }
 
-  return targets
-    .slice()
+  return [...targets]
     .sort((a, b) => a.localeCompare(b))
     .map((group) => {
       const rand = seededRandom(baseSeed ^ hashStringToSeed(group))
@@ -834,9 +990,14 @@ export function buildRateLimits(model: PricingModel): RateLimit[] {
 
 /** Format an integer rate-limit value compactly. */
 export function formatRateLimit(value: number): string {
-  if (value <= 0) return '—'
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
-  if (value >= 1_000)
+  if (value <= 0) {
+    return '—'
+  }
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}M`
+  }
+  if (value >= 1_000) {
     return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}K`
+  }
   return value.toLocaleString()
 }
