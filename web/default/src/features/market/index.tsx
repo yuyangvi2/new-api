@@ -572,7 +572,7 @@ function MarketPricePanel(props: {
   }
 
   const detailEntries = [...primaryEntries, ...extraEntries]
-  const visibleEntries = detailEntries.slice(0, 3)
+  const visibleEntries = detailEntries.slice(0, 4)
   const extraMoreCount = Math.max(
     0,
     detailEntries.length - visibleEntries.length
@@ -598,23 +598,23 @@ function MarketPricePanel(props: {
       <div
         key={entry.key}
         className={cn(
-          'flex min-w-0 items-baseline justify-between gap-4 text-[13px] leading-5',
+          'flex min-w-0 items-baseline justify-between gap-2 text-[13px] leading-4',
           muted && 'text-muted-foreground'
         )}
       >
-        <span className='text-muted-foreground min-w-0 truncate text-[13px] font-bold'>
+        <span className='text-muted-foreground min-w-0 truncate text-xs leading-4 font-bold'>
           {entry.labelKey ? t(entry.labelKey) : entry.label}
         </span>
         <span className='shrink-0 text-right whitespace-nowrap'>
           <span
             className={cn(
-              'font-mono text-base font-extrabold tracking-[-0.03em] tabular-nums',
+              'font-mono text-[15px] leading-4 font-extrabold tracking-[-0.03em] tabular-nums',
               muted ? 'text-muted-foreground' : 'text-foreground'
             )}
           >
             {formatMarketPriceValue(entry.formatted)}
           </span>{' '}
-          <span className='text-muted-foreground text-xs font-semibold'>
+          <span className='text-muted-foreground text-[11px] leading-4 font-semibold'>
             {renderUnit(entry)}
           </span>
         </span>
@@ -634,12 +634,12 @@ function MarketPricePanel(props: {
             {primaryFallback}
           </div>
         ) : (
-          <div className='space-y-1.5'>
+          <div className='space-y-0.5'>
             {visibleEntries.map(renderPriceRow)}
           </div>
         )}
         {extraMoreCount > 0 ? (
-          <div className='text-muted-foreground mt-2 text-right text-[11px] font-medium'>
+          <div className='text-muted-foreground mt-1 text-right text-[11px] leading-3 font-medium'>
             {t('+{{count}} more', { count: extraMoreCount })}
           </div>
         ) : null}
@@ -699,7 +699,9 @@ function MarketModelCard(props: {
   const model = props.model
   const vendor = model.vendor_name || t('Unknown provider')
   const tags = splitTags(model.tags)
-  const endpoints = model.supported_endpoint_types ?? []
+  const endpoints = (model.supported_endpoint_types ?? []).filter(
+    (endpoint) => endpoint !== 'openai-video'
+  )
   const detailHref = `/model-guide/${toModelGuideSlug(model.model_name)}`
   const modelIconKey = model.icon || model.vendor_icon
   const modelIcon = modelIconKey ? getLobeIcon(modelIconKey, 32) : null

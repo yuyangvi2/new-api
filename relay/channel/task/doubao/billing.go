@@ -13,7 +13,11 @@ import (
 const seedanceDefaultUSDExchangeRate = 7.14
 
 func SeedancePricePerMillionCNY(modelName, resolution string, hasVideoInput bool) (float64, bool) {
-	prices, ok := videoPriceTable[NormalizeSeedanceModelName(modelName)]
+	return seedancePricePerMillionCNY(videoPriceTable, modelName, resolution, hasVideoInput)
+}
+
+func seedancePricePerMillionCNY(priceTable map[string]map[videoPriceKey]float64, modelName, resolution string, hasVideoInput bool) (float64, bool) {
+	prices, ok := priceTable[NormalizeSeedanceModelName(modelName)]
 	if !ok {
 		return 0, false
 	}
@@ -41,7 +45,11 @@ func EstimateSeedanceVideoTokens(inputDuration float64, outputDuration int, rati
 }
 
 func EstimateSeedanceQuota(modelName, resolution, ratio string, outputDuration int, inputDuration float64, hasVideoInput bool, groupRatio float64) (int, int, float64, bool) {
-	pricePerMillionCNY, ok := SeedancePricePerMillionCNY(modelName, resolution, hasVideoInput)
+	return estimateSeedanceQuota(videoPriceTable, modelName, resolution, ratio, outputDuration, inputDuration, hasVideoInput, groupRatio)
+}
+
+func estimateSeedanceQuota(priceTable map[string]map[videoPriceKey]float64, modelName, resolution, ratio string, outputDuration int, inputDuration float64, hasVideoInput bool, groupRatio float64) (int, int, float64, bool) {
+	pricePerMillionCNY, ok := seedancePricePerMillionCNY(priceTable, modelName, resolution, hasVideoInput)
 	if !ok {
 		return 0, 0, 0, false
 	}
@@ -55,6 +63,10 @@ func EstimateSeedanceQuota(modelName, resolution, ratio string, outputDuration i
 }
 
 func EstimateSeedanceQuotaForRequest(modelName string, req relaycommon.TaskSubmitReq, hasVideoInput bool, groupRatio float64) (int, int, float64, bool) {
+	return estimateSeedanceQuotaForRequest(videoPriceTable, modelName, req, hasVideoInput, groupRatio)
+}
+
+func estimateSeedanceQuotaForRequest(priceTable map[string]map[videoPriceKey]float64, modelName string, req relaycommon.TaskSubmitReq, hasVideoInput bool, groupRatio float64) (int, int, float64, bool) {
 	resolution := stringFromAny(req.Metadata["resolution"])
 	if resolution == "" && strings.HasSuffix(strings.ToLower(strings.TrimSpace(req.Size)), "p") {
 		resolution = req.Size
@@ -90,7 +102,7 @@ func EstimateSeedanceQuotaForRequest(modelName string, req relaycommon.TaskSubmi
 		req.Metadata["input_duration"],
 	)
 
-	return EstimateSeedanceQuota(modelName, resolution, ratio, outputDuration, inputDuration, hasVideoInput, groupRatio)
+	return estimateSeedanceQuota(priceTable, modelName, resolution, ratio, outputDuration, inputDuration, hasVideoInput, groupRatio)
 }
 
 func SeedanceOutputSize(ratioValue, resolutionValue string) (int, int) {

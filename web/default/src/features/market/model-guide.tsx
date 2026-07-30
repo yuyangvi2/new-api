@@ -183,15 +183,7 @@ function ModelHero(props: {
         </div>
 
         <div className='min-w-0'>
-          <div
-            className={cn(
-              'inline-flex rounded-full border px-3 py-1 font-mono text-[11px] font-black tracking-[0.22em] uppercase',
-              tone.accent
-            )}
-          >
-            {t('Production model guide')}
-          </div>
-          <h1 className='text-foreground mt-5 max-w-5xl text-4xl leading-[1.05] font-black tracking-tight break-words sm:text-5xl lg:text-6xl'>
+          <h1 className='text-foreground max-w-5xl text-4xl leading-[1.05] font-black tracking-tight break-words sm:text-5xl lg:text-6xl'>
             {model.model_name}
           </h1>
           <p className='text-muted-foreground mt-5 max-w-3xl text-base leading-8 md:text-lg'>

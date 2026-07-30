@@ -461,11 +461,21 @@ export function isToAPIsSeedanceVideoModel(model: string): boolean {
   )
 }
 
+export function isSeedanceMVideoModel(model: string): boolean {
+  const normalizedModel = model.toLowerCase().trim()
+  return (
+    normalizedModel === 'doubao-seedance-2.0' ||
+    normalizedModel === 'aicc-doubao-seedance-2.0' ||
+    normalizedModel === 'aicc-seedance2.0'
+  )
+}
+
 export function isSeedanceVideoModel(model: string): boolean {
   return (
     isApizSeedanceVideoModel(model) ||
     isVipeakSeedanceVideoModel(model) ||
-    isToAPIsSeedanceVideoModel(model)
+    isToAPIsSeedanceVideoModel(model) ||
+    isSeedanceMVideoModel(model)
   )
 }
 
@@ -474,6 +484,11 @@ export function getSeedanceResolutionOptions(
 ): NonNullable<FamilyParam['options']> {
   const options = FAMILY_PARAMS.seedance[0]?.options ?? []
   const normalizedModel = normalizeVideoVariantModel(model).toLowerCase()
+  if (isSeedanceMVideoModel(model)) {
+    return options.filter((option) =>
+      ['480p', '720p', '1080p'].includes(option.value.toLowerCase())
+    )
+  }
   const isFastOrMini =
     normalizedModel === 'seedance-2-fast' ||
     normalizedModel === 'seedance-2-mini' ||
@@ -542,6 +557,13 @@ export function getSeedancePricePerMillionCNY({
   const normalizedModel = normalizeVideoVariantModel(model)
   const normalizedModelKey = normalizedModel.toLowerCase()
   const normalizedResolution = resolution.toLowerCase().trim()
+  if (isSeedanceMVideoModel(model)) {
+    if (normalizedResolution === '1080p') return hasVideoInput ? 31 : 51
+    if (normalizedResolution === '480p' || normalizedResolution === '720p') {
+      return hasVideoInput ? 28 : 46
+    }
+    return undefined
+  }
   const isHighQuality =
     normalizedModelKey === 'seedance_2.0' ||
     normalizedModelKey === 'seedance-2' ||

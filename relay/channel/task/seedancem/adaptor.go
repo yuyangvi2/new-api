@@ -387,6 +387,13 @@ func validateSeedanceMRequest(req relaycommon.TaskSubmitReq) error {
 			return fmt.Errorf("duration must be -1 or an integer between 4 and 15")
 		}
 	}
+	if resolution := requestResolution(req); resolution != "" {
+		switch resolution {
+		case "480p", "720p", "1080p":
+		default:
+			return fmt.Errorf("resolution must be 480p, 720p, or 1080p")
+		}
+	}
 	if expiry, ok := intFromAny(req.Metadata["execution_expires_after"]); ok && (expiry < 3600 || expiry > 259200) {
 		return fmt.Errorf("execution_expires_after must be between 3600 and 259200")
 	}
