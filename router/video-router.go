@@ -23,6 +23,21 @@ func SetVideoRouter(router *gin.Engine) {
 		videoV1Router.POST("/video/generations", controller.RelayTask)
 		videoV1Router.GET("/video/generations/:task_id", controller.RelayTaskFetch)
 		videoV1Router.POST("/videos/:video_id/remix", controller.RelayTask)
+		videoV1Router.GET("/seedance-m/video-tasks", controller.ListSeedanceMVideoTasks)
+		videoV1Router.GET("/seedance-m/video-tasks/:upstream_task_id", controller.GetSeedanceMVideoTask)
+		videoV1Router.DELETE("/seedance-m/video-tasks/:upstream_task_id", controller.DeleteSeedanceMVideoTask)
+		videoV1Router.POST("/seedance-m/asset-groups", controller.CreateSeedanceMAssetGroup)
+		videoV1Router.POST("/seedance-m/asset-groups/query", controller.QuerySeedanceMAssetGroups)
+		videoV1Router.GET("/seedance-m/asset-groups/:group_id", controller.GetSeedanceMAssetGroup)
+		videoV1Router.PUT("/seedance-m/asset-groups/:group_id", controller.UpdateSeedanceMAssetGroup)
+		videoV1Router.DELETE("/seedance-m/asset-groups/:group_id", controller.DeleteSeedanceMAssetGroup)
+		videoV1Router.POST("/seedance-m/assets", controller.CreateSeedanceMAsset)
+		videoV1Router.POST("/seedance-m/assets/query", controller.QuerySeedanceMAssets)
+		videoV1Router.GET("/seedance-m/assets/:asset_id", controller.GetSeedanceMAsset)
+		videoV1Router.PUT("/seedance-m/assets/:asset_id", controller.UpdateSeedanceMAsset)
+		videoV1Router.DELETE("/seedance-m/assets/:asset_id", controller.DeleteSeedanceMAsset)
+		videoV1Router.POST("/seedance-m/real-person-auth/sessions", controller.CreateSeedanceMRealPersonAuthSession)
+		videoV1Router.POST("/seedance-m/real-person-auth/asset-group/by-byted-token", controller.CreateSeedanceMRealPersonAssetGroupByBytedToken)
 	}
 	// openai compatible API video routes
 	// docs: https://platform.openai.com/docs/api-reference/videos/create

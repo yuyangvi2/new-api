@@ -49,6 +49,19 @@ type ChannelOtherSettings struct {
 	UpstreamModelUpdateLastRemovedModels  []string              `json:"upstream_model_update_last_removed_models,omitempty"`  // 上次检测到的可删除模型
 	UpstreamModelUpdateIgnoredModels      []string              `json:"upstream_model_update_ignored_models,omitempty"`       // 手动忽略的模型
 	AdvancedCustom                        *AdvancedCustomConfig `json:"advanced_custom,omitempty"`
+	SeedanceM                             *SeedanceMSettings    `json:"seedance_m,omitempty"`
+}
+
+type SeedanceMSettings struct {
+	ServiceVersion       string `json:"service_version,omitempty"`
+	EnableVideoEncrypt   bool   `json:"enable_video_encrypt,omitempty"`
+	PublicKeyPEM         string `json:"public_key_pem,omitempty"`
+	PrivateKeyPEM        string `json:"private_key_pem,omitempty"`
+	AssetEndpoint        string `json:"asset_endpoint,omitempty"`
+	AssetPoolID          string `json:"asset_pool_id,omitempty"`
+	AssetAccessKey       string `json:"asset_access_key,omitempty"`
+	AssetSecretKey       string `json:"asset_secret_key,omitempty"`
+	AssetSignatureMethod string `json:"asset_signature_method,omitempty"`
 }
 
 func (s *ChannelOtherSettings) IsOpenRouterEnterprise() bool {
