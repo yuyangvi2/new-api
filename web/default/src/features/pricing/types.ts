@@ -106,7 +106,7 @@ export type DisplayPricingFactor = {
   values: DisplayPricingFactorValue[]
 }
 
-export type DisplayPricingUnit = 'second' | 'request'
+export type DisplayPricingUnit = 'second' | 'request' | 'image'
 
 export type DisplayPricingWeightedFactors = {
   mode: 'weighted_factors'

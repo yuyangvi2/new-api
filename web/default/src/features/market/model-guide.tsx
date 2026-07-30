@@ -52,6 +52,11 @@ function modelDescription(
   model: PricingModel,
   t: ReturnType<typeof useTranslation>['t']
 ) {
+  if (model.model_name.trim().toLowerCase() === 'grok-imagine-video-1.5') {
+    return t(
+      'Grok Imagine Video 1.5 is xAI image-to-video model for animating an input image into a short video. It supports creative camera motion, product image animation, storyboards, and visual concept validation; pure text-to-video is not supported.'
+    )
+  }
   if (model.description) return model.description
   const provider = model.vendor_name || t('Unknown provider')
   const kind = t(marketKindLabelKey(inferKind(model)))

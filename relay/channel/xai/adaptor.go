@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/relay/channel"
 	"github.com/QuantumNous/new-api/relay/channel/openai"
+	xaipricing "github.com/QuantumNous/new-api/relay/channel/xai/pricing"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/types"
 
@@ -45,6 +46,12 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 		N:              int(lo.FromPtrOr(request.N, uint(1))),
 		ResponseFormat: request.ResponseFormat,
 	}
+	if len(request.Image) > 0 {
+		xaiRequest.Image = request.Image
+	}
+	if len(request.Images) > 0 {
+		xaiRequest.Images = request.Images
+	}
 	if value, ok := request.Extra["aspect_ratio"]; ok {
 		if err := common.Unmarshal(value, &xaiRequest.AspectRatio); err != nil {
 			return nil, errors.New("invalid aspect_ratio")
@@ -54,6 +61,17 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 		if err := common.Unmarshal(value, &xaiRequest.Resolution); err != nil {
 			return nil, errors.New("invalid resolution")
 		}
+	}
+	inputImageCount := xaipricing.CountImageRequestInputs(request)
+	requestPrice, ok := xaipricing.GrokImagineImageRequestPrice(
+		info.OriginModelName,
+		xaiRequest.Resolution,
+		xaiRequest.N,
+		inputImageCount,
+	)
+	if ok && info.PriceData.ModelPrice > 0 {
+		info.PriceData.AddOtherRatio("xai_imagine_price", requestPrice/info.PriceData.ModelPrice)
+		info.PriceData.AddOtherRatio("n", 1)
 	}
 	return xaiRequest, nil
 }

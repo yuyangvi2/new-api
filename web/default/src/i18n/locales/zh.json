@@ -2303,6 +2303,7 @@
     "Greater Than or Equal": "大于等于",
     "Grok": "Grok",
     "Grok 4.5": "Grok 4.5",
+    "Grok Imagine Video 1.5 is xAI image-to-video model for animating an input image into a short video. It supports creative camera motion, product image animation, storyboards, and visual concept validation; pure text-to-video is not supported.": "Grok Imagine Video 1.5 是 xAI 的图生视频模型，可将输入图片动画化为短视频，适合创意镜头运动、产品图动态化、分镜和视觉概念验证；不支持纯文本生成视频。",
     "Grok Settings": "Grok 设置",
     "Group": "分组",
     "Group & Quota": "分组与配额",

@@ -45,6 +45,82 @@ export type TieredSecondPricingStep = {
   toSecond?: number
 }
 
+
+function normalizedModelName(model: PricingModel): string {
+  return model.model_name.trim().toLowerCase()
+}
+
+function isGrokImagineQualityImage(modelName: string): boolean {
+  return (
+    modelName === 'grok-imagine-image-quality' ||
+    modelName === 'grok-imagine-image-pro'
+  )
+}
+
+function getBuiltinDisplayPricingEntries(
+  model: PricingModel,
+  groupRatio: number
+): DisplayPricingEntry[] {
+  const modelName = normalizedModelName(model)
+  const entry = (
+    key: string,
+    label: string,
+    price: number,
+    unit: DisplayPricingUnit
+  ): DisplayPricingEntry => {
+    const numericPrice = price * groupRatio
+    return {
+      key,
+      label,
+      formatted: formatDisplayPricingValue(numericPrice),
+      numericPrice,
+      unit,
+    }
+  }
+
+  if (
+    modelName === 'grok-imagine' ||
+    modelName === 'grok-imagine-image' ||
+    isGrokImagineQualityImage(modelName)
+  ) {
+    if (isGrokImagineQualityImage(modelName)) {
+      return [
+        entry('output-1k', '1K output', 0.05, 'image'),
+        entry('output-2k', '2K output', 0.07, 'image'),
+        entry('image-input', 'Image input', 0.01, 'image'),
+      ]
+    }
+    return [
+      entry('output', 'Output image', 0.02, 'image'),
+      entry('image-input', 'Image input', 0.002, 'image'),
+    ]
+  }
+
+  if (modelName === 'grok-imagine-video') {
+    return [
+      entry('image-input', 'Image input', 0.002, 'image'),
+      entry('video-input', 'Video input', 0.01, 'second'),
+      entry('output-480p', '480p output', 0.05, 'second'),
+      entry('output-720p', '720p output', 0.07, 'second'),
+    ]
+  }
+
+  if (modelName === 'grok-imagine-video-1.5') {
+    return [
+      entry('image-input', 'Image input', 0.01, 'image'),
+      entry('output-480p', '480p output', 0.08, 'second'),
+      entry('output-720p', '720p output', 0.14, 'second'),
+      entry('output-1080p', '1080p output', 0.25, 'second'),
+    ]
+  }
+
+  return []
+}
+
+function isBuiltinDisplayPricingModel(model: PricingModel): boolean {
+  return getBuiltinDisplayPricingEntries(model, 1).length > 0
+}
+
 function formatDisplayPricingValue(price: number): string {
   return formatBillingCurrencyFromUSD(price, {
     digitsLarge: 4,
@@ -106,6 +182,7 @@ export function isTieredSecondsDisplayPricingModel(
 
 export function isDisplayPricingModel(model: PricingModel): boolean {
   return (
+    isBuiltinDisplayPricingModel(model) ||
     isWeightedFactorsDisplayPricingModel(model) ||
     isTieredSecondsDisplayPricingModel(model)
   )
@@ -115,6 +192,11 @@ export function formatDisplayBasePrice(
   model: PricingModel,
   groupRatio: number
 ): string | null {
+  const builtinEntries = getBuiltinDisplayPricingEntries(model, groupRatio)
+  if (builtinEntries.length > 0) {
+    return builtinEntries[0]?.formatted ?? null
+  }
+
   const config = model.display_pricing
   if (!config) return null
 
@@ -200,6 +282,11 @@ export function getDisplayPricingEntries(
   model: PricingModel,
   groupRatio: number
 ): DisplayPricingEntry[] {
+  const builtinEntries = getBuiltinDisplayPricingEntries(model, groupRatio)
+  if (builtinEntries.length > 0) {
+    return builtinEntries
+  }
+
   const config = model.display_pricing
   if (!config) {
     return []

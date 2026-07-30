@@ -315,8 +315,12 @@ function PriceSummary(props: {
 
   if (displayPricingEntries.length > 0) {
     const basePrice = formatDisplayBasePrice(props.model, displayGroupRatio)
-    const unitSuffix =
-      displayPricingEntries[0].unit === 'second' ? '/s' : `/ ${t('request')}`
+    let unitSuffix = `/ ${t('request')}`
+    if (displayPricingEntries[0].unit === 'second') {
+      unitSuffix = '/s'
+    } else if (displayPricingEntries[0].unit === 'image') {
+      unitSuffix = `/ ${t('image')}`
+    }
 
     return (
       <span className='text-muted-foreground text-xs'>

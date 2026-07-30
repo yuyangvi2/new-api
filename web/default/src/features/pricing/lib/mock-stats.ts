@@ -859,7 +859,7 @@ const GROK_IMAGINE_IMAGE_VIDEO_PARAMS: SupportedParameter[] = [
   {
     name: 'resolution',
     type: 'enum',
-    enumValues: ['480p', '720p'],
+    enumValues: ['480p', '720p', '1080p'],
     defaultValue: '720p',
     descriptionKey: 'Resolution',
   },

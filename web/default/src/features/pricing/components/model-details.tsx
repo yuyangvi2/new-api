@@ -136,7 +136,9 @@ function getDisplayPricingUnitSuffix(
   unit: DisplayPricingUnit,
   t: (key: string) => string
 ): string {
-  return unit === 'second' ? '/s' : `/ ${t('request')}`
+  if (unit === 'second') return '/s'
+  if (unit === 'image') return `/ ${t('image')}`
+  return `/ ${t('request')}`
 }
 
 function getDisplayPricingFootnote(
@@ -144,6 +146,7 @@ function getDisplayPricingFootnote(
   t: (key: string) => string
 ): string {
   if (unit === 'second') return t('Prices shown per second')
+  if (unit === 'image') return `${t('Prices shown per')} ${t('image')}`
   return `${t('Prices shown per')} ${t('request')}`
 }
 

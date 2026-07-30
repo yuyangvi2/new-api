@@ -5,9 +5,11 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
+	xaipricing "github.com/QuantumNous/new-api/relay/channel/xai/pricing"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
@@ -160,12 +162,44 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		CacheCreation1hRatio: cacheCreationRatio1h,
 		QuotaToPreConsume:    preConsumedQuota,
 	}
+	applyXAIImagineImagePricing(info, &priceData)
 
 	if common.DebugEnabled {
 		logger.LogDebug(c, "model_price_helper result: %s", priceData.ToSetting())
 	}
 	info.PriceData = priceData
 	return priceData, nil
+}
+
+func applyXAIImagineImagePricing(info *relaycommon.RelayInfo, priceData *types.PriceData) {
+	if info == nil || priceData == nil || !priceData.UsePrice || priceData.ModelPrice <= 0 {
+		return
+	}
+	request, ok := info.Request.(*dto.ImageRequest)
+	if !ok {
+		return
+	}
+	resolution := ""
+	if value, ok := request.Extra["resolution"]; ok {
+		_ = common.Unmarshal(value, &resolution)
+	}
+	inputImageCount := xaipricing.CountImageRequestInputs(*request)
+	outputCount := 1
+	if request.N != nil && *request.N > 0 {
+		outputCount = int(*request.N)
+	}
+	requestPrice, ok := xaipricing.GrokImagineImageRequestPrice(info.OriginModelName, resolution, outputCount, inputImageCount)
+	if !ok {
+		return
+	}
+	priceData.AddOtherRatio("xai_imagine_price", requestPrice/priceData.ModelPrice)
+	priceData.AddOtherRatio("n", 1)
+	quotaWithRatios := priceData.ApplyOtherRatiosToFloat(float64(priceData.QuotaToPreConsume))
+	quota, clamp := common.QuotaFromFloatChecked(quotaWithRatios)
+	priceData.QuotaToPreConsume = quota
+	if clamp != nil && info.QuotaClamp == nil {
+		info.QuotaClamp = clamp
+	}
 }
 
 // ModelPriceHelperPerCall 按次/按量计费的 PriceHelper (MJ、Task)

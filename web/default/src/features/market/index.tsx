@@ -238,7 +238,7 @@ type MarketPriceEntry = {
   label?: string
   labelKey?: string
   formatted: string
-  unit: 'M' | 'request' | 'second'
+  unit: 'M' | 'request' | 'second' | 'image'
   numericPrice?: number
 }
 
@@ -586,6 +586,10 @@ function MarketPricePanel(props: {
 
     if (entry.unit === 'request') {
       return `/ ${t('request')}`
+    }
+
+    if (entry.unit === 'image') {
+      return `/ ${t('image')}`
     }
 
     return '/ 1M'

@@ -13,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relay/channel"
 	"github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
+	xaipricing "github.com/QuantumNous/new-api/relay/channel/xai/pricing"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
@@ -61,7 +62,18 @@ func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo) {
 }
 
 func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskError {
-	return relaycommon.ValidateMultipartDirect(c, info)
+	taskErr := relaycommon.ValidateMultipartDirect(c, info)
+	if taskErr != nil {
+		return taskErr
+	}
+	req, err := relaycommon.GetTaskRequest(c)
+	if err != nil {
+		return service.TaskErrorWrapperLocal(err, "invalid_request", http.StatusBadRequest)
+	}
+	if strings.EqualFold(info.OriginModelName, "grok-imagine-video-1.5") && strings.TrimSpace(req.Image) == "" && len(req.Images) == 0 {
+		return service.TaskErrorWrapperLocal(fmt.Errorf("image is required for grok-imagine-video-1.5"), "invalid_request", http.StatusBadRequest)
+	}
+	return nil
 }
 
 func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInfo) map[string]float64 {
@@ -69,19 +81,19 @@ func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInf
 	if err != nil {
 		return nil
 	}
-	seconds, _ := strconv.Atoi(req.Seconds)
-	if seconds == 0 {
-		seconds = req.Duration
+	price, ok := xaipricing.GrokImagineTaskPrice(req, info.OriginModelName)
+	if !ok || info.PriceData.Quota <= 0 {
+		return nil
 	}
-	// The current Grok Imagine video API returns 8-second clips by default even
-	// when a shorter duration is requested. Pre-consume conservatively for 8s.
-	if seconds <= 0 || seconds < 8 {
-		seconds = 8
+	groupRatio := info.PriceData.GroupRatioInfo.GroupRatio
+	if groupRatio < 0 {
+		groupRatio = 0
 	}
-	if seconds > relaycommon.MaxTaskDurationSeconds {
-		seconds = relaycommon.MaxTaskDurationSeconds
+	ratio := price * float64(common.QuotaPerUnit) * groupRatio / float64(info.PriceData.Quota)
+	if ratio == 1.0 {
+		return nil
 	}
-	return map[string]float64{"seconds": float64(seconds)}
+	return map[string]float64{"xai_imagine_price": ratio}
 }
 
 func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, error) {
@@ -112,10 +124,13 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 		}
 	}
 	if req.Image != "" {
-		body["image"] = req.Image
-	}
-	if len(req.Images) > 0 {
-		body["images"] = req.Images
+		body["image"] = map[string]string{"url": req.Image}
+	} else if len(req.Images) > 0 {
+		if strings.EqualFold(info.OriginModelName, "grok-imagine-video-1.5") {
+			body["image"] = map[string]string{"url": req.Images[0]}
+		} else {
+			body["images"] = req.Images
+		}
 	}
 	for key, value := range req.Metadata {
 		if key == "size" || key == "model" || key == "prompt" {
