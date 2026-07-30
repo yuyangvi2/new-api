@@ -77,6 +77,7 @@ import { parseTags } from '../lib/filters'
 import {
   getAvailableGroups,
   getDisplayBillingUnitLabelKey,
+  isSecondBilledFixedPriceModel,
   isTokenBasedModel,
 } from '../lib/model-helpers'
 import { formatFixedPrice, formatGroupPrice } from '../lib/price'
@@ -675,6 +676,9 @@ function PriceSection(props: {
   ]
   const displayPricingEntries = getDisplayPricingEntries(props.model, 1)
   const tieredSecondEntries = getTieredSecondPricingEntries(props.model, 1)
+  const fixedPriceUnitSuffix = isSecondBilledFixedPriceModel(props.model)
+    ? '/s'
+    : `/ ${t('request')}`
 
   if (tieredSecondEntries.length > 0) {
     const entry = tieredSecondEntries[0]
@@ -811,7 +815,7 @@ function PriceSection(props: {
         <SectionTitle>{t('Base Price')}</SectionTitle>
         <div className='flex items-baseline justify-between'>
           <span className='text-muted-foreground text-sm'>
-            {t('Per request')}
+            {t(getDisplayBillingUnitLabelKey(props.model))}
           </span>
           <span className='text-foreground font-mono text-sm font-semibold tabular-nums'>
             {formatFixedPrice(
@@ -822,6 +826,9 @@ function PriceSection(props: {
               props.usdExchangeRate,
               baseGroupRatioMap
             )}
+            <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
+              {fixedPriceUnitSuffix}
+            </span>
           </span>
         </div>
       </section>
@@ -1128,6 +1135,9 @@ function GroupPricingSection(props: {
   const tokenUnitLabel = props.tokenUnit === 'K' ? '1K' : '1M'
   const displayPricingEntries = getDisplayPricingEntries(props.model, 1)
   const tieredSecondEntries = getTieredSecondPricingEntries(props.model, 1)
+  const fixedPriceUnitSuffix = isSecondBilledFixedPriceModel(props.model)
+    ? '/s'
+    : `/ ${t('request')}`
 
   const extraPriceTypes = useMemo(() => {
     const types: { label: string; type: PriceType }[] = []
@@ -1396,14 +1406,14 @@ function GroupPricingSection(props: {
       props.groupRatio
     )
   const renderFixedGroupPrice = (group: string) =>
-    formatFixedPrice(
+    `${formatFixedPrice(
       props.model,
       group,
       showRechargePrice,
       props.priceRate,
       props.usdExchangeRate,
       props.groupRatio
-    )
+    )} ${fixedPriceUnitSuffix}`
 
   return (
     <section>
@@ -1469,6 +1479,11 @@ function GroupPricingSection(props: {
         {isTokenBased && (
           <p className='text-muted-foreground/40 mt-1.5 px-4 text-[10px] sm:px-0'>
             {t('Prices shown per')} {tokenUnitLabel} tokens
+          </p>
+        )}
+        {!isTokenBased && isSecondBilledFixedPriceModel(props.model) && (
+          <p className='text-muted-foreground/40 mt-1.5 px-4 text-[10px] sm:px-0'>
+            {t('Prices shown per second')}
           </p>
         )}
       </div>

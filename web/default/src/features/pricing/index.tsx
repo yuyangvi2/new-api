@@ -57,7 +57,10 @@ import {
   getDynamicPricingSummary,
 } from './lib/dynamic-price'
 import { parseTags } from './lib/filters'
-import { isTokenBasedModel } from './lib/model-helpers'
+import {
+  isSecondBilledFixedPriceModel,
+  isTokenBasedModel,
+} from './lib/model-helpers'
 import { formatPrice, formatRequestPrice } from './lib/price'
 import type { PricingModel, TokenUnit } from './types'
 
@@ -426,6 +429,10 @@ function PriceSummary(props: {
     )
   }
 
+  const fixedPriceUnitSuffix = isSecondBilledFixedPriceModel(props.model)
+    ? '/s'
+    : `/ ${t('request')}`
+
   return (
     <span className='text-muted-foreground text-xs'>
       <span className='font-mono font-semibold text-orange-600 dark:text-orange-300'>
@@ -437,7 +444,7 @@ function PriceSummary(props: {
           props.selectedGroup
         )}
       </span>{' '}
-      / {t('request')}
+      {fixedPriceUnitSuffix}
     </span>
   )
 }

@@ -33,6 +33,30 @@ func TestGetModelPriceExactViduQModelOverridesFamilyFallback(t *testing.T) {
 	assert.Equal(t, 0.2, price)
 }
 
+func TestGetModelPriceUnitUsesViduQFamilyFallback(t *testing.T) {
+	original := ModelPriceUnit2JSONString()
+	t.Cleanup(func() {
+		require.NoError(t, UpdateModelPriceUnitByJSONString(original))
+	})
+	require.NoError(t, UpdateModelPriceUnitByJSONString(`{"viduq":"second"}`))
+
+	unit := GetModelPriceUnit("viduq2-pro")
+
+	assert.Equal(t, ModelPriceUnitSecond, unit)
+}
+
+func TestGetModelPriceUnitExactModelOverridesFamilyFallback(t *testing.T) {
+	original := ModelPriceUnit2JSONString()
+	t.Cleanup(func() {
+		require.NoError(t, UpdateModelPriceUnitByJSONString(original))
+	})
+	require.NoError(t, UpdateModelPriceUnitByJSONString(`{"viduq":"second","viduq2-pro":"request"}`))
+
+	unit := GetModelPriceUnit("viduq2-pro")
+
+	assert.Equal(t, ModelPriceUnitRequest, unit)
+}
+
 func TestGetModelRatioUsesViduQFamilyFallback(t *testing.T) {
 	original := ModelRatio2JSONString()
 	t.Cleanup(func() {

@@ -24,6 +24,7 @@ type Pricing struct {
 	ModelType              int                     `json:"model_type"`
 	ModelRatio             float64                 `json:"model_ratio"`
 	ModelPrice             float64                 `json:"model_price"`
+	ModelPriceUnit         string                  `json:"model_price_unit,omitempty"`
 	OwnerBy                string                  `json:"owner_by"`
 	CompletionRatio        float64                 `json:"completion_ratio"`
 	CacheRatio             *float64                `json:"cache_ratio,omitempty"`
@@ -371,6 +372,7 @@ func updatePricing() {
 		modelPrice, findPrice := ratio_setting.GetModelPrice(model, false)
 		if findPrice {
 			pricing.ModelPrice = modelPrice
+			pricing.ModelPriceUnit = ratio_setting.GetModelPriceUnit(model)
 			pricing.QuotaType = 1
 		} else {
 			modelRatio, _, _ := ratio_setting.GetModelRatio(model)

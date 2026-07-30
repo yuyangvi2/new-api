@@ -403,6 +403,22 @@ var defaultModelPrice = map[string]float64{
 	"image-01-live":                  0.025 / USD2RMB,
 }
 
+const (
+	ModelPriceUnitRequest = "request"
+	ModelPriceUnitSecond  = "second"
+)
+
+var defaultModelPriceUnit = map[string]string{
+	"sora-2":                        ModelPriceUnitSecond,
+	"sora-2-pro":                    ModelPriceUnitSecond,
+	"grok-imagine-video":            ModelPriceUnitSecond,
+	"grok-imagine-video-1.5":        ModelPriceUnitSecond,
+	"veo-3.0-generate-001":          ModelPriceUnitSecond,
+	"veo-3.0-fast-generate-001":     ModelPriceUnitSecond,
+	"veo-3.1-generate-preview":      ModelPriceUnitSecond,
+	"veo-3.1-fast-generate-preview": ModelPriceUnitSecond,
+}
+
 var defaultAudioRatio = map[string]float64{
 	"gpt-4o-audio-preview":         16,
 	"gpt-4o-mini-audio-preview":    66.67,
@@ -422,6 +438,7 @@ var defaultAudioCompletionRatio = map[string]float64{
 }
 
 var modelPriceMap = types.NewRWMap[string, float64]()
+var modelPriceUnitMap = types.NewRWMap[string, string]()
 var modelRatioMap = types.NewRWMap[string, float64]()
 var completionRatioMap = types.NewRWMap[string, float64]()
 
@@ -439,6 +456,7 @@ var defaultCompletionRatio = map[string]float64{
 // InitRatioSettings initializes all model related settings maps
 func InitRatioSettings() {
 	modelPriceMap.AddAll(defaultModelPrice)
+	modelPriceUnitMap.AddAll(defaultModelPriceUnit)
 	modelRatioMap.AddAll(defaultModelRatio)
 	completionRatioMap.AddAll(defaultCompletionRatio)
 	cacheRatioMap.AddAll(defaultCacheRatio)
@@ -458,6 +476,43 @@ func ModelPrice2JSONString() string {
 
 func UpdateModelPriceByJSONString(jsonStr string) error {
 	return types.LoadFromJsonStringWithCallback(modelPriceMap, jsonStr, InvalidateExposedDataCache)
+}
+
+func ModelPriceUnit2JSONString() string {
+	return modelPriceUnitMap.MarshalJSONString()
+}
+
+func UpdateModelPriceUnitByJSONString(jsonStr string) error {
+	return types.LoadFromJsonStringWithCallback(modelPriceUnitMap, jsonStr, InvalidateExposedDataCache)
+}
+
+func GetModelPriceUnit(name string) string {
+	name = FormatMatchingModelName(name)
+
+	if unit, ok := modelPriceUnitMap.Get(name); ok {
+		return normalizeModelPriceUnit(unit)
+	}
+
+	if strings.HasSuffix(name, CompactModelSuffix) {
+		if unit, ok := modelPriceUnitMap.Get(CompactWildcardModelKey); ok {
+			return normalizeModelPriceUnit(unit)
+		}
+	}
+
+	if family, ok := fallbackModelFamilyKey(name); ok {
+		if unit, ok := modelPriceUnitMap.Get(family); ok {
+			return normalizeModelPriceUnit(unit)
+		}
+	}
+
+	return ModelPriceUnitRequest
+}
+
+func normalizeModelPriceUnit(unit string) string {
+	if strings.EqualFold(strings.TrimSpace(unit), ModelPriceUnitSecond) {
+		return ModelPriceUnitSecond
+	}
+	return ModelPriceUnitRequest
 }
 
 // GetModelPrice 返回模型的价格，如果模型不存在则返回-1，false
@@ -824,6 +879,10 @@ func GetModelRatioCopy() map[string]float64 {
 
 func GetModelPriceCopy() map[string]float64 {
 	return modelPriceMap.ReadAll()
+}
+
+func GetModelPriceUnitCopy() map[string]string {
+	return modelPriceUnitMap.ReadAll()
 }
 
 func GetCompletionRatioCopy() map[string]float64 {

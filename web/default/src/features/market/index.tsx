@@ -68,6 +68,7 @@ import {
 } from '../pricing/lib/dynamic-price'
 import {
   getDisplayGroupRatio,
+  isSecondBilledFixedPriceModel,
   isTokenBasedModel,
 } from '../pricing/lib/model-helpers'
 import {
@@ -542,22 +543,25 @@ function MarketPricePanel(props: {
       )
     }
   } else {
+    const unit = isSecondBilledFixedPriceModel(model) ? 'second' : 'request'
+    const labelKey = unit === 'second' ? 'Per Second' : 'Per Request'
+
     primaryEntries.push({
       key: 'request',
-      labelKey: 'Per Request',
+      labelKey,
       formatted: formatRequestPrice(
         model,
         false,
         props.priceRate,
         props.usdExchangeRate
       ),
-      unit: 'request',
+      unit,
     })
 
     if (savingPercent !== null) {
       officialEntries.push({
         key: 'official-request',
-        labelKey: 'Per Request',
+        labelKey,
         formatted: formatFixedPrice(
           model,
           '__base',
@@ -566,7 +570,7 @@ function MarketPricePanel(props: {
           props.usdExchangeRate,
           { __base: 1 }
         ),
-        unit: 'request',
+        unit,
       })
     }
   }

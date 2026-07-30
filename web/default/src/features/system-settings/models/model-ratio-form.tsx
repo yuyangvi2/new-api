@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { Code2, Eye, RotateCcw, Save } from 'lucide-react'
 import { memo, useCallback, useRef, useState } from 'react'
-import { type UseFormReturn } from 'react-hook-form'
+import type { UseFormReturn } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
 import { JsonCodeEditor } from '@/components/json-code-editor'
@@ -46,6 +46,7 @@ import {
 
 type ModelFormValues = {
   ModelPrice: string
+  ModelPriceUnit: string
   ModelRatio: string
   CacheRatio: string
   CreateCacheRatio: string
@@ -69,6 +70,7 @@ type ModelRatioFormProps = {
 
 type ModelJsonFieldName =
   | 'ModelPrice'
+  | 'ModelPriceUnit'
   | 'ModelRatio'
   | 'CacheRatio'
   | 'CreateCacheRatio'
@@ -87,6 +89,12 @@ const modelJsonFields: Array<{
     labelKey: 'Model fixed pricing',
     descriptionKey:
       'JSON map of model → USD cost per request. Takes precedence over ratio based billing.',
+  },
+  {
+    name: 'ModelPriceUnit',
+    labelKey: 'Fixed price unit',
+    descriptionKey:
+      'JSON map of fixed-price model → billing unit. Supported values: request, second.',
   },
   {
     name: 'ModelRatio',

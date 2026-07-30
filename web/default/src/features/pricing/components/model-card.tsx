@@ -33,6 +33,7 @@ import {
 import { parseTags } from '../lib/filters'
 import {
   getDisplayBillingUnitLabelKey,
+  isSecondBilledFixedPriceModel,
   isTokenBasedModel,
 } from '../lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '../lib/price'
@@ -58,6 +59,9 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   const usdExchangeRate = props.usdExchangeRate ?? 1
   const showRechargePrice = props.showRechargePrice ?? false
   const isTokenBased = isTokenBasedModel(props.model)
+  const fixedPriceUnitSuffix = isSecondBilledFixedPriceModel(props.model)
+    ? '/s'
+    : `/ ${t('request')}`
   const tokenUnitLabel = tokenUnit === 'K' ? '1K' : '1M'
   const tags = parseTags(props.model.tags)
   const groups = props.model.enable_groups || []
@@ -196,7 +200,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
             props.selectedGroup
           )}
         </span>{' '}
-        / {t('request')}
+        {fixedPriceUnitSuffix}
       </span>
     )
   }
