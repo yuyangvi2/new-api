@@ -88,6 +88,21 @@ function isKlingVideoModelName(modelName: string): boolean {
   return /kling/i.test(modelName)
 }
 
+function getKlingTextMode(modelName: string): string | undefined {
+  const normalized = modelName.trim().toLowerCase()
+  if (normalized === 'kling-v1' || normalized === 'kling-v1-5') {
+    return 'pro'
+  }
+  if (normalized === 'kling-v1-6') {
+    return 'std'
+  }
+  return undefined
+}
+
+function prefersKlingTextSample(modelName: string): boolean {
+  return modelName.trim().toLowerCase() === 'kling-v1-5'
+}
+
 function isViduVideoModelName(modelName: string): boolean {
   return /vidu/i.test(modelName)
 }
@@ -461,18 +476,35 @@ function buildVideoSample(lang: Lang, ctx: SampleContext): string {
       metadata: { resolution: '720p' },
     }
   } else if (isKlingVideoModelName(ctx.modelName)) {
-    body = {
-      model: ctx.modelName,
-      prompt: 'A product shot of an orange pencil on a clean white desk.',
-      image: 'https://example.com/input.jpg',
-      duration: 5,
-      size: '1280x720',
-      mode: 'std',
-      metadata: {
-        NegativePrompt: 'text, watermark, distorted objects',
-        CfgScale: 0.5,
-        Sound: 'off',
-      },
+    if (prefersKlingTextSample(ctx.modelName)) {
+      body = {
+        model: ctx.modelName,
+        prompt: 'A cinematic product video of an orange pencil on a clean white desk.',
+        duration: 5,
+        mode: 'pro',
+        metadata: {
+          AspectRatio: '16:9',
+          NegativePrompt: 'text, watermark, distorted objects',
+          CfgScale: 0.5,
+        },
+      }
+    } else {
+      body = {
+        model: ctx.modelName,
+        prompt: 'Add subtle cinematic motion to the product photo.',
+        image: 'https://example.com/input.jpg',
+        duration: 5,
+        mode: 'std',
+        metadata: {
+          NegativePrompt: 'text, watermark, distorted objects',
+          CfgScale: 0.5,
+        },
+      }
+
+      const mode = getKlingTextMode(ctx.modelName)
+      if (mode) {
+        body.mode = mode
+      }
     }
   } else if (isViduVideoModelName(ctx.modelName)) {
     body = {

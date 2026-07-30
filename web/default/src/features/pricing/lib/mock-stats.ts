@@ -795,18 +795,12 @@ const GROK_IMAGINE_VIDEO_PARAMS: SupportedParameter[] = [
   },
 ]
 
-const KLING_VIDEO_PARAMS: SupportedParameter[] = [
+const KLING_TEXT_VIDEO_PARAMS: SupportedParameter[] = [
   {
     name: 'prompt',
     type: 'string',
     required: true,
     descriptionKey: 'Text description of the desired video',
-  },
-  {
-    name: 'image',
-    type: 'string',
-    descriptionKey:
-      'Input image URL or base64. When present, the gateway uses image-to-video.',
   },
   {
     name: 'duration',
@@ -816,20 +810,19 @@ const KLING_VIDEO_PARAMS: SupportedParameter[] = [
     descriptionKey: 'Video length in seconds',
   },
   {
-    name: 'size',
+    name: 'metadata.AspectRatio',
     type: 'enum',
-    enumValues: ['1280x720', '720x1280', '1024x1024'],
-    defaultValue: '1280x720',
+    enumValues: ['16:9', '9:16', '1:1'],
+    defaultValue: '16:9',
     descriptionKey:
-      'Maps to Kling aspect ratio; use 1280x720, 720x1280, or 1024x1024.',
+      'Text-to-video aspect ratio; VCLM accepts 16:9, 9:16, or 1:1.',
   },
   {
     name: 'mode',
     type: 'enum',
-    enumValues: ['std', 'pro', '4k'],
-    defaultValue: 'std',
+    enumValues: ['std', 'pro'],
     descriptionKey:
-      'Generation mode; 4k is available only on supported Kling versions.',
+      'For text-to-video, v1.0 and v1.5 use pro; v1.6 supports std/pro; v2+ usually omits mode.',
   },
   {
     name: 'metadata.NegativePrompt',
@@ -851,14 +844,144 @@ const KLING_VIDEO_PARAMS: SupportedParameter[] = [
     descriptionKey: 'Sound generation switch',
   },
   {
-    name: 'metadata.ImageTail',
-    type: 'string',
-    descriptionKey: 'Tail-frame image URL or base64',
+    name: 'metadata.MultiShot',
+    type: 'boolean',
+    descriptionKey: 'Whether to enable multi-shot generation',
+  },
+  {
+    name: 'metadata.ShotType',
+    type: 'enum',
+    enumValues: ['auto', 'customize'],
+    descriptionKey: 'Shot type for multi-shot generation',
+  },
+  {
+    name: 'metadata.MultiPrompt',
+    type: 'array',
+    descriptionKey: 'Prompt list for customized multi-shot generation',
+  },
+  {
+    name: 'metadata.LogoAdd',
+    type: 'boolean',
+    descriptionKey: 'Whether to add the AI-generated content logo',
+  },
+  {
+    name: 'metadata.LogoParam',
+    type: 'object',
+    descriptionKey: 'Logo configuration object',
   },
   {
     name: 'metadata.CameraControl',
     type: 'object',
     descriptionKey: 'VCLM camera control object',
+  },
+  {
+    name: 'metadata.CallbackUrl',
+    type: 'string',
+    descriptionKey: 'Callback URL for provider task notifications',
+  },
+  {
+    name: 'metadata.ExternalTaskId',
+    type: 'string',
+    descriptionKey: 'Caller-provided task id for provider-side tracing',
+  },
+]
+
+const KLING_IMAGE_VIDEO_PARAMS: SupportedParameter[] = [
+  {
+    name: 'prompt',
+    type: 'string',
+    required: true,
+    descriptionKey: 'Text description of the desired video',
+  },
+  {
+    name: 'image',
+    type: 'string',
+    required: true,
+    descriptionKey: 'Input image URL or base64. Required for Kling image-to-video.',
+  },
+  {
+    name: 'duration',
+    type: 'integer',
+    range: '5 / 10, v3.0: 3 ~ 15',
+    defaultValue: 5,
+    descriptionKey: 'Video length in seconds',
+  },
+  {
+    name: 'mode',
+    type: 'enum',
+    enumValues: ['std', 'pro', '4k'],
+    descriptionKey:
+      'Image-to-video generation mode; 4k is available only on supported Kling versions.',
+  },
+  {
+    name: 'metadata.NegativePrompt',
+    type: 'string',
+    descriptionKey: 'Kling negative prompt',
+  },
+  {
+    name: 'metadata.CfgScale',
+    type: 'number',
+    range: '0 ~ 1',
+    defaultValue: 0.5,
+    descriptionKey: 'Guidance scale; not supported by some Kling v2 models',
+  },
+  {
+    name: 'metadata.Sound',
+    type: 'enum',
+    enumValues: ['on', 'off'],
+    defaultValue: 'off',
+    descriptionKey: 'Sound generation switch',
+  },
+  {
+    name: 'metadata.MultiShot',
+    type: 'boolean',
+    descriptionKey: 'Whether to enable multi-shot generation',
+  },
+  {
+    name: 'metadata.ShotType',
+    type: 'enum',
+    enumValues: ['auto', 'customize'],
+    descriptionKey: 'Shot type for multi-shot generation',
+  },
+  {
+    name: 'metadata.MultiPrompt',
+    type: 'array',
+    descriptionKey: 'Prompt list for customized multi-shot generation',
+  },
+  {
+    name: 'metadata.LogoAdd',
+    type: 'boolean',
+    descriptionKey: 'Whether to add the AI-generated content logo',
+  },
+  {
+    name: 'metadata.LogoParam',
+    type: 'object',
+    descriptionKey: 'Logo configuration object',
+  },
+  {
+    name: 'metadata.ImageTail',
+    type: 'string',
+    descriptionKey: 'Tail-frame image URL or base64',
+  },
+  {
+    name: 'metadata.StaticMask',
+    type: 'string',
+    descriptionKey: 'Static mask image URL or base64 for motion brush',
+  },
+  {
+    name: 'metadata.DynamicMasks',
+    type: 'array',
+    descriptionKey: 'Dynamic mask list for motion brush trajectories',
+  },
+  {
+    name: 'metadata.CameraControl',
+    type: 'object',
+    descriptionKey: 'VCLM camera control object',
+  },
+  {
+    name: 'metadata.ElementList',
+    type: 'array',
+    descriptionKey: 'Reference subject list; VCLM supports up to three elements',
   },
   {
     name: 'metadata.CallbackUrl',
@@ -911,6 +1034,16 @@ function isGrokImagineVideoModel(model: PricingModel): boolean {
 
 function isKlingVideoModel(model: PricingModel): boolean {
   return /kling/i.test(model.model_name)
+}
+
+function isKlingTextOnlyModel(model: PricingModel): boolean {
+  return model.model_name.trim().toLowerCase() === 'kling-v1-5'
+}
+
+function buildKlingVideoParameters(model: PricingModel): SupportedParameter[] {
+  return isKlingTextOnlyModel(model)
+    ? KLING_TEXT_VIDEO_PARAMS
+    : KLING_IMAGE_VIDEO_PARAMS
 }
 
 function isViduVideoModel(model: PricingModel): boolean {
@@ -974,7 +1107,7 @@ export function buildSupportedParameters(
   if (configuredParams.length > 0) return configuredParams
 
   if (isGrokImagineVideoModel(model)) return GROK_IMAGINE_VIDEO_PARAMS
-  if (isKlingVideoModel(model)) return KLING_VIDEO_PARAMS
+  if (isKlingVideoModel(model)) return buildKlingVideoParameters(model)
   if (isViduVideoModel(model)) return VIDU_VIDEO_PARAMS
 
   const cat = apiCategoryOf(model)
