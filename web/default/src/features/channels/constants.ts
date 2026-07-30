@@ -77,7 +77,7 @@ export const CHANNEL_TYPES = {
   56: 'Replicate',
   57: 'ChatGPT Subscription (Codex)',
   58: 'Advanced Custom',
-  9001: 'VCLM (Kling)',
+  9001: 'Kling',
   9002: 'AIART (Image-GI)',
   9003: 'vipeak (Wan2.7/Seedance)',
   9004: 'apiz.ai / xskill.ai',

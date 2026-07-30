@@ -130,6 +130,14 @@ func requestDuration(req relaycommon.TaskSubmitReq) (int, bool) {
 	return intFromAny(req.Metadata["duration"])
 }
 
+func requestResolution(req relaycommon.TaskSubmitReq) string {
+	resolution := strings.ToLower(strings.TrimSpace(asString(req.Metadata["resolution"])))
+	if resolution == "" && strings.HasSuffix(strings.ToLower(strings.TrimSpace(req.Size)), "p") {
+		resolution = strings.ToLower(strings.TrimSpace(req.Size))
+	}
+	return resolution
+}
+
 func intFromAny(value any) (int, bool) {
 	switch v := value.(type) {
 	case int:

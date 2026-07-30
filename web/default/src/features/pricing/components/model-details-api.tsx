@@ -41,6 +41,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useStatus } from '@/hooks/use-status'
 import { getApiBaseAddress } from '@/lib/server-address'
 
+import { getEndpointTypeLabels } from '../constants'
 import {
   buildRateLimits,
   buildSupportedParameters,
@@ -540,6 +541,7 @@ function CodeSamplesSection(props: {
 }) {
   const { t } = useTranslation()
   const { status } = useStatus()
+  const endpointTypeLabels = getEndpointTypeLabels(t) as Record<string, string>
 
   const baseUrl = useMemo(() => {
     return getApiBaseAddress(status, 'https://api.example.com')
@@ -594,7 +596,7 @@ function CodeSamplesSection(props: {
                   value={ep.type}
                   className='h-7 px-2.5 text-xs'
                 >
-                  {ep.type}
+                  {endpointTypeLabels[ep.type] ?? ep.type}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -692,7 +694,7 @@ function SupportedParametersSection(props: { model: PricingModel }) {
           {
             id: 'range',
             header: t('Default / range'),
-            className: 'h-9 w-32',
+            className: 'h-9 w-48',
             cellClassName: tableStyles.topCell,
             cell: (p) => <ParamRangeCell param={p} />,
           },
@@ -713,13 +715,17 @@ function ParamRangeCell(props: { param: SupportedParameter }) {
   const { defaultValue, range, enumValues } = props.param
   if (defaultValue !== undefined) {
     return (
-      <div className='flex flex-wrap items-center gap-1'>
-        <span className='text-muted-foreground text-sm'>=</span>
-        <code className='bg-muted rounded px-1.5 py-0.5 font-mono text-sm'>
-          {String(defaultValue)}
-        </code>
+      <div className='flex flex-col items-start gap-1'>
+        <div className='flex items-center gap-1'>
+          <span className='text-muted-foreground text-sm'>=</span>
+          <code className='bg-muted rounded px-1.5 py-0.5 font-mono text-sm'>
+            {String(defaultValue)}
+          </code>
+        </div>
         {range && (
-          <span className='text-muted-foreground text-sm'>{range}</span>
+          <span className='text-muted-foreground font-mono text-sm leading-5'>
+            {range}
+          </span>
         )}
       </div>
     )

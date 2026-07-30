@@ -15,6 +15,8 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/types"
 )
 
 func TestConvertToRequestPayloadPreservesExplicitZeroValues(t *testing.T) {
@@ -175,6 +177,15 @@ func TestValidateSeedanceMRequestBounds(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "4k unsupported",
+			req: relaycommon.TaskSubmitReq{
+				Prompt: "prompt",
+				Metadata: map[string]any{
+					"resolution": "4k",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -226,6 +237,37 @@ func TestValidateRequestAcceptsOfficialTopLevelContent(t *testing.T) {
 	assert.Equal(t, false, storedReq.Metadata["draft"])
 	assert.Equal(t, false, storedReq.Metadata["watermark"])
 	require.Contains(t, storedReq.Metadata, "content")
+}
+
+func TestEstimateBillingUsesVolcengineBasePriceForUserCharge(t *testing.T) {
+	originalQuotaPerUnit := common.QuotaPerUnit
+	originalExchangeRate := operation_setting.USDExchangeRate
+	t.Cleanup(func() {
+		common.QuotaPerUnit = originalQuotaPerUnit
+		operation_setting.USDExchangeRate = originalExchangeRate
+	})
+	common.QuotaPerUnit = 1_000_000
+	operation_setting.USDExchangeRate = 1
+
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Set("task_request", relaycommon.TaskSubmitReq{
+		Model:    "doubao-seedance-2.0",
+		Duration: 5,
+		Size:     "16:9",
+		Metadata: map[string]any{"resolution": "720p"},
+	})
+
+	ratios := (&TaskAdaptor{}).EstimateBilling(ctx, &relaycommon.RelayInfo{
+		OriginModelName: "doubao-seedance-2.0",
+		ChannelMeta:     &relaycommon.ChannelMeta{},
+		PriceData: types.PriceData{
+			Quota:          4_968_000,
+			GroupRatioInfo: types.GroupRatioInfo{GroupRatio: 1},
+		},
+	})
+
+	assert.Empty(t, ratios)
 }
 
 func TestParseTaskResultMapsStatusesAndLastFrame(t *testing.T) {

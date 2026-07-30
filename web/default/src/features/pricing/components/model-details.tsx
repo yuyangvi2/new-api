@@ -445,7 +445,9 @@ function ModelBackendProviderSection(props: { model: PricingModel }) {
   const { t } = useTranslation()
   const model = props.model
   const groups = normalizeCatalogItems(model.enable_groups)
-  const endpoints = normalizeCatalogItems(model.supported_endpoint_types)
+  const endpoints = normalizeCatalogItems(model.supported_endpoint_types).filter(
+    (endpoint) => endpoint !== 'openai-video'
+  )
   const tags = parseTags(model.tags)
   const cells: React.ReactNode[] = []
 

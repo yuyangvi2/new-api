@@ -82,7 +82,14 @@ func (c *Client) Call(method string, path string, query url.Values, payload any)
 	if query == nil {
 		query = url.Values{}
 	}
-	signedQuery, err := c.signedQuery(method, path, query, time.Now().UTC(), randomNonce)
+	// Mobile Cloud OpenAPI SDK formats China local time with a literal Z suffix.
+	now := time.Now()
+	if loc, err := time.LoadLocation("Asia/Shanghai"); err == nil {
+		now = now.In(loc)
+	} else {
+		now = now.In(time.FixedZone("CST", 8*60*60))
+	}
+	signedQuery, err := c.signedQuery(method, path, query, now, randomNonce)
 	if err != nil {
 		return 0, nil, nil, err
 	}
