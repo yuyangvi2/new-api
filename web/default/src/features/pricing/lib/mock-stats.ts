@@ -1026,6 +1026,137 @@ const VIDU_VIDEO_PARAMS: SupportedParameter[] = [
   },
 ]
 
+const SEEDANCE_VIDEO_PARAMS: SupportedParameter[] = [
+  {
+    name: 'model',
+    type: 'string',
+    required: true,
+    descriptionKey: 'Model name to use for video generation',
+  },
+  {
+    name: 'content',
+    type: 'array',
+    required: true,
+    descriptionKey: 'Ordered text, image, video, and audio content items',
+  },
+  {
+    name: 'content[].type',
+    type: 'enum',
+    enumValues: ['text', 'image_url', 'video_url', 'audio_url'],
+    descriptionKey: 'Content item type',
+  },
+  {
+    name: 'content[].text',
+    type: 'string',
+    descriptionKey: 'Text content for text items',
+  },
+  {
+    name: 'content[].image_url.url',
+    type: 'string',
+    descriptionKey: 'Image URL for image content items',
+  },
+  {
+    name: 'content[].video_url.url',
+    type: 'string',
+    descriptionKey: 'Video URL for video content items',
+  },
+  {
+    name: 'content[].audio_url.url',
+    type: 'string',
+    descriptionKey: 'Audio URL for audio content items',
+  },
+  {
+    name: 'content[].role',
+    type: 'string',
+    descriptionKey: 'Media role such as first frame, last frame, or reference media',
+  },
+  {
+    name: 'generate_audio',
+    type: 'boolean',
+    defaultValue: true,
+    descriptionKey: 'Generate audio for the output video',
+  },
+  {
+    name: 'ratio',
+    type: 'enum',
+    enumValues: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+    defaultValue: '16:9',
+    descriptionKey: 'Output aspect ratio',
+  },
+  {
+    name: 'resolution',
+    type: 'enum',
+    enumValues: ['480p', '720p', '1080p', '4k'],
+    defaultValue: '720p',
+    descriptionKey: 'Output video resolution',
+  },
+  {
+    name: 'duration',
+    type: 'integer',
+    range: '-1 or 4 ~ 15',
+    descriptionKey: 'Output video duration in seconds',
+  },
+  {
+    name: 'watermark',
+    type: 'boolean',
+    defaultValue: false,
+    descriptionKey: 'Whether to add a watermark to the output',
+  },
+  {
+    name: 'return_last_frame',
+    type: 'boolean',
+    descriptionKey: 'Return the final frame image URL when available',
+  },
+  {
+    name: 'callback_url',
+    type: 'string',
+    descriptionKey: 'Callback URL for asynchronous task updates',
+  },
+  {
+    name: 'service_tier',
+    type: 'string',
+    descriptionKey: 'Service tier requested for task execution',
+  },
+  {
+    name: 'execution_expires_after',
+    type: 'integer',
+    range: '3600 ~ 259200',
+    descriptionKey: 'Task expiration time in seconds',
+  },
+  {
+    name: 'draft',
+    type: 'boolean',
+    descriptionKey: 'Generate a draft preview when supported',
+  },
+  {
+    name: 'seed',
+    type: 'integer',
+    range: '-1 or 0 ~ 4294967295',
+    descriptionKey: 'Deterministic generation seed',
+  },
+  {
+    name: 'camera_fixed',
+    type: 'boolean',
+    descriptionKey: 'Keep the camera movement fixed when supported',
+  },
+  {
+    name: 'frames',
+    type: 'integer',
+    range: '>= 0',
+    descriptionKey: 'Requested frame count when supported',
+  },
+  {
+    name: 'tools',
+    type: 'array',
+    descriptionKey: 'Tool declarations for generation features',
+  },
+  {
+    name: 'safety_identifier',
+    type: 'string',
+    descriptionKey: 'End-user identifier for abuse monitoring',
+  },
+]
+
 type ApiCategory = 'reasoning' | 'embedding' | 'image' | 'video' | 'chat'
 
 function isGrokImagineVideoModel(model: PricingModel): boolean {
@@ -1048,6 +1179,10 @@ function buildKlingVideoParameters(model: PricingModel): SupportedParameter[] {
 
 function isViduVideoModel(model: PricingModel): boolean {
   return /vidu/i.test(model.model_name)
+}
+
+function isSeedanceVideoModel(model: PricingModel): boolean {
+  return /seedance|doubao-seedance/i.test(model.model_name)
 }
 
 function normalizeConfiguredParameters(
@@ -1085,10 +1220,13 @@ function normalizeConfiguredParameters(
  * need to distinguish them so the request-parameter table is accurate.
  */
 function apiCategoryOf(model: PricingModel): ApiCategory {
+  if ((model.supported_endpoint_types ?? []).includes('openai-video')) {
+    return 'video'
+  }
   const profile = PROFILE_BY_NAME(model.model_name)
   if (profile === 'embedding' || profile === 'reasoning') return profile
   if (profile === 'image') {
-    return /sora|veo|kling|pika|video|wan-|hunyuanvideo/i.test(model.model_name)
+    return /sora|veo|kling|pika|video|wan-|hunyuanvideo|seedance/i.test(model.model_name)
       ? 'video'
       : 'image'
   }
@@ -1109,6 +1247,7 @@ export function buildSupportedParameters(
   if (isGrokImagineVideoModel(model)) return GROK_IMAGINE_VIDEO_PARAMS
   if (isKlingVideoModel(model)) return buildKlingVideoParameters(model)
   if (isViduVideoModel(model)) return VIDU_VIDEO_PARAMS
+  if (isSeedanceVideoModel(model)) return SEEDANCE_VIDEO_PARAMS
 
   const cat = apiCategoryOf(model)
   if (cat === 'reasoning') return REASONING_PARAMS

@@ -107,6 +107,10 @@ function isViduVideoModelName(modelName: string): boolean {
   return /vidu/i.test(modelName)
 }
 
+function isSeedanceVideoModelName(modelName: string): boolean {
+  return /seedance|doubao-seedance/i.test(modelName)
+}
+
 function prefersViduTextSample(modelName: string): boolean {
   return /^(viduq2|viduq1|vidu1\.5|vidu2\.0)$/i.test(modelName.trim())
 }
@@ -115,7 +119,8 @@ function usesOpenAIVideoGuide(modelName: string): boolean {
   return (
     isGrokImagineVideoModelName(modelName) ||
     isKlingVideoModelName(modelName) ||
-    isViduVideoModelName(modelName)
+    isViduVideoModelName(modelName) ||
+    isSeedanceVideoModelName(modelName)
   )
 }
 
@@ -468,7 +473,19 @@ function buildVideoSample(lang: Lang, ctx: SampleContext): string {
     duration: 8,
   }
 
-  if (isGrokImagineVideoModelName(ctx.modelName)) {
+  if (isSeedanceVideoModelName(ctx.modelName)) {
+    const prompt =
+      'Create a 10 second night city video with a slow push-in camera move and neon lights reflected on wet streets.'
+    body = {
+      model: ctx.modelName,
+      content: [{ type: 'text', text: prompt }],
+      generate_audio: true,
+      ratio: '16:9',
+      resolution: '720p',
+      duration: 10,
+      watermark: false,
+    }
+  } else if (isGrokImagineVideoModelName(ctx.modelName)) {
     body = {
       model: ctx.modelName,
       prompt: 'Cinematic motion of a futuristic city at sunset.',

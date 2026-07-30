@@ -3,12 +3,16 @@ package seedancem
 import (
 	"bytes"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 )
@@ -68,6 +72,75 @@ func TestBuildRequestHeaderSetsVideoAndEncryptionHeaders(t *testing.T) {
 	assert.NotEmpty(t, req.Header.Get("PK"))
 }
 
+func TestConvertToRequestPayloadUsesOfficialContentFields(t *testing.T) {
+	adaptor := &TaskAdaptor{}
+	req := &relaycommon.TaskSubmitReq{
+		Model: "doubao-seedance-2.0",
+		Metadata: map[string]any{
+			"content": []any{
+				map[string]any{"type": "text", "text": "Create a product video"},
+				map[string]any{
+					"type":      "image_url",
+					"image_url": map[string]any{"url": "https://example.com/input.png"},
+					"role":      "reference_image",
+				},
+				map[string]any{
+					"type":      "video_url",
+					"video_url": map[string]any{"url": "https://example.com/input.mp4"},
+					"role":      "reference_video",
+				},
+				map[string]any{
+					"type":      "audio_url",
+					"audio_url": map[string]any{"url": "https://example.com/input.mp3"},
+					"role":      "reference_audio",
+				},
+			},
+			"generate_audio":          false,
+			"ratio":                   "16:9",
+			"resolution":              "720p",
+			"duration":                float64(10),
+			"return_last_frame":       true,
+			"service_tier":            "default",
+			"execution_expires_after": float64(3600),
+			"draft":                   false,
+			"frames":                  float64(240),
+			"seed":                    float64(42),
+			"camera_fixed":            true,
+			"watermark":               false,
+		},
+	}
+
+	payload, err := adaptor.convertToRequestPayload(req)
+	require.NoError(t, err)
+
+	require.Len(t, payload.Content, 4)
+	assert.Equal(t, "Create a product video", payload.Content[0].Text)
+	assert.Equal(t, "https://example.com/input.png", payload.Content[1].ImageURL.URL)
+	assert.Equal(t, "https://example.com/input.mp4", payload.Content[2].VideoURL.URL)
+	assert.Equal(t, "https://example.com/input.mp3", payload.Content[3].AudioURL.URL)
+	require.NotNil(t, payload.GenerateAudio)
+	assert.False(t, *payload.GenerateAudio)
+	assert.Equal(t, "16:9", payload.Ratio)
+	assert.Equal(t, "720p", payload.Resolution)
+	require.NotNil(t, payload.Duration)
+	assert.Equal(t, 10, *payload.Duration)
+	require.NotNil(t, payload.ReturnLastFrame)
+	assert.True(t, *payload.ReturnLastFrame)
+	assert.Equal(t, "default", payload.ServiceTier)
+	require.NotNil(t, payload.ExecutionExpiresAfter)
+	assert.Equal(t, 3600, *payload.ExecutionExpiresAfter)
+	require.NotNil(t, payload.Draft)
+	assert.False(t, *payload.Draft)
+	require.NotNil(t, payload.Frames)
+	assert.Equal(t, 240, *payload.Frames)
+	require.NotNil(t, payload.Seed)
+	assert.Equal(t, int64(42), *payload.Seed)
+	require.NotNil(t, payload.CameraFixed)
+	assert.True(t, *payload.CameraFixed)
+	require.NotNil(t, payload.Watermark)
+	assert.False(t, *payload.Watermark)
+}
+
 func TestChannelNameIsPublicAlias(t *testing.T) {
 	assert.Equal(t, "seedance-m", (&TaskAdaptor{}).GetChannelName())
 }
@@ -118,6 +191,41 @@ func TestValidateSeedanceMRequestBounds(t *testing.T) {
 			"seed":                    float64(0),
 		},
 	}))
+}
+
+func TestValidateRequestAcceptsOfficialTopLevelContent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	body := strings.NewReader(`{
+		"model": "doubao-seedance-2.0",
+		"content": [
+			{"type": "text", "text": "生成一段城市夜景视频"}
+		],
+		"generate_audio": true,
+		"ratio": "16:9",
+		"resolution": "720p",
+		"duration": 10,
+		"draft": false,
+		"watermark": false
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/video/generations", body)
+	req.Header.Set("Content-Type", "application/json")
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = req
+	info := &relaycommon.RelayInfo{TaskRelayInfo: &relaycommon.TaskRelayInfo{}}
+
+	taskErr := (&TaskAdaptor{}).ValidateRequestAndSetAction(ctx, info)
+	require.Nil(t, taskErr)
+
+	storedReq, err := relaycommon.GetTaskRequest(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, constant.TaskActionGenerate, info.Action)
+	assert.Equal(t, "生成一段城市夜景视频", storedReq.Prompt)
+	assert.Equal(t, true, storedReq.Metadata["generate_audio"])
+	assert.Equal(t, "16:9", storedReq.Metadata["ratio"])
+	assert.Equal(t, "720p", storedReq.Metadata["resolution"])
+	assert.Equal(t, false, storedReq.Metadata["draft"])
+	assert.Equal(t, false, storedReq.Metadata["watermark"])
+	require.Contains(t, storedReq.Metadata, "content")
 }
 
 func TestParseTaskResultMapsStatusesAndLastFrame(t *testing.T) {

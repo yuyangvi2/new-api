@@ -40,7 +40,7 @@ func proxySeedanceMVideoTaskRequest(c *gin.Context, method string, path string) 
 	channelID := common.GetContextKeyInt(c, constant.ContextKeyChannelId)
 	channel, err := model.CacheGetChannel(channelID)
 	if err != nil || channel == nil || channel.Type != constant.ChannelTypeSeedanceM {
-		common.ApiErrorMsg(c, "selected channel is not Seedance-M")
+		common.ApiErrorMsg(c, "selected channel is not Seedance")
 		return
 	}
 	base := strings.TrimRight(channel.GetBaseURL(), "/")

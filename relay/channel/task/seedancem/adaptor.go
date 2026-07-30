@@ -124,16 +124,15 @@ func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo) {
 }
 
 func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskError {
-	if taskErr := relaycommon.ValidateBasicTaskRequest(c, info, constant.TaskActionGenerate); taskErr != nil {
-		return taskErr
-	}
-	req, err := relaycommon.GetTaskRequest(c)
+	req, err := parseSeedanceMTaskRequest(c)
 	if err != nil {
 		return service.TaskErrorWrapperLocal(err, "invalid_request", http.StatusBadRequest)
 	}
 	if err := validateSeedanceMRequest(req); err != nil {
 		return service.TaskErrorWrapperLocal(err, "invalid_request", http.StatusBadRequest)
 	}
+	info.Action = constant.TaskActionGenerate
+	c.Set("task_request", req)
 	return nil
 }
 
@@ -378,7 +377,10 @@ func (a *TaskAdaptor) resolveEndpoint(modelName, proxy string) (string, error) {
 
 func validateSeedanceMRequest(req relaycommon.TaskSubmitReq) error {
 	if req.Model != "" && !isSupportedModel(req.Model) {
-		return fmt.Errorf("unsupported Seedance-M model: %s", req.Model)
+		return fmt.Errorf("unsupported Seedance model: %s", req.Model)
+	}
+	if strings.TrimSpace(req.Prompt) == "" && !metadataHasContent(req.Metadata) {
+		return fmt.Errorf("prompt or content is required")
 	}
 	if duration, ok := requestDuration(req); ok {
 		if duration != -1 && (duration < 4 || duration > 15) {
@@ -395,6 +397,80 @@ func validateSeedanceMRequest(req relaycommon.TaskSubmitReq) error {
 		return fmt.Errorf("frames must be non-negative")
 	}
 	return nil
+}
+
+func parseSeedanceMTaskRequest(c *gin.Context) (relaycommon.TaskSubmitReq, error) {
+	var req relaycommon.TaskSubmitReq
+	if err := common.UnmarshalBodyReusable(c, &req); err != nil {
+		return req, err
+	}
+	if len(req.Images) == 0 && strings.TrimSpace(req.Image) != "" {
+		req.Images = []string{strings.TrimSpace(req.Image)}
+	}
+	if req.Metadata == nil {
+		req.Metadata = make(map[string]interface{})
+	}
+
+	var raw map[string]interface{}
+	if err := common.UnmarshalBodyReusable(c, &raw); err == nil {
+		for _, key := range seedanceMOfficialRequestFields {
+			if value, ok := raw[key]; ok {
+				if _, exists := req.Metadata[key]; !exists {
+					req.Metadata[key] = value
+				}
+			}
+		}
+		if strings.TrimSpace(req.Prompt) == "" {
+			req.Prompt = firstTextFromContent(raw["content"])
+		}
+	}
+	return req, nil
+}
+
+var seedanceMOfficialRequestFields = []string{
+	"content",
+	"callback_url",
+	"return_last_frame",
+	"service_tier",
+	"execution_expires_after",
+	"generate_audio",
+	"draft",
+	"tools",
+	"safety_identifier",
+	"resolution",
+	"ratio",
+	"frames",
+	"seed",
+	"camera_fixed",
+	"watermark",
+}
+
+func metadataHasContent(metadata map[string]interface{}) bool {
+	if len(metadata) == 0 {
+		return false
+	}
+	content, ok := metadata["content"].([]interface{})
+	if !ok {
+		return false
+	}
+	return len(content) > 0
+}
+
+func firstTextFromContent(value interface{}) string {
+	content, ok := value.([]interface{})
+	if !ok {
+		return ""
+	}
+	for _, item := range content {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if text, ok := m["text"].(string); ok && strings.TrimSpace(text) != "" {
+			return strings.TrimSpace(text)
+		}
+	}
+	return ""
 }
 
 func queryModelMapping(base, apiKey, modelName, proxy string, settings *dto.SeedanceMSettings) (string, error) {
