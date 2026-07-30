@@ -885,7 +885,7 @@ const KLING_TEXT_VIDEO_PARAMS: SupportedParameter[] = [
     enumValues: ['16:9', '9:16', '1:1'],
     defaultValue: '16:9',
     descriptionKey:
-      'Text-to-video aspect ratio; VCLM accepts 16:9, 9:16, or 1:1.',
+      'Text-to-video aspect ratio; accepts 16:9, 9:16, or 1:1.',
   },
   {
     name: 'mode',
@@ -942,7 +942,7 @@ const KLING_TEXT_VIDEO_PARAMS: SupportedParameter[] = [
   {
     name: 'metadata.CameraControl',
     type: 'object',
-    descriptionKey: 'VCLM camera control object',
+    descriptionKey: 'Camera control object',
   },
   {
     name: 'metadata.CallbackUrl',
@@ -1046,12 +1046,12 @@ const KLING_IMAGE_VIDEO_PARAMS: SupportedParameter[] = [
   {
     name: 'metadata.CameraControl',
     type: 'object',
-    descriptionKey: 'VCLM camera control object',
+    descriptionKey: 'Camera control object',
   },
   {
     name: 'metadata.ElementList',
     type: 'array',
-    descriptionKey: 'Reference subject list; VCLM supports up to three elements',
+    descriptionKey: 'Reference subject list; supports up to three elements',
   },
   {
     name: 'metadata.CallbackUrl',
