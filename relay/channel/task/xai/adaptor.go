@@ -70,10 +70,30 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 	if err != nil {
 		return service.TaskErrorWrapperLocal(err, "invalid_request", http.StatusBadRequest)
 	}
+	mergeXAITopLevelMetadata(c, &req)
+	c.Set("task_request", req)
 	if strings.EqualFold(info.OriginModelName, "grok-imagine-video-1.5") && strings.TrimSpace(req.Image) == "" && len(req.Images) == 0 {
 		return service.TaskErrorWrapperLocal(fmt.Errorf("image is required for grok-imagine-video-1.5"), "invalid_request", http.StatusBadRequest)
 	}
 	return nil
+}
+
+func mergeXAITopLevelMetadata(c *gin.Context, req *relaycommon.TaskSubmitReq) {
+	if req == nil {
+		return
+	}
+	var raw map[string]any
+	if err := common.UnmarshalBodyReusable(c, &raw); err != nil {
+		return
+	}
+	if req.Metadata == nil {
+		req.Metadata = make(map[string]any)
+	}
+	for _, key := range []string{"resolution", "aspect_ratio"} {
+		if value, ok := raw[key]; ok {
+			req.Metadata[key] = value
+		}
+	}
 }
 
 func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInfo) map[string]float64 {

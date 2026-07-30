@@ -58,3 +58,26 @@ func TestValidateRequestRejectsVideo15WithoutImage(t *testing.T) {
 	require.NotNil(t, taskErr)
 	assert.Contains(t, taskErr.Message, "image is required")
 }
+
+func TestValidateRequestPreservesTopLevelResolution(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	req := httptest.NewRequest(http.MethodPost, "/v1/video/generations", strings.NewReader(`{
+		"model":"grok-imagine-video-1.5",
+		"prompt":"animate it",
+		"image":"https://example.com/input.jpg",
+		"duration":6,
+		"resolution":"480p",
+		"aspect_ratio":"16:9"
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = req
+	info := &relaycommon.RelayInfo{OriginModelName: "grok-imagine-video-1.5", TaskRelayInfo: &relaycommon.TaskRelayInfo{}}
+
+	taskErr := (&TaskAdaptor{}).ValidateRequestAndSetAction(ctx, info)
+	require.Nil(t, taskErr)
+	storedReq, err := relaycommon.GetTaskRequest(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "480p", storedReq.Metadata["resolution"])
+	assert.Equal(t, "16:9", storedReq.Metadata["aspect_ratio"])
+}
