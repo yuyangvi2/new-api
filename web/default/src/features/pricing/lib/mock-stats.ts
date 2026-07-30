@@ -795,10 +795,126 @@ const GROK_IMAGINE_VIDEO_PARAMS: SupportedParameter[] = [
   },
 ]
 
+const KLING_VIDEO_PARAMS: SupportedParameter[] = [
+  {
+    name: 'prompt',
+    type: 'string',
+    required: true,
+    descriptionKey: 'Text description of the desired video',
+  },
+  {
+    name: 'image',
+    type: 'string',
+    descriptionKey:
+      'Input image URL or base64. When present, the gateway uses image-to-video.',
+  },
+  {
+    name: 'duration',
+    type: 'integer',
+    range: '5 / 10, v3.0: 3 ~ 15',
+    defaultValue: 5,
+    descriptionKey: 'Video length in seconds',
+  },
+  {
+    name: 'size',
+    type: 'enum',
+    enumValues: ['1280x720', '720x1280', '1024x1024'],
+    defaultValue: '1280x720',
+    descriptionKey:
+      'Maps to Kling aspect ratio; use 1280x720, 720x1280, or 1024x1024.',
+  },
+  {
+    name: 'mode',
+    type: 'enum',
+    enumValues: ['std', 'pro', '4k'],
+    defaultValue: 'std',
+    descriptionKey:
+      'Generation mode; 4k is available only on supported Kling versions.',
+  },
+  {
+    name: 'metadata.NegativePrompt',
+    type: 'string',
+    descriptionKey: 'Kling negative prompt',
+  },
+  {
+    name: 'metadata.CfgScale',
+    type: 'number',
+    range: '0 ~ 1',
+    defaultValue: 0.5,
+    descriptionKey: 'Guidance scale; not supported by some Kling v2 models',
+  },
+  {
+    name: 'metadata.Sound',
+    type: 'enum',
+    enumValues: ['on', 'off'],
+    defaultValue: 'off',
+    descriptionKey: 'Sound generation switch',
+  },
+  {
+    name: 'metadata.ImageTail',
+    type: 'string',
+    descriptionKey: 'Tail-frame image URL or base64',
+  },
+  {
+    name: 'metadata.CameraControl',
+    type: 'object',
+    descriptionKey: 'VCLM camera control object',
+  },
+  {
+    name: 'metadata.CallbackUrl',
+    type: 'string',
+    descriptionKey: 'Callback URL for provider task notifications',
+  },
+  {
+    name: 'metadata.ExternalTaskId',
+    type: 'string',
+    descriptionKey: 'Caller-provided task id for provider-side tracing',
+  },
+]
+
+const VIDU_VIDEO_PARAMS: SupportedParameter[] = [
+  {
+    name: 'prompt',
+    type: 'string',
+    required: true,
+    descriptionKey: 'Text description of the desired video',
+  },
+  {
+    name: 'images',
+    type: 'array',
+    descriptionKey:
+      'Vidu image URL list. VCLM Vidu requires URLs for image-to-video.',
+  },
+  {
+    name: 'duration',
+    type: 'integer',
+    defaultValue: 5,
+    descriptionKey: 'Provider-specific video length',
+  },
+  {
+    name: 'metadata.CallbackUrl',
+    type: 'string',
+    descriptionKey: 'Callback URL for provider task notifications',
+  },
+  {
+    name: 'metadata.ExternalTaskId',
+    type: 'string',
+    descriptionKey: 'Caller-provided task id for provider-side tracing',
+  },
+]
+
 type ApiCategory = 'reasoning' | 'embedding' | 'image' | 'video' | 'chat'
 
 function isGrokImagineVideoModel(model: PricingModel): boolean {
   return /grok-imagine-video/i.test(model.model_name)
+}
+
+function isKlingVideoModel(model: PricingModel): boolean {
+  return /kling/i.test(model.model_name)
+}
+
+function isViduVideoModel(model: PricingModel): boolean {
+  return /vidu/i.test(model.model_name)
 }
 
 function normalizeConfiguredParameters(
@@ -858,6 +974,8 @@ export function buildSupportedParameters(
   if (configuredParams.length > 0) return configuredParams
 
   if (isGrokImagineVideoModel(model)) return GROK_IMAGINE_VIDEO_PARAMS
+  if (isKlingVideoModel(model)) return KLING_VIDEO_PARAMS
+  if (isViduVideoModel(model)) return VIDU_VIDEO_PARAMS
 
   const cat = apiCategoryOf(model)
   if (cat === 'reasoning') return REASONING_PARAMS
@@ -865,57 +983,4 @@ export function buildSupportedParameters(
   if (cat === 'image') return IMAGE_PARAMS
   if (cat === 'video') return VIDEO_PARAMS
   return COMMON_CHAT_PARAMS
-}
-
-export type RateLimit = {
-  group: string
-  rpm: number
-  tpm: number
-  rpd: number
-}
-
-/** Build per-group RPM / TPM / RPD limits for the model. */
-export function buildRateLimits(model: PricingModel): RateLimit[] {
-  const groups = (model.enable_groups ?? []).filter((g) => g && g !== 'auto')
-  const targets = groups.length > 0 ? groups : ['default']
-  const cat = apiCategoryOf(model)
-  const baseSeed = hashStringToSeed(`${model.model_name}:rl`)
-  const isHeavy = cat === 'image' || cat === 'video'
-  const isLight = cat === 'embedding'
-  let baseRpm = 500
-  let baseTpm = 200_000
-  let baseRpd = 10_000
-
-  if (isHeavy) {
-    baseRpm = 60
-    baseTpm = 0
-    baseRpd = 1_000
-  } else if (isLight) {
-    baseRpm = 5_000
-    baseTpm = 1_000_000
-    baseRpd = 100_000
-  }
-
-  return [...targets]
-    .sort((a, b) => a.localeCompare(b))
-    .map((group) => {
-      const rand = seededRandom(baseSeed ^ hashStringToSeed(group))
-      const tier = 0.6 + rand() * 1.4
-      return {
-        group,
-        rpm: Math.round((baseRpm * tier) / 10) * 10,
-        tpm: baseTpm === 0 ? 0 : Math.round((baseTpm * tier) / 1_000) * 1_000,
-        rpd: Math.round((baseRpd * tier) / 100) * 100,
-      }
-    })
-}
-
-/** Format an integer rate-limit value compactly. */
-export function formatRateLimit(value: number): string {
-  if (value <= 0) return '—'
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
-  if (value >= 1_000) {
-    return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}K`
-  }
-  return value.toLocaleString()
 }

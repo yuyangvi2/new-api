@@ -18,7 +18,6 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import {
   ChevronRight,
-  Gauge,
   KeyRound,
   ScrollText,
   Sigma,
@@ -42,9 +41,7 @@ import { useStatus } from '@/hooks/use-status'
 import { getApiBaseAddress } from '@/lib/server-address'
 
 import {
-  buildRateLimits,
   buildSupportedParameters,
-  formatRateLimit,
   type SupportedParameter,
 } from '../lib/mock-stats'
 import { replaceModelInPath } from '../lib/model-helpers'
@@ -81,6 +78,30 @@ type SampleContext = {
   modelName: string
   endpointType: string
   endpointPath: string
+}
+
+function isGrokImagineVideoModelName(modelName: string): boolean {
+  return /grok-imagine-video/i.test(modelName)
+}
+
+function isKlingVideoModelName(modelName: string): boolean {
+  return /kling/i.test(modelName)
+}
+
+function isViduVideoModelName(modelName: string): boolean {
+  return /vidu/i.test(modelName)
+}
+
+function prefersViduTextSample(modelName: string): boolean {
+  return /^(viduq2|viduq1|vidu1\.5|vidu2\.0)$/i.test(modelName.trim())
+}
+
+function usesOpenAIVideoGuide(modelName: string): boolean {
+  return (
+    isGrokImagineVideoModelName(modelName) ||
+    isKlingVideoModelName(modelName) ||
+    isViduVideoModelName(modelName)
+  )
 }
 
 function buildChatSample(lang: Lang, ctx: SampleContext): string {
@@ -426,19 +447,49 @@ function buildImageSample(lang: Lang, ctx: SampleContext): string {
 
 function buildVideoSample(lang: Lang, ctx: SampleContext): string {
   const url = `${ctx.baseUrl}${ctx.endpointPath}`
-  const isGrokImagineVideo = /grok-imagine-video/i.test(ctx.modelName)
-  const body = isGrokImagineVideo
-    ? {
-        model: ctx.modelName,
-        prompt: 'Cinematic motion of a futuristic city at sunset.',
-        duration: 8,
-        metadata: { resolution: '720p' },
-      }
-    : {
-        model: ctx.modelName,
-        prompt: 'Cinematic motion of a futuristic city at sunset.',
-        duration: 8,
-      }
+  let body: Record<string, unknown> = {
+    model: ctx.modelName,
+    prompt: 'Cinematic motion of a futuristic city at sunset.',
+    duration: 8,
+  }
+
+  if (isGrokImagineVideoModelName(ctx.modelName)) {
+    body = {
+      model: ctx.modelName,
+      prompt: 'Cinematic motion of a futuristic city at sunset.',
+      duration: 8,
+      metadata: { resolution: '720p' },
+    }
+  } else if (isKlingVideoModelName(ctx.modelName)) {
+    body = {
+      model: ctx.modelName,
+      prompt: 'A product shot of an orange pencil on a clean white desk.',
+      image: 'https://example.com/input.jpg',
+      duration: 5,
+      size: '1280x720',
+      mode: 'std',
+      metadata: {
+        NegativePrompt: 'text, watermark, distorted objects',
+        CfgScale: 0.5,
+        Sound: 'off',
+      },
+    }
+  } else if (isViduVideoModelName(ctx.modelName)) {
+    body = {
+      model: ctx.modelName,
+      prompt: 'A product shot of an orange pencil on a clean white desk.',
+      duration: 5,
+      metadata: {
+        CallbackUrl: 'https://example.com/callback',
+        ExternalTaskId: 'demo-vidu-001',
+      },
+    }
+
+    if (!prefersViduTextSample(ctx.modelName)) {
+      body.images = ['https://example.com/input.jpg']
+    }
+  }
+
   const bodyJson = JSON.stringify(body, null, 2)
 
   if (lang === 'curl') {
@@ -549,7 +600,7 @@ function CodeSamplesSection(props: {
       })
       .filter((e) => Boolean(e.path))
 
-    if (/grok-imagine-video/i.test(props.model.model_name || '')) {
+    if (usesOpenAIVideoGuide(props.model.model_name || '')) {
       const videoEndpointIndex = configuredEndpoints.findIndex(
         (endpoint) => endpoint.type === 'openai-video'
       )
@@ -770,65 +821,6 @@ function ParamRangeCell(props: { param: SupportedParameter }) {
 }
 
 // ---------------------------------------------------------------------------
-// Rate-limits table
-// ---------------------------------------------------------------------------
-
-function RateLimitsSection(props: { model: PricingModel }) {
-  const { t } = useTranslation()
-  const limits = useMemo(() => buildRateLimits(props.model), [props.model])
-
-  if (limits.length === 0) return null
-
-  return (
-    <section>
-      <SectionTitle icon={Gauge}>{t('Rate limits')}</SectionTitle>
-      <StaticDataTable
-        className={tableStyles.sectionContainer}
-        headerRowClassName={tableStyles.mutedHeaderRow}
-        data={limits}
-        getRowKey={(limit) => limit.group}
-        getRowClassName={() => 'hover:bg-muted/20'}
-        columns={[
-          {
-            id: 'group',
-            header: t('Group'),
-            className: 'h-9',
-            cellClassName: 'py-2 font-mono',
-            cell: (limit) => limit.group,
-          },
-          {
-            id: 'rpm',
-            header: 'RPM',
-            className: 'h-9 text-right',
-            cellClassName: tableStyles.topNumericCell,
-            cell: (limit) => formatRateLimit(limit.rpm),
-          },
-          {
-            id: 'tpm',
-            header: 'TPM',
-            className: 'h-9 text-right',
-            cellClassName: tableStyles.topNumericCell,
-            cell: (limit) => formatRateLimit(limit.tpm),
-          },
-          {
-            id: 'rpd',
-            header: 'RPD',
-            className: 'h-9 text-right',
-            cellClassName: tableStyles.topNumericCell,
-            cell: (limit) => formatRateLimit(limit.rpd),
-          },
-        ]}
-      />
-      <p className='text-muted-foreground mt-2 text-[11px] leading-relaxed'>
-        {t(
-          'RPM = requests per minute, TPM = tokens per minute, RPD = requests per day. Limits apply per token group.'
-        )}
-      </p>
-    </section>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Authentication preview
 // ---------------------------------------------------------------------------
 
@@ -875,7 +867,6 @@ export function ModelDetailsApi(props: {
       <CodeSamplesSection model={props.model} endpointMap={props.endpointMap} />
       <AuthSection />
       <SupportedParametersSection model={props.model} />
-      <RateLimitsSection model={props.model} />
     </div>
   )
 }
