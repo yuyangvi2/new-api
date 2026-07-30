@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/relay/channel"
 	"github.com/QuantumNous/new-api/relay/channel/openai"
@@ -43,6 +44,16 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 		Prompt:         request.Prompt,
 		N:              int(lo.FromPtrOr(request.N, uint(1))),
 		ResponseFormat: request.ResponseFormat,
+	}
+	if value, ok := request.Extra["aspect_ratio"]; ok {
+		if err := common.Unmarshal(value, &xaiRequest.AspectRatio); err != nil {
+			return nil, errors.New("invalid aspect_ratio")
+		}
+	}
+	if value, ok := request.Extra["resolution"]; ok {
+		if err := common.Unmarshal(value, &xaiRequest.Resolution); err != nil {
+			return nil, errors.New("invalid resolution")
+		}
 	}
 	return xaiRequest, nil
 }

@@ -733,6 +733,43 @@ const IMAGE_PARAMS: SupportedParameter[] = [
   },
 ]
 
+const GROK_IMAGINE_IMAGE_PARAMS: SupportedParameter[] = [
+  {
+    name: 'prompt',
+    type: 'string',
+    required: true,
+    descriptionKey: 'Text description of the desired image',
+  },
+  {
+    name: 'n',
+    type: 'integer',
+    defaultValue: 1,
+    range: '1 ~ 10',
+    descriptionKey: 'Number of images to generate',
+  },
+  {
+    name: 'aspect_ratio',
+    type: 'enum',
+    enumValues: ['1:1', '3:4', '4:3', '9:16', '16:9', '2:3', '3:2'],
+    defaultValue: '1:1',
+    descriptionKey: 'Output aspect ratio',
+  },
+  {
+    name: 'resolution',
+    type: 'enum',
+    enumValues: ['1k', '2k'],
+    defaultValue: '1k',
+    descriptionKey: 'Resolution',
+  },
+  {
+    name: 'response_format',
+    type: 'enum',
+    enumValues: ['url', 'b64_json'],
+    defaultValue: 'url',
+    descriptionKey: 'How to deliver the resulting image',
+  },
+]
+
 const VIDEO_PARAMS: SupportedParameter[] = [
   {
     name: 'prompt',
@@ -762,7 +799,7 @@ const VIDEO_PARAMS: SupportedParameter[] = [
   },
 ]
 
-const GROK_IMAGINE_VIDEO_PARAMS: SupportedParameter[] = [
+const GROK_IMAGINE_TEXT_VIDEO_PARAMS: SupportedParameter[] = [
   {
     name: 'prompt',
     type: 'string',
@@ -777,17 +814,50 @@ const GROK_IMAGINE_VIDEO_PARAMS: SupportedParameter[] = [
     descriptionKey: 'Video length in seconds',
   },
   {
+    name: 'aspect_ratio',
+    type: 'enum',
+    enumValues: ['16:9', '9:16'],
+    defaultValue: '16:9',
+    descriptionKey: 'Output aspect ratio',
+  },
+  {
+    name: 'resolution',
+    type: 'enum',
+    enumValues: ['480p', '720p'],
+    defaultValue: '720p',
+    descriptionKey: 'Resolution',
+  },
+]
+
+const GROK_IMAGINE_IMAGE_VIDEO_PARAMS: SupportedParameter[] = [
+  {
+    name: 'prompt',
+    type: 'string',
+    required: true,
+    descriptionKey: 'Text description of the desired video',
+  },
+  {
     name: 'image',
     type: 'string',
+    required: true,
     descriptionKey: 'Input image',
   },
   {
-    name: 'images',
-    type: 'array',
-    descriptionKey: 'Reference images',
+    name: 'duration',
+    type: 'integer',
+    range: '6 ~ 15',
+    defaultValue: 8,
+    descriptionKey: 'Video length in seconds',
   },
   {
-    name: 'metadata.resolution',
+    name: 'aspect_ratio',
+    type: 'enum',
+    enumValues: ['16:9', '9:16'],
+    defaultValue: '16:9',
+    descriptionKey: 'Output aspect ratio',
+  },
+  {
+    name: 'resolution',
     type: 'enum',
     enumValues: ['480p', '720p'],
     defaultValue: '720p',
@@ -1163,6 +1233,24 @@ function isGrokImagineVideoModel(model: PricingModel): boolean {
   return /grok-imagine-video/i.test(model.model_name)
 }
 
+function isGrokImagineVideo15Model(model: PricingModel): boolean {
+  return /grok-imagine-video-1\.5/i.test(model.model_name)
+}
+
+function buildGrokImagineVideoParameters(
+  model: PricingModel
+): SupportedParameter[] {
+  return isGrokImagineVideo15Model(model)
+    ? GROK_IMAGINE_IMAGE_VIDEO_PARAMS
+    : GROK_IMAGINE_TEXT_VIDEO_PARAMS
+}
+
+function isGrokImagineImageModel(model: PricingModel): boolean {
+  return /(?:^|[-_])grok-imagine(?:$|-image)|grok-2-image/i.test(
+    model.model_name
+  )
+}
+
 function isKlingVideoModel(model: PricingModel): boolean {
   return /kling/i.test(model.model_name)
 }
@@ -1244,7 +1332,10 @@ export function buildSupportedParameters(
   const configuredParams = normalizeConfiguredParameters(model.api_parameters)
   if (configuredParams.length > 0) return configuredParams
 
-  if (isGrokImagineVideoModel(model)) return GROK_IMAGINE_VIDEO_PARAMS
+  if (isGrokImagineVideoModel(model)) {
+    return buildGrokImagineVideoParameters(model)
+  }
+  if (isGrokImagineImageModel(model)) return GROK_IMAGINE_IMAGE_PARAMS
   if (isKlingVideoModel(model)) return buildKlingVideoParameters(model)
   if (isViduVideoModel(model)) return VIDU_VIDEO_PARAMS
   if (isSeedanceVideoModel(model)) return SEEDANCE_VIDEO_PARAMS

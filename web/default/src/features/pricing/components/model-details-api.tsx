@@ -84,6 +84,14 @@ function isGrokImagineVideoModelName(modelName: string): boolean {
   return /grok-imagine-video/i.test(modelName)
 }
 
+function isGrokImagineVideo15ModelName(modelName: string): boolean {
+  return /grok-imagine-video-1\.5/i.test(modelName)
+}
+
+function isGrokImagineImageModelName(modelName: string): boolean {
+  return /(?:^|[-_])grok-imagine(?:$|-image)|grok-2-image/i.test(modelName)
+}
+
 function isKlingVideoModelName(modelName: string): boolean {
   return /kling/i.test(modelName)
 }
@@ -396,37 +404,73 @@ function buildEmbeddingSample(lang: Lang, ctx: SampleContext): string {
 function buildImageSample(lang: Lang, ctx: SampleContext): string {
   const url = `${ctx.baseUrl}${ctx.endpointPath}`
   const prompt = 'A serene koi pond at sunset, ukiyo-e style.'
+  const isGrokImagineImage = isGrokImagineImageModelName(ctx.modelName)
+  const body = isGrokImagineImage
+    ? {
+        model: ctx.modelName,
+        prompt,
+        n: 1,
+        aspect_ratio: '1:1',
+        resolution: '1k',
+        response_format: 'url',
+      }
+    : { model: ctx.modelName, prompt, size: '1024x1024', n: 1 }
 
   if (lang === 'curl') {
-    const body = JSON.stringify(
-      { model: ctx.modelName, prompt, size: '1024x1024', n: 1 },
-      null,
-      2
-    )
+    const bodyJson = JSON.stringify(body, null, 2)
     return [
       `curl ${url} \\`,
       `  -H "Authorization: Bearer $${ctx.apiKeyEnv}" \\`,
       `  -H "Content-Type: application/json" \\`,
-      `  -d '${body.replaceAll('\n', '\n     ')}'`,
+      `  -d '${bodyJson.replaceAll('\n', '\n     ')}'`,
     ].join('\n')
   }
   if (lang === 'python') {
+    const fields = isGrokImagineImage
+      ? [
+          `    model="${ctx.modelName}",`,
+          `    prompt="${prompt}",`,
+          `    n=1,`,
+          `    aspect_ratio="1:1",`,
+          `    resolution="1k",`,
+          `    response_format="url",`,
+        ]
+      : [
+          `    model="${ctx.modelName}",`,
+          `    prompt="${prompt}",`,
+          `    size="1024x1024",`,
+          `    n=1,`,
+        ]
+
     return [
       'from openai import OpenAI',
       '',
       `client = OpenAI(base_url="${ctx.baseUrl}/v1", api_key="<YOUR_API_KEY>")`,
       '',
       'response = client.images.generate(',
-      `    model="${ctx.modelName}",`,
-      `    prompt="${prompt}",`,
-      `    size="1024x1024",`,
-      `    n=1,`,
+      ...fields,
       ')',
       '',
       'print(response.data[0].url)',
     ].join('\n')
   }
   if (lang === 'typescript') {
+    const fields = isGrokImagineImage
+      ? [
+          `  model: '${ctx.modelName}',`,
+          `  prompt: '${prompt}',`,
+          `  n: 1,`,
+          `  aspect_ratio: '1:1',`,
+          `  resolution: '1k',`,
+          `  response_format: 'url',`,
+        ]
+      : [
+          `  model: '${ctx.modelName}',`,
+          `  prompt: '${prompt}',`,
+          `  size: '1024x1024',`,
+          `  n: 1,`,
+        ]
+
     return [
       `import OpenAI from 'openai'`,
       '',
@@ -436,15 +480,13 @@ function buildImageSample(lang: Lang, ctx: SampleContext): string {
       `})`,
       '',
       `const response = await client.images.generate({`,
-      `  model: '${ctx.modelName}',`,
-      `  prompt: '${prompt}',`,
-      `  size: '1024x1024',`,
-      `  n: 1,`,
+      ...fields,
       `})`,
       '',
       `console.log(response.data[0].url)`,
     ].join('\n')
   }
+  const bodyJson = JSON.stringify(body, null, 2)
   return [
     `const response = await fetch('${url}', {`,
     `  method: 'POST',`,
@@ -452,12 +494,7 @@ function buildImageSample(lang: Lang, ctx: SampleContext): string {
     `    Authorization: \`Bearer \${process.env.${ctx.apiKeyEnv}}\`,`,
     `    'Content-Type': 'application/json',`,
     `  },`,
-    `  body: JSON.stringify({`,
-    `    model: '${ctx.modelName}',`,
-    `    prompt: '${prompt}',`,
-    `    size: '1024x1024',`,
-    `    n: 1,`,
-    `  }),`,
+    `  body: JSON.stringify(${bodyJson.replaceAll('\n', '\n  ')}),`,
     `})`,
     '',
     `const data = await response.json()`,
@@ -486,12 +523,22 @@ function buildVideoSample(lang: Lang, ctx: SampleContext): string {
       watermark: false,
     }
   } else if (isGrokImagineVideoModelName(ctx.modelName)) {
-    body = {
-      model: ctx.modelName,
-      prompt: 'Cinematic motion of a futuristic city at sunset.',
-      duration: 8,
-      metadata: { resolution: '720p' },
-    }
+    body = isGrokImagineVideo15ModelName(ctx.modelName)
+      ? {
+          model: ctx.modelName,
+          prompt: 'Add smooth cinematic camera motion to the product photo.',
+          image: 'https://example.com/input.jpg',
+          duration: 8,
+          aspect_ratio: '16:9',
+          resolution: '720p',
+        }
+      : {
+          model: ctx.modelName,
+          prompt: 'Cinematic motion of a futuristic city at sunset.',
+          duration: 8,
+          aspect_ratio: '16:9',
+          resolution: '720p',
+        }
   } else if (isKlingVideoModelName(ctx.modelName)) {
     if (prefersKlingTextSample(ctx.modelName)) {
       body = {
