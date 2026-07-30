@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/relay/channel/task/seedancem"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
@@ -167,6 +168,37 @@ func VideoProxy(c *gin.Context) {
 		videoProxyError(c, http.StatusBadGateway, "server_error",
 			fmt.Sprintf("Upstream service returned status %d", resp.StatusCode))
 		return
+	}
+
+	if channel.Type == constant.ChannelTypeSeedanceM {
+		settings := channel.GetOtherSettings().SeedanceM
+		encryptedDEK := resp.Header.Get("x-tos-meta-enc-dek")
+		if settings != nil && settings.EnableVideoEncrypt && encryptedDEK != "" {
+			encrypted, readErr := io.ReadAll(resp.Body)
+			if readErr != nil {
+				logger.LogError(c.Request.Context(), fmt.Sprintf("Failed to read encrypted video content: %s", readErr.Error()))
+				videoProxyError(c, http.StatusBadGateway, "server_error", "Failed to fetch video content")
+				return
+			}
+			plain, decryptErr := seedancem.DecryptVideoContent(encrypted, encryptedDEK, settings.PrivateKeyPEM)
+			if decryptErr != nil {
+				logger.LogError(c.Request.Context(), fmt.Sprintf("Failed to decrypt video content: %s", decryptErr.Error()))
+				videoProxyError(c, http.StatusBadGateway, "server_error", "Failed to fetch video content")
+				return
+			}
+			for key, values := range resp.Header {
+				if strings.EqualFold(key, "x-tos-meta-enc-dek") || strings.EqualFold(key, "Content-Length") {
+					continue
+				}
+				for _, value := range values {
+					c.Writer.Header().Add(key, value)
+				}
+			}
+			c.Writer.Header().Set("Cache-Control", "public, max-age=86400")
+			c.Writer.WriteHeader(resp.StatusCode)
+			_, _ = c.Writer.Write(plain)
+			return
+		}
 	}
 
 	for key, values := range resp.Header {
