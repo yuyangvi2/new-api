@@ -538,7 +538,7 @@ function CodeSamplesSection(props: {
 
   const endpoints = useMemo(() => {
     const types = props.model.supported_endpoint_types || []
-    return types
+    const configuredEndpoints = types
       .map((type) => {
         const info = props.endpointMap[type] || {}
         let path = info.path || ''
@@ -548,6 +548,30 @@ function CodeSamplesSection(props: {
         return { type, path, method: info.method || 'POST' }
       })
       .filter((e) => Boolean(e.path))
+
+    if (/grok-imagine-video/i.test(props.model.model_name || '')) {
+      const videoEndpointIndex = configuredEndpoints.findIndex(
+        (endpoint) => endpoint.type === 'openai-video'
+      )
+      if (videoEndpointIndex === 0) {
+        return configuredEndpoints
+      }
+      if (videoEndpointIndex > 0) {
+        const videoEndpoint = configuredEndpoints[videoEndpointIndex]
+        return [
+          videoEndpoint,
+          ...configuredEndpoints.filter(
+            (_, index) => index !== videoEndpointIndex
+          ),
+        ]
+      }
+      return [
+        { type: 'openai-video', path: '/v1/videos', method: 'POST' },
+        ...configuredEndpoints,
+      ]
+    }
+
+    return configuredEndpoints
   }, [props.model, props.endpointMap])
 
   const [endpointType, setEndpointType] = useState<string>(
@@ -709,6 +733,14 @@ function ParamRangeCell(props: { param: SupportedParameter }) {
         <code className='bg-muted rounded px-1.5 py-0.5 font-mono text-sm'>
           {String(defaultValue)}
         </code>
+        {enumValues?.map((v) => (
+          <code
+            key={v}
+            className='bg-muted text-muted-foreground rounded px-1.5 py-0.5 font-mono text-sm'
+          >
+            {v}
+          </code>
+        ))}
         {range && (
           <span className='text-muted-foreground text-sm'>{range}</span>
         )}
