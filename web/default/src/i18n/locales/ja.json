@@ -1366,6 +1366,7 @@
     "Default: {{value}}": "デフォルト: {{value}}",
     "Defaults to the wallet page when empty": "空欄の場合はウォレットページを既定にします",
     "Define API endpoints for this model (JSON format)": "このモデルのAPIエンドポイントを定義します (JSON形式)",
+    "Define API parameter documentation for model guide pages (JSON array).": "モデルガイドページ用の API パラメータードキュメントを定義します（JSON 配列）。",
     "Define display-only pricing for the model catalog. This does not affect billing.": "モデル広場に表示する価格を定義します。実際の課金には影響しません。",
     "Define endpoint mappings for each provider.": "各プロバイダーごとにエンドポイントのマッピングを定義してください。",
     "Define per-group rules to add, remove, or append selectable groups for specific user groups.": "特定のユーザーグループに対して選択可能なグループを追加、削除、または追加するグループごとのルールを定義します。",

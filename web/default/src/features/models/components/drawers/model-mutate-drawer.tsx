@@ -96,6 +96,7 @@ const extendedModelFormSchema = z.object({
   vendor_id: z.number().optional(),
   endpoints: z.string(),
   display_pricing: z.string(),
+  api_parameters: z.string(),
   name_rule: z.number(),
   status: z.boolean(),
   sync_official: z.boolean(),
@@ -236,6 +237,7 @@ export function ModelMutateDrawer({
       vendor_id: undefined,
       endpoints: '',
       display_pricing: '',
+      api_parameters: '',
       name_rule: 0,
       status: true,
       sync_official: true,
@@ -297,6 +299,7 @@ export function ModelMutateDrawer({
         vendor_id: model.vendor_id,
         endpoints: model.endpoints || '',
         display_pricing: model.display_pricing || '',
+        api_parameters: model.api_parameters || '',
         name_rule: model.name_rule || 0,
         status: model.status === 1,
         sync_official: model.sync_official === 1,
@@ -402,6 +405,7 @@ export function ModelMutateDrawer({
         vendor_id: undefined,
         endpoints: '',
         display_pricing: '',
+        api_parameters: '',
         name_rule: 0,
         status: true,
         sync_official: true,
@@ -980,6 +984,30 @@ export function ModelMutateDrawer({
                     <FormDescription>
                       {t(
                         'Define display-only pricing for the model catalog. This does not affect billing.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='api_parameters'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Supported parameters')}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        placeholder='[{"name":"metadata.resolution","type":"enum","enumValues":["480p","720p"],"defaultValue":"720p","descriptionKey":"Resolution"}]'
+                        className='min-h-40 font-mono text-xs'
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Define API parameter documentation for model guide pages (JSON array).'
                       )}
                     </FormDescription>
                     <FormMessage />

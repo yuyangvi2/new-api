@@ -46,6 +46,12 @@ import { cn } from '@/lib/utils'
 
 import { LoadingSkeleton, ModelDetailsDrawer } from './components'
 import { EXCLUDED_GROUPS, FILTER_ALL, getEndpointTypeLabels } from './constants'
+import { usePricingData } from './hooks/use-pricing-data'
+import {
+  formatDisplayBasePrice,
+  getDisplayPricingEntries,
+  getTieredSecondPricingEntries,
+} from './lib/display-pricing'
 import {
   getDynamicDisplayGroupRatio,
   getDynamicPricingSummary,
@@ -53,7 +59,6 @@ import {
 import { parseTags } from './lib/filters'
 import { isTokenBasedModel } from './lib/model-helpers'
 import { formatPrice, formatRequestPrice } from './lib/price'
-import { usePricingData } from './hooks/use-pricing-data'
 import type { PricingModel, TokenUnit } from './types'
 
 type PricingModality = 'all' | 'text' | 'video' | 'image' | 'audio'
@@ -276,6 +281,54 @@ function PriceSummary(props: {
   selectedGroup: string
 }) {
   const { t } = useTranslation()
+  const displayGroupRatio = getDynamicDisplayGroupRatio(
+    props.model,
+    props.selectedGroup
+  )
+  const tieredSecondEntries = getTieredSecondPricingEntries(
+    props.model,
+    displayGroupRatio
+  )
+  const displayPricingEntries = getDisplayPricingEntries(
+    props.model,
+    displayGroupRatio
+  )
+
+  if (tieredSecondEntries.length > 0) {
+    const primaryTier = tieredSecondEntries[0]
+    const visibleSteps = primaryTier.steps.slice(0, 2)
+
+    return (
+      <div className='flex flex-wrap gap-x-4 gap-y-1'>
+        {visibleSteps.map((step) => (
+          <span key={step.key} className='text-muted-foreground text-xs'>
+            {primaryTier.label} · {step.label}{' '}
+            <span className='font-mono font-semibold text-orange-600 dark:text-orange-300'>
+              {step.formatted}
+            </span>
+            /s
+          </span>
+        ))}
+      </div>
+    )
+  }
+
+  if (displayPricingEntries.length > 0) {
+    const basePrice = formatDisplayBasePrice(props.model, displayGroupRatio)
+    const unitSuffix =
+      displayPricingEntries[0].unit === 'second' ? '/s' : `/ ${t('request')}`
+
+    return (
+      <span className='text-muted-foreground text-xs'>
+        {t('Default combination')}{' '}
+        <span className='font-mono font-semibold text-orange-600 dark:text-orange-300'>
+          {basePrice}
+        </span>{' '}
+        {unitSuffix}
+      </span>
+    )
+  }
+
   const isDynamicPricing =
     props.model.billing_mode === 'tiered_expr' &&
     Boolean(props.model.billing_expr)
@@ -285,10 +338,7 @@ function PriceSummary(props: {
         showRechargePrice: false,
         priceRate: props.priceRate,
         usdExchangeRate: props.usdExchangeRate,
-        groupRatioMultiplier: getDynamicDisplayGroupRatio(
-          props.model,
-          props.selectedGroup
-        ),
+        groupRatioMultiplier: displayGroupRatio,
       })
     : null
 
@@ -296,7 +346,10 @@ function PriceSummary(props: {
     if (dynamicSummary.isSpecialExpression) {
       return (
         <div className='space-y-1'>
-          <Badge variant='outline' className='border-amber-500/30 text-amber-700 dark:text-amber-300'>
+          <Badge
+            variant='outline'
+            className='border-amber-500/30 text-amber-700 dark:text-amber-300'
+          >
             {t('Special billing expression')}
           </Badge>
           <code className='text-muted-foreground line-clamp-1 block text-xs break-all'>
@@ -323,7 +376,10 @@ function PriceSummary(props: {
     }
 
     return (
-      <Badge variant='outline' className='border-amber-500/30 text-amber-700 dark:text-amber-300'>
+      <Badge
+        variant='outline'
+        className='border-amber-500/30 text-amber-700 dark:text-amber-300'
+      >
         {t('Dynamic Pricing')}
       </Badge>
     )
@@ -393,8 +449,8 @@ function PricingGroupCard(props: {
   const { t } = useTranslation()
 
   return (
-    <section className='overflow-hidden rounded-xl border border-border bg-card shadow-sm'>
-      <div className='border-border/70 border-b bg-muted/20 px-4 py-3 sm:px-5'>
+    <section className='border-border bg-card overflow-hidden rounded-xl border shadow-sm'>
+      <div className='border-border/70 bg-muted/20 border-b px-4 py-3 sm:px-5'>
         <div className='flex flex-wrap items-center justify-between gap-2'>
           <div>
             <h2 className='text-foreground text-base font-semibold'>
@@ -431,7 +487,7 @@ function PricingGroupCard(props: {
               key={model.model_name}
               type='button'
               onClick={() => props.onModelClick(model.model_name)}
-              className='grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30 sm:grid-cols-[minmax(0,1.35fr)_minmax(220px,1fr)_minmax(220px,1fr)] sm:items-center sm:px-5'
+              className='hover:bg-muted/30 grid w-full gap-3 px-4 py-3 text-left transition-colors sm:grid-cols-[minmax(0,1.35fr)_minmax(220px,1fr)_minmax(220px,1fr)] sm:items-center sm:px-5'
             >
               <span className='min-w-0'>
                 <span className='text-foreground block truncate font-mono text-sm font-semibold'>
@@ -487,8 +543,8 @@ function DecisionCard(props: PricingFeature) {
   const Icon = props.icon
 
   return (
-    <div className='rounded-xl border border-border bg-card p-4 shadow-sm'>
-      <div className='mb-3 flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary'>
+    <div className='border-border bg-card rounded-xl border p-4 shadow-sm'>
+      <div className='bg-primary/10 text-primary mb-3 flex size-8 items-center justify-center rounded-lg'>
         <Icon className='size-4' />
       </div>
       <h2 className='text-foreground text-sm font-semibold'>{props.title}</h2>
@@ -576,7 +632,9 @@ export function Pricing() {
 
   const selectedModel = useMemo(() => {
     if (!selectedModelName) return null
-    return models.find((model) => model.model_name === selectedModelName) || null
+    return (
+      models.find((model) => model.model_name === selectedModelName) || null
+    )
   }, [models, selectedModelName])
 
   const heroFeatures: PricingFeature[] = [
@@ -661,11 +719,11 @@ export function Pricing() {
           <section className='mx-auto max-w-4xl text-center'>
             <Badge
               variant='secondary'
-              className='mb-5 rounded-full border border-border bg-card/80 px-3 py-1'
+              className='border-border bg-card/80 mb-5 rounded-full border px-3 py-1'
             >
               {t('Transparent pricing, pay as you go')}
             </Badge>
-            <h1 className='text-foreground text-4xl leading-[1.05] font-semibold tracking-tight sm:text-5xl lg:text-6xl [font-family:var(--font-playfair-display),Georgia,serif]'>
+            <h1 className='text-foreground [font-family:var(--font-playfair-display),Georgia,serif] text-4xl leading-[1.05] font-semibold tracking-tight sm:text-5xl lg:text-6xl'>
               {t('Simple transparent API pricing')}
             </h1>
             <p className='text-muted-foreground mx-auto mt-5 max-w-2xl text-base leading-relaxed sm:text-lg'>
@@ -675,7 +733,7 @@ export function Pricing() {
             </p>
           </section>
 
-          <section className='mx-auto mt-7 max-w-3xl rounded-xl border border-border bg-card/85 p-5 shadow-sm backdrop-blur'>
+          <section className='border-border bg-card/85 mx-auto mt-7 max-w-3xl rounded-xl border p-5 shadow-sm backdrop-blur'>
             <h2 className='text-foreground text-lg font-semibold'>
               {t('Public pricing decision page')}
             </h2>
@@ -697,7 +755,7 @@ export function Pricing() {
             <Button
               variant='outline'
               render={<Link to='/pricing' />}
-              className='h-11 rounded-full bg-card/70 px-6'
+              className='bg-card/70 h-11 rounded-full px-6'
             >
               {t('Pricing')}
             </Button>
@@ -709,7 +767,7 @@ export function Pricing() {
             ))}
           </section>
 
-          <section className='mt-8 rounded-xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur sm:p-5'>
+          <section className='border-border bg-card/80 mt-8 rounded-xl border p-4 shadow-sm backdrop-blur sm:p-5'>
             <div className='flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
               <div>
                 <p className='text-primary text-xs font-semibold tracking-wide uppercase'>
@@ -734,7 +792,7 @@ export function Pricing() {
                 variant='outline'
                 size='sm'
                 onClick={handleRefresh}
-                className='w-fit rounded-full bg-card'
+                className='bg-card w-fit rounded-full'
               >
                 <RefreshCw className='size-4' />
                 {t('Refresh')}
@@ -771,7 +829,7 @@ export function Pricing() {
                   placeholder={t(
                     'Search models, modalities, providers, or endpoints...'
                   )}
-                  className='h-10 rounded-lg bg-background pl-9'
+                  className='bg-background h-10 rounded-lg pl-9'
                 />
               </div>
             </div>
@@ -816,7 +874,7 @@ export function Pricing() {
                 />
               ))
             ) : (
-              <div className='rounded-xl border border-border bg-card p-10 text-center'>
+              <div className='border-border bg-card rounded-xl border p-10 text-center'>
                 <h2 className='text-foreground text-lg font-semibold'>
                   {t('No pricing groups found')}
                 </h2>
@@ -828,7 +886,7 @@ export function Pricing() {
           </main>
 
           {pricingGroups.length > 0 && (
-            <div className='mt-4 flex flex-col gap-3 rounded-xl border border-border bg-card p-3 text-sm text-muted-foreground shadow-sm sm:flex-row sm:items-center sm:justify-between'>
+            <div className='border-border bg-card text-muted-foreground mt-4 flex flex-col gap-3 rounded-xl border p-3 text-sm shadow-sm sm:flex-row sm:items-center sm:justify-between'>
               <span>
                 {t('Show {{start}}-{{end}} of {{total}} model groups', {
                   start: startGroup,
@@ -841,9 +899,11 @@ export function Pricing() {
                   type='button'
                   variant='outline'
                   size='sm'
-                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  onClick={() =>
+                    setCurrentPage((page) => Math.max(1, page - 1))
+                  }
                   disabled={currentPage <= 1}
-                  className='rounded-full bg-card'
+                  className='bg-card rounded-full'
                 >
                   <ChevronLeft className='size-4' />
                   {t('Previous page')}
@@ -862,7 +922,7 @@ export function Pricing() {
                     setCurrentPage((page) => Math.min(totalPages, page + 1))
                   }
                   disabled={currentPage >= totalPages}
-                  className='rounded-full bg-card'
+                  className='bg-card rounded-full'
                 >
                   {t('Next page')}
                   <ChevronRight className='size-4' />
@@ -872,24 +932,33 @@ export function Pricing() {
           )}
 
           <section className='mt-8 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]'>
-            <div className='rounded-xl border border-border bg-card p-5 shadow-sm'>
+            <div className='border-border bg-card rounded-xl border p-5 shadow-sm'>
               <h2 className='text-foreground text-lg font-semibold'>
-                {t('Pricing helps turn model cost into deployable route decisions.')}
+                {t(
+                  'Pricing helps turn model cost into deployable route decisions.'
+                )}
               </h2>
               <div className='mt-4 grid gap-3 sm:grid-cols-3'>
                 {[
-                  t('Choose default and fallback models for different workloads.'),
-                  t('Estimate how resolution, duration, or token ratio changes total cost.'),
+                  t(
+                    'Choose default and fallback models for different workloads.'
+                  ),
+                  t(
+                    'Estimate how resolution, duration, or token ratio changes total cost.'
+                  ),
                   t('Convert model unit price into budgets and routing rules.'),
                 ].map((item) => (
-                  <div key={item} className='rounded-lg bg-muted/30 p-3 text-sm text-muted-foreground'>
+                  <div
+                    key={item}
+                    className='bg-muted/30 text-muted-foreground rounded-lg p-3 text-sm'
+                  >
                     {item}
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className='rounded-xl border border-border bg-card p-5 shadow-sm'>
+            <div className='border-border bg-card rounded-xl border p-5 shadow-sm'>
               <h2 className='text-foreground text-lg font-semibold'>
                 {t('Recommended workflow')}
               </h2>
@@ -897,7 +966,9 @@ export function Pricing() {
                 {[
                   t('Start in model marketplace to shortlist capability.'),
                   t('Confirm billing units and cost curves on pricing.'),
-                  t('Open a model guide for request parameters and integration details.'),
+                  t(
+                    'Open a model guide for request parameters and integration details.'
+                  ),
                 ].map((item, index) => (
                   <li key={item} className='flex gap-3'>
                     <span className='bg-primary/10 text-primary flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold'>
@@ -910,7 +981,7 @@ export function Pricing() {
             </div>
           </section>
 
-          <section className='mt-4 rounded-xl border border-border bg-card p-5 shadow-sm'>
+          <section className='border-border bg-card mt-4 rounded-xl border p-5 shadow-sm'>
             <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
               <div>
                 <h2 className='text-foreground text-base font-semibold'>

@@ -58,6 +58,8 @@ export type PricingModel = {
   display_pricing?: DisplayPricing
   /** Pricing version returned by backend, useful for cache busting */
   pricing_version?: string
+  /** Backend-provided API parameter documentation for model guide pages */
+  api_parameters?: PricingApiParameter[]
   /**
    * Optional model metadata fields reserved for backend-provided catalog data.
    * Keep them data-driven; do not synthesize display values on the client.
@@ -72,6 +74,23 @@ export type PricingModel = {
   capabilities?: ModelCapability[]
   cover_thumb_url?: string
   yesterday_request_count?: number
+}
+
+export type PricingApiParameter = {
+  name: string
+  type:
+    | 'string'
+    | 'number'
+    | 'integer'
+    | 'boolean'
+    | 'enum'
+    | 'array'
+    | 'object'
+  required?: boolean
+  defaultValue?: string | number | boolean
+  range?: string
+  enumValues?: string[]
+  descriptionKey?: string
 }
 
 export type DisplayPricingFactorValue = {

@@ -30,6 +30,7 @@ type Model struct {
 	VendorID       int            `json:"vendor_id,omitempty" gorm:"index"`
 	Endpoints      string         `json:"endpoints,omitempty" gorm:"type:text"`
 	DisplayPricing string         `json:"display_pricing,omitempty" gorm:"type:text"`
+	APIParameters  string         `json:"api_parameters,omitempty" gorm:"type:text"`
 	Status         int            `json:"status" gorm:"default:1"`
 	SyncOfficial   int            `json:"sync_official" gorm:"default:1"`
 	CreatedTime    int64          `json:"created_time" gorm:"bigint"`
@@ -79,7 +80,7 @@ func (mi *Model) Update() error {
 	mi.UpdatedTime = common.GetTimestamp()
 	// 使用 Select 强制更新所有字段，包括零值
 	return DB.Model(&Model{}).Where("id = ?", mi.Id).
-		Select("model_name", "description", "icon", "tags", "vendor_id", "endpoints", "display_pricing", "status", "sync_official", "name_rule", "updated_time").
+		Select("model_name", "description", "icon", "tags", "vendor_id", "endpoints", "display_pricing", "api_parameters", "status", "sync_official", "name_rule", "updated_time").
 		Updates(mi).Error
 }
 

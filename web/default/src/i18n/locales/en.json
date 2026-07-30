@@ -1366,6 +1366,7 @@
     "Default: {{value}}": "Default: {{value}}",
     "Defaults to the wallet page when empty": "Defaults to the wallet page when empty",
     "Define API endpoints for this model (JSON format)": "Define API endpoints for this model (JSON format)",
+    "Define API parameter documentation for model guide pages (JSON array).": "Define API parameter documentation for model guide pages (JSON array).",
     "Define display-only pricing for the model catalog. This does not affect billing.": "Define display-only pricing for the model catalog. This does not affect billing.",
     "Define endpoint mappings for each provider.": "Define endpoint mappings for each provider.",
     "Define per-group rules to add, remove, or append selectable groups for specific user groups.": "Define per-group rules to add, remove, or append selectable groups for specific user groups.",

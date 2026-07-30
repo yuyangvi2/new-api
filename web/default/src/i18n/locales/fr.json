@@ -1366,6 +1366,7 @@
     "Default: {{value}}": "Par défaut : {{value}}",
     "Defaults to the wallet page when empty": "Si vide, la page portefeuille est utilisée par défaut",
     "Define API endpoints for this model (JSON format)": "Définir les points de terminaison API pour ce modèle (format JSON)",
+    "Define API parameter documentation for model guide pages (JSON array).": "Définissez la documentation des paramètres API pour les pages de guide de modèle (tableau JSON).",
     "Define display-only pricing for the model catalog. This does not affect billing.": "Définissez le prix affiché dans la galerie de modèles. Cela n'affecte pas la facturation.",
     "Define endpoint mappings for each provider.": "Définissez les mappages d'endpoints pour chaque fournisseur.",
     "Define per-group rules to add, remove, or append selectable groups for specific user groups.": "Définir des règles par groupe pour ajouter, supprimer ou ajouter des groupes sélectionnables pour des groupes d'utilisateurs spécifiques.",

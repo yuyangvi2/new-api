@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { PricingModel } from '../types'
+import type { PricingApiParameter, PricingModel } from '../types'
 import {
   hashStringToSeed,
   randomInRange,
@@ -315,8 +315,7 @@ export function buildGroupPerformance(model: PricingModel): GroupPerformance[] {
   const spec = PROFILE_SPECS[profile]
   const baseSeed = hashStringToSeed(model.model_name)
 
-  return targets
-    .slice()
+  return [...targets]
     .sort((a, b) => a.localeCompare(b))
     .map<GroupPerformance>((group) => {
       const rand = seededRandom(baseSeed ^ hashStringToSeed(group))
@@ -763,7 +762,72 @@ const VIDEO_PARAMS: SupportedParameter[] = [
   },
 ]
 
+const GROK_IMAGINE_VIDEO_PARAMS: SupportedParameter[] = [
+  {
+    name: 'prompt',
+    type: 'string',
+    required: true,
+    descriptionKey: 'Text description of the desired video',
+  },
+  {
+    name: 'duration',
+    type: 'integer',
+    range: '6 ~ 15',
+    defaultValue: 8,
+    descriptionKey: 'Video length in seconds',
+  },
+  {
+    name: 'image',
+    type: 'string',
+    descriptionKey: 'Input image',
+  },
+  {
+    name: 'images',
+    type: 'array',
+    descriptionKey: 'Reference images',
+  },
+  {
+    name: 'metadata.resolution',
+    type: 'enum',
+    enumValues: ['480p', '720p'],
+    defaultValue: '720p',
+    descriptionKey: 'Resolution',
+  },
+]
+
 type ApiCategory = 'reasoning' | 'embedding' | 'image' | 'video' | 'chat'
+
+function isGrokImagineVideoModel(model: PricingModel): boolean {
+  return /grok-imagine-video/i.test(model.model_name)
+}
+
+function normalizeConfiguredParameters(
+  params?: PricingApiParameter[]
+): SupportedParameter[] {
+  if (!Array.isArray(params) || params.length === 0) {
+    return []
+  }
+
+  return params.flatMap((param) => {
+    const name = param.name?.trim()
+    const type = param.type?.trim() as SupportedParameter['type']
+    if (!name || !type) {
+      return []
+    }
+
+    return [
+      {
+        name,
+        type,
+        required: param.required,
+        defaultValue: param.defaultValue,
+        range: param.range,
+        enumValues: param.enumValues,
+        descriptionKey: param.descriptionKey?.trim() || name,
+      },
+    ]
+  })
+}
 
 /**
  * Refine the broad PROFILE_BY_NAME bucket into an API-shape category. The
@@ -790,6 +854,11 @@ function apiCategoryOf(model: PricingModel): ApiCategory {
 export function buildSupportedParameters(
   model: PricingModel
 ): SupportedParameter[] {
+  const configuredParams = normalizeConfiguredParameters(model.api_parameters)
+  if (configuredParams.length > 0) return configuredParams
+
+  if (isGrokImagineVideoModel(model)) return GROK_IMAGINE_VIDEO_PARAMS
+
   const cat = apiCategoryOf(model)
   if (cat === 'reasoning') return REASONING_PARAMS
   if (cat === 'embedding') return EMBEDDING_PARAMS
@@ -813,12 +882,21 @@ export function buildRateLimits(model: PricingModel): RateLimit[] {
   const baseSeed = hashStringToSeed(`${model.model_name}:rl`)
   const isHeavy = cat === 'image' || cat === 'video'
   const isLight = cat === 'embedding'
-  const baseRpm = isHeavy ? 60 : isLight ? 5_000 : 500
-  const baseTpm = isHeavy ? 0 : isLight ? 1_000_000 : 200_000
-  const baseRpd = isHeavy ? 1_000 : isLight ? 100_000 : 10_000
+  let baseRpm = 500
+  let baseTpm = 200_000
+  let baseRpd = 10_000
 
-  return targets
-    .slice()
+  if (isHeavy) {
+    baseRpm = 60
+    baseTpm = 0
+    baseRpd = 1_000
+  } else if (isLight) {
+    baseRpm = 5_000
+    baseTpm = 1_000_000
+    baseRpd = 100_000
+  }
+
+  return [...targets]
     .sort((a, b) => a.localeCompare(b))
     .map((group) => {
       const rand = seededRandom(baseSeed ^ hashStringToSeed(group))
@@ -836,7 +914,8 @@ export function buildRateLimits(model: PricingModel): RateLimit[] {
 export function formatRateLimit(value: number): string {
   if (value <= 0) return '—'
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
-  if (value >= 1_000)
+  if (value >= 1_000) {
     return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}K`
+  }
   return value.toLocaleString()
 }

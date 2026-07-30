@@ -1366,6 +1366,7 @@
     "Default: {{value}}": "Mặc định: {{value}}",
     "Defaults to the wallet page when empty": "Để trống sẽ dùng trang ví mặc định",
     "Define API endpoints for this model (JSON format)": "Định nghĩa các điểm cuối API cho mô hình này (định dạng JSON)",
+    "Define API parameter documentation for model guide pages (JSON array).": "Định nghĩa tài liệu tham số API cho các trang hướng dẫn mô hình (mảng JSON).",
     "Define display-only pricing for the model catalog. This does not affect billing.": "Định nghĩa giá chỉ để hiển thị trong chợ mô hình. Cài đặt này không ảnh hưởng đến tính phí thực tế.",
     "Define endpoint mappings for each provider.": "Định nghĩa ánh xạ điểm cuối cho mỗi nhà cung cấp.",
     "Define per-group rules to add, remove, or append selectable groups for specific user groups.": "Định nghĩa quy tắc theo nhóm để thêm, xóa hoặc nối các nhóm có thể chọn cho các nhóm người dùng cụ thể.",

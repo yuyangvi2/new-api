@@ -56,14 +56,15 @@ type upstreamEnvelope[T any] struct {
 }
 
 type upstreamModel struct {
-	Description string          `json:"description"`
-	Endpoints   json.RawMessage `json:"endpoints"`
-	Icon        string          `json:"icon"`
-	ModelName   string          `json:"model_name"`
-	NameRule    int             `json:"name_rule"`
-	Status      int             `json:"status"`
-	Tags        string          `json:"tags"`
-	VendorName  string          `json:"vendor_name"`
+	APIParameters json.RawMessage `json:"api_parameters"`
+	Description   string          `json:"description"`
+	Endpoints     json.RawMessage `json:"endpoints"`
+	Icon          string          `json:"icon"`
+	ModelName     string          `json:"model_name"`
+	NameRule      int             `json:"name_rule"`
+	Status        int             `json:"status"`
+	Tags          string          `json:"tags"`
+	VendorName    string          `json:"vendor_name"`
 }
 
 type upstreamVendor struct {
@@ -180,10 +181,10 @@ func fetchJSON[T any](ctx context.Context, url string, out *upstreamEnvelope[T])
 				cacheMutex.Unlock()
 
 				// Try decode as envelope first
-				if err := json.Unmarshal(buf, out); err != nil {
+				if err := common.Unmarshal(buf, out); err != nil {
 					// Try decode as pure array
 					var arr []T
-					if err2 := json.Unmarshal(buf, &arr); err2 != nil {
+					if err2 := common.Unmarshal(buf, &arr); err2 != nil {
 						lastErr = err
 						return
 					}
@@ -205,9 +206,9 @@ func fetchJSON[T any](ctx context.Context, url string, out *upstreamEnvelope[T])
 					lastErr = errors.New("cache miss for 304 response")
 					return
 				}
-				if err := json.Unmarshal(buf, out); err != nil {
+				if err := common.Unmarshal(buf, out); err != nil {
 					var arr []T
-					if err2 := json.Unmarshal(buf, &arr); err2 != nil {
+					if err2 := common.Unmarshal(buf, &arr); err2 != nil {
 						lastErr = err
 						return
 					}
@@ -260,6 +261,14 @@ func ensureVendorID(vendorName string, vendorByName map[string]upstreamVendor, v
 	}
 	vendorIDCache[vendorName] = 0
 	return 0
+}
+
+func rawJSONString(raw json.RawMessage) string {
+	value := strings.TrimSpace(string(raw))
+	if value == "" || value == "null" {
+		return ""
+	}
+	return value
 }
 
 // SyncUpstreamModels 同步上游模型与供应商：
@@ -373,13 +382,14 @@ func SyncUpstreamModels(c *gin.Context) {
 
 		// 创建模型
 		mi := &model.Model{
-			ModelName:   name,
-			Description: up.Description,
-			Icon:        up.Icon,
-			Tags:        up.Tags,
-			VendorID:    vendorID,
-			Status:      chooseStatus(up.Status, 1),
-			NameRule:    up.NameRule,
+			ModelName:     name,
+			Description:   up.Description,
+			Icon:          up.Icon,
+			Tags:          up.Tags,
+			VendorID:      vendorID,
+			APIParameters: rawJSONString(up.APIParameters),
+			Status:        chooseStatus(up.Status, 1),
+			NameRule:      up.NameRule,
 		}
 		if err := mi.Insert(); err == nil {
 			createdModels++
@@ -431,6 +441,10 @@ func SyncUpstreamModels(c *gin.Context) {
 				}
 				if containsField(ow.Fields, "name_rule") {
 					local.NameRule = up.NameRule
+					needUpdate = true
+				}
+				if containsField(ow.Fields, "api_parameters") {
+					local.APIParameters = rawJSONString(up.APIParameters)
 					needUpdate = true
 				}
 				if containsField(ow.Fields, "status") {
@@ -610,6 +624,9 @@ func SyncUpstreamPreview(c *gin.Context) {
 		}
 		if local.NameRule != up.NameRule {
 			fields = append(fields, conflictField{Field: "name_rule", Local: local.NameRule, Upstream: up.NameRule})
+		}
+		if strings.TrimSpace(local.APIParameters) != rawJSONString(up.APIParameters) {
+			fields = append(fields, conflictField{Field: "api_parameters", Local: local.APIParameters, Upstream: rawJSONString(up.APIParameters)})
 		}
 		if local.Status != chooseStatus(up.Status, local.Status) {
 			fields = append(fields, conflictField{Field: "status", Local: local.Status, Upstream: up.Status})

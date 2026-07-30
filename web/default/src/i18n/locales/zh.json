@@ -1366,6 +1366,7 @@
     "Default: {{value}}": "默认值：{{value}}",
     "Defaults to the wallet page when empty": "为空时默认使用钱包页面",
     "Define API endpoints for this model (JSON format)": "为此模型定义 API 端点（JSON 格式）",
+    "Define API parameter documentation for model guide pages (JSON array).": "定义模型指南页面的 API 参数文档（JSON 数组）。",
     "Define display-only pricing for the model catalog. This does not affect billing.": "定义模型广场的展示价格，不影响实际计费。",
     "Define endpoint mappings for each provider.": "为每个提供商定义端点映射。",
     "Define per-group rules to add, remove, or append selectable groups for specific user groups.": "为特定用户组定义按分组规则，以添加、移除或追加可选分组。",

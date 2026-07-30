@@ -1366,6 +1366,7 @@
     "Default: {{value}}": "По умолчанию: {{value}}",
     "Defaults to the wallet page when empty": "Если пусто, по умолчанию открывается страница кошелька",
     "Define API endpoints for this model (JSON format)": "Определить конечные точки API для этой модели (формат JSON)",
+    "Define API parameter documentation for model guide pages (JSON array).": "Задайте документацию по параметрам API для страниц руководства модели (JSON-массив).",
     "Define display-only pricing for the model catalog. This does not affect billing.": "Задайте цену для отображения в каталоге моделей. Это не влияет на фактическую тарификацию.",
     "Define endpoint mappings for each provider.": "Определите сопоставления конечных точек для каждого провайдера.",
     "Define per-group rules to add, remove, or append selectable groups for specific user groups.": "Определите правила для групп, чтобы добавлять, удалять или дополнять доступные группы для конкретных групп пользователей.",

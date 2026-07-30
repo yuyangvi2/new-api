@@ -1366,6 +1366,7 @@
     "Default: {{value}}": "기본값: {{value}}",
     "Defaults to the wallet page when empty": "Defaults to the wallet page when empty",
     "Define API endpoints for this model (JSON format)": "Define API endpoints for this model (JSON format)",
+    "Define API parameter documentation for model guide pages (JSON array).": "모델 가이드 페이지용 API 매개변수 문서를 정의합니다(JSON 배열).",
     "Define display-only pricing for the model catalog. This does not affect billing.": "모델 광장에 표시할 가격을 정의합니다. 실제 과금에는 영향을 주지 않습니다.",
     "Define endpoint mappings for each provider.": "Define endpoint mappings for each provider.",
     "Define per-group rules to add, remove, or append selectable groups for specific user groups.": "Define per-group rules to add, remove, or append selectable groups for specific user groups.",
