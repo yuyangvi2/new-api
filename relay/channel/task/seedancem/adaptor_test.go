@@ -161,6 +161,13 @@ func TestChannelNameIsPublicAlias(t *testing.T) {
 	assert.Equal(t, "seedance-m", (&TaskAdaptor{}).GetChannelName())
 }
 
+func TestSeedanceRAURLUsesGatewayHost(t *testing.T) {
+	assert.Equal(t,
+		"https://zhenze-huhehaote.cmecloud.cn/v1/security/token",
+		seedanceRAURL("https://zhenze-huhehaote.cmecloud.cn/api/v3"),
+	)
+}
+
 func TestValidateSeedanceMRequestBounds(t *testing.T) {
 	tests := []struct {
 		name string

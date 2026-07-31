@@ -1156,7 +1156,7 @@ const SEEDANCE_VIDEO_PARAMS: SupportedParameter[] = [
   {
     name: 'resolution',
     type: 'enum',
-    enumValues: ['480p', '720p', '1080p', '4k'],
+    enumValues: ['480p', '720p', '1080p'],
     defaultValue: '720p',
     descriptionKey: 'Output video resolution',
   },
