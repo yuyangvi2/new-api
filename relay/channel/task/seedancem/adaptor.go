@@ -17,7 +17,6 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/relay/channel"
 	doubaotask "github.com/QuantumNous/new-api/relay/channel/task/doubao"
 	"github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
@@ -204,7 +203,29 @@ func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInf
 }
 
 func (a *TaskAdaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, requestBody io.Reader) (*http.Response, error) {
-	return channel.DoTaskApiRequest(a, c, info, requestBody)
+	fullRequestURL, err := a.BuildRequestURL(info)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("new request failed: %w", err)
+	}
+	if err := a.BuildRequestHeader(c, req, info); err != nil {
+		return nil, fmt.Errorf("setup request header failed: %w", err)
+	}
+	client, err := newAICCHTTPClient(a.baseURL, a.apiKey, info.ChannelSetting.Proxy)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("do secure request failed: %w", err)
+	}
+	if upID := resp.Header.Get(common.RequestIdKey); upID != "" {
+		c.Set(common.UpstreamRequestIdKey, upID)
+	}
+	return resp, nil
 }
 
 func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (taskID string, taskData []byte, taskErr *dto.TaskError) {
@@ -242,9 +263,9 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 		return nil, err
 	}
 	setBearerHeaders(req, strings.TrimSpace(key), a.settings)
-	client, err := service.GetHttpClientWithProxy(proxy)
+	client, err := newAICCHTTPClient(baseUrl, strings.TrimSpace(key), proxy)
 	if err != nil {
-		return nil, fmt.Errorf("new proxy http client failed: %w", err)
+		return nil, err
 	}
 	return client.Do(req)
 }
