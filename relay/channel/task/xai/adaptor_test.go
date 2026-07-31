@@ -101,7 +101,7 @@ func TestParseTaskResultExtractsCostTicks(t *testing.T) {
 	assert.InDelta(t, 2.51, taskResult.BillingUnits, 0.0000001)
 }
 
-func TestAdjustBillingOnCompleteScalesUpstreamUsageByConfiguredPrice(t *testing.T) {
+func TestAdjustBillingOnCompleteUsesUpstreamFinalUSDCost(t *testing.T) {
 	originalQuotaPerUnit := common.QuotaPerUnit
 	t.Cleanup(func() {
 		common.QuotaPerUnit = originalQuotaPerUnit
@@ -109,18 +109,39 @@ func TestAdjustBillingOnCompleteScalesUpstreamUsageByConfiguredPrice(t *testing.
 	common.QuotaPerUnit = 500000
 
 	task := &model.Task{
-		Properties: model.Properties{OriginModelName: "grok-imagine-video"},
+		Properties: model.Properties{OriginModelName: "grok-imagine-video-1.5"},
 		PrivateData: model.TaskPrivateData{
 			BillingContext: &model.TaskBillingContext{
-				ModelPrice:      0.05 / 0.6,
-				GroupRatio:      0.6,
-				OriginModelName: "grok-imagine-video",
+				ModelPrice:      0.08 / 0.6,
+				GroupRatio:      1,
+				OriginModelName: "grok-imagine-video-1.5",
 			},
 		},
 	}
 
-	quota, clamp := (&TaskAdaptor{}).AdjustBillingOnCompleteWithClamp(task, &relaycommon.TaskInfo{BillingUnits: 0.28})
+	quota, clamp := (&TaskAdaptor{}).AdjustBillingOnCompleteWithClamp(task, &relaycommon.TaskInfo{BillingUnits: 2.01})
 
 	require.Nil(t, clamp)
-	assert.Equal(t, 140000, quota)
+	assert.Equal(t, 1004999, quota)
+}
+
+func TestAdjustBillingOnCompleteAppliesGroupRatioToUpstreamFinalUSDCost(t *testing.T) {
+	originalQuotaPerUnit := common.QuotaPerUnit
+	t.Cleanup(func() {
+		common.QuotaPerUnit = originalQuotaPerUnit
+	})
+	common.QuotaPerUnit = 500000
+
+	task := &model.Task{
+		PrivateData: model.TaskPrivateData{
+			BillingContext: &model.TaskBillingContext{
+				GroupRatio: 0.6,
+			},
+		},
+	}
+
+	quota, clamp := (&TaskAdaptor{}).AdjustBillingOnCompleteWithClamp(task, &relaycommon.TaskInfo{BillingUnits: 2.0})
+
+	require.Nil(t, clamp)
+	assert.Equal(t, 600000, quota)
 }

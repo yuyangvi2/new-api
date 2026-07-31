@@ -285,26 +285,11 @@ func (a *TaskAdaptor) AdjustBillingOnCompleteWithClamp(task *model.Task, taskRes
 	if task == nil || taskResult == nil || taskResult.BillingUnits <= 0 {
 		return 0, nil
 	}
-	spec, ok := videoPriceSpecs[taskModelName(task)]
-	if !ok || spec.baseOutputPriceUSD <= 0 {
-		return 0, nil
-	}
 	bc := task.PrivateData.BillingContext
-	if bc == nil || bc.ModelPrice <= 0 || bc.GroupRatio <= 0 {
+	if bc == nil || bc.GroupRatio <= 0 {
 		return 0, nil
 	}
-	priceScale := bc.ModelPrice / spec.baseOutputPriceUSD
-	return common.QuotaFromFloatChecked(taskResult.BillingUnits * priceScale * bc.GroupRatio * common.QuotaPerUnit)
-}
-
-func taskModelName(task *model.Task) string {
-	if task.PrivateData.BillingContext != nil && task.PrivateData.BillingContext.OriginModelName != "" {
-		return task.PrivateData.BillingContext.OriginModelName
-	}
-	if task.Properties.OriginModelName != "" {
-		return task.Properties.OriginModelName
-	}
-	return task.Properties.UpstreamModelName
+	return common.QuotaFromFloatChecked(taskResult.BillingUnits * bc.GroupRatio * common.QuotaPerUnit)
 }
 
 func xaiRequestDuration(req relaycommon.TaskSubmitReq) int {
