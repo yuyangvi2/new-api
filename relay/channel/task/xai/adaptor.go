@@ -265,37 +265,11 @@ func (a *TaskAdaptor) AdjustBillingOnCompleteWithClamp(task *model.Task, taskRes
 	if task == nil || taskResult == nil || taskResult.BillingUnits <= 0 {
 		return 0, nil
 	}
-	basePriceUSD, ok := xaiBaseOutputSecondPrice(xaiTaskModelName(task))
-	if !ok || basePriceUSD <= 0 {
-		return 0, nil
-	}
 	bc := task.PrivateData.BillingContext
-	if bc == nil || bc.ModelPrice <= 0 || bc.GroupRatio <= 0 {
+	if bc == nil || bc.GroupRatio <= 0 {
 		return 0, nil
 	}
-	priceScale := bc.ModelPrice / basePriceUSD
-	return common.QuotaFromFloatChecked(taskResult.BillingUnits * priceScale * bc.GroupRatio * common.QuotaPerUnit)
-}
-
-func xaiTaskModelName(task *model.Task) string {
-	if task.PrivateData.BillingContext != nil && task.PrivateData.BillingContext.OriginModelName != "" {
-		return task.PrivateData.BillingContext.OriginModelName
-	}
-	if task.Properties.OriginModelName != "" {
-		return task.Properties.OriginModelName
-	}
-	return task.Properties.UpstreamModelName
-}
-
-func xaiBaseOutputSecondPrice(modelName string) (float64, bool) {
-	switch strings.ToLower(strings.TrimSpace(modelName)) {
-	case "grok-imagine-video":
-		return 0.05, true
-	case "grok-imagine-video-1.5":
-		return 0.08, true
-	default:
-		return 0, false
-	}
+	return common.QuotaFromFloatChecked(taskResult.BillingUnits * bc.GroupRatio * common.QuotaPerUnit)
 }
 
 func xaiUsageCostUSD(usage map[string]any) (float64, bool) {
