@@ -501,7 +501,7 @@ func firstTextFromContent(value interface{}) string {
 	return ""
 }
 
-func queryModelMapping(base, apiKey, modelName, proxy string, settings *dto.SeedanceMSettings) (string, error) {
+func queryModelMapping(base, apiKey, modelName string, _ string, settings *dto.SeedanceMSettings) (string, error) {
 	body, err := common.Marshal(map[string]string{"model": modelName})
 	if err != nil {
 		return "", err
@@ -511,7 +511,9 @@ func queryModelMapping(base, apiKey, modelName, proxy string, settings *dto.Seed
 		return "", err
 	}
 	setBearerHeaders(req, apiKey, settings)
-	client, err := service.GetHttpClientWithProxy(proxy)
+	// Keep model mapping on the same direct path as the secure AICC transport;
+	// generic channel proxies can reject this upstream's TLS CONNECT.
+	client, err := service.GetHttpClientWithProxy("")
 	if err != nil {
 		return "", err
 	}
