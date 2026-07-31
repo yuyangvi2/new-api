@@ -68,7 +68,12 @@ import {
 } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
 import { getAvailableGroups, isTokenBasedModel } from '../lib/model-helpers'
-import { formatFixedPrice, formatGroupPrice } from '../lib/price'
+import {
+  formatFixedPrice,
+  formatGroupPrice,
+  getFixedPriceTypeLabel,
+  getFixedPriceUnitLabel,
+} from '../lib/price'
 import type {
   ModelCapability,
   PriceType,
@@ -445,9 +450,9 @@ function ModelBackendProviderSection(props: { model: PricingModel }) {
   const { t } = useTranslation()
   const model = props.model
   const groups = normalizeCatalogItems(model.enable_groups)
-  const endpoints = normalizeCatalogItems(model.supported_endpoint_types).filter(
-    (endpoint) => endpoint !== 'openai-video'
-  )
+  const endpoints = normalizeCatalogItems(
+    model.supported_endpoint_types
+  ).filter((endpoint) => endpoint !== 'openai-video')
   const tags = parseTags(model.tags)
   const cells: React.ReactNode[] = []
 
@@ -464,7 +469,7 @@ function ModelBackendProviderSection(props: { model: PricingModel }) {
       <CatalogTextValue>
         {model.quota_type === QUOTA_TYPE_VALUES.TOKEN
           ? t('Token-based')
-          : t('Per Request')}
+          : getFixedPriceTypeLabel(t, model)}
       </CatalogTextValue>
     </CatalogInfoCell>
   )
@@ -562,7 +567,7 @@ function ModelHeader(props: { model: PricingModel }) {
         <span className='text-muted-foreground/70'>
           {model.quota_type === QUOTA_TYPE_VALUES.TOKEN
             ? t('Token-based')
-            : t('Per Request')}
+            : getFixedPriceTypeLabel(t, model)}
         </span>
         {model.billing_mode === 'tiered_expr' && model.billing_expr && (
           <>
@@ -730,7 +735,7 @@ function PriceSection(props: {
         <SectionTitle>{t('Base Price')}</SectionTitle>
         <div className='flex items-baseline justify-between'>
           <span className='text-muted-foreground text-sm'>
-            {t('Per request')}
+            {getFixedPriceTypeLabel(t, props.model)}
           </span>
           <span className='text-foreground font-mono text-sm font-semibold tabular-nums'>
             {formatFixedPrice(
@@ -1128,6 +1133,11 @@ function GroupPricingSection(props: {
         {isTokenBased && (
           <p className='text-muted-foreground/40 mt-1.5 px-4 text-[10px] sm:px-0'>
             {t('Prices shown per')} {tokenUnitLabel} tokens
+          </p>
+        )}
+        {!isTokenBased && (
+          <p className='text-muted-foreground/40 mt-1.5 px-4 text-[10px] sm:px-0'>
+            {t('Prices shown per')} {getFixedPriceUnitLabel(t, props.model)}
           </p>
         )}
       </div>

@@ -29,8 +29,9 @@ func TestModelPriceHelperTieredUsesPreloadedRequestInput(t *testing.T) {
 	})
 
 	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{
-		"billing_setting.billing_mode": `{"tiered-test-model":"tiered_expr"}`,
-		"billing_setting.billing_expr": `{"tiered-test-model":"param(\"stream\") == true ? tier(\"stream\", p * 3) : tier(\"base\", p * 2)"}`,
+		"billing_setting.billing_mode":    `{"tiered-test-model":"tiered_expr"}`,
+		"billing_setting.billing_expr":    `{"tiered-test-model":"param(\"stream\") == true ? tier(\"stream\", p * 3) : tier(\"base\", p * 2)"}`,
+		"group_ratio_setting.group_ratio": `{"default":1}`,
 	}))
 
 	recorder := httptest.NewRecorder()

@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { TFunction } from 'i18next'
+
 import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 
 import { QUOTA_TYPE_VALUES, TOKEN_UNIT_DIVISORS } from '../constants'
@@ -269,4 +271,20 @@ export function formatRequestPrice(
     digitsSmall: 4,
     abbreviate: false,
   })
+}
+
+export function getFixedPriceUnitLabel(
+  t: TFunction,
+  model: PricingModel
+): string {
+  return model.model_price_unit === 'second' ? t('second') : t('request')
+}
+
+export function getFixedPriceTypeLabel(
+  t: TFunction,
+  model: PricingModel
+): string {
+  return model.model_price_unit === 'second'
+    ? t('Per Second')
+    : t('Per Request')
 }

@@ -403,6 +403,19 @@ var defaultModelPrice = map[string]float64{
 	"image-01-live":                  0.025 / USD2RMB,
 }
 
+var defaultModelPriceUnit = map[string]string{
+	"grok-imagine-video":     "second",
+	"grok-imagine-video-1.5": "second",
+}
+
+func GetModelPriceUnit(name string) string {
+	name = FormatMatchingModelName(name)
+	if unit, ok := defaultModelPriceUnit[name]; ok {
+		return unit
+	}
+	return "request"
+}
+
 var defaultAudioRatio = map[string]float64{
 	"gpt-4o-audio-preview":         16,
 	"gpt-4o-mini-audio-preview":    66.67,

@@ -33,6 +33,12 @@ func TestGetModelPriceExactViduQModelOverridesFamilyFallback(t *testing.T) {
 	assert.Equal(t, 0.2, price)
 }
 
+func TestGetModelPriceUnitMarksXaiVideoAsSecond(t *testing.T) {
+	assert.Equal(t, "second", GetModelPriceUnit("grok-imagine-video"))
+	assert.Equal(t, "second", GetModelPriceUnit("grok-imagine-video-1.5"))
+	assert.Equal(t, "request", GetModelPriceUnit("suno_music"))
+}
+
 func TestGetModelRatioUsesViduQFamilyFallback(t *testing.T) {
 	original := ModelRatio2JSONString()
 	t.Cleanup(func() {
