@@ -19,10 +19,12 @@ type aiccHTTPClient struct {
 	sc     *securechannel.Client
 }
 
-func newAICCHTTPClient(base, apiKey, proxy string) (*aiccHTTPClient, error) {
-	httpClient, err := service.GetHttpClientWithProxy(proxy)
+func newAICCHTTPClient(base, apiKey, _ string) (*aiccHTTPClient, error) {
+	// The official AICC SDK uses a direct client for attestation and encrypted
+	// video task calls; some generic channel proxies reject the RA handshake.
+	httpClient, err := service.GetHttpClientWithProxy("")
 	if err != nil {
-		return nil, fmt.Errorf("new proxy http client failed: %w", err)
+		return nil, fmt.Errorf("new http client failed: %w", err)
 	}
 
 	trueValue := true
