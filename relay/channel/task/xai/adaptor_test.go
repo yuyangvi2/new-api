@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
@@ -80,4 +81,44 @@ func TestValidateRequestPreservesTopLevelResolution(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "480p", storedReq.Metadata["resolution"])
 	assert.Equal(t, "16:9", storedReq.Metadata["aspect_ratio"])
+}
+
+func TestParseTaskResultExtractsURLAndCostTicks(t *testing.T) {
+	body := []byte(`{
+		"id":"task_upstream",
+		"status":"completed",
+		"usage":{"cost_in_usd_ticks":25100000000},
+		"video":{"duration":10,"url":"https://example.com/video.mp4"}
+	}`)
+
+	taskResult, err := (&TaskAdaptor{}).ParseTaskResult(body)
+
+	require.NoError(t, err)
+	require.Equal(t, string(model.TaskStatusSuccess), taskResult.Status)
+	assert.Equal(t, "https://example.com/video.mp4", taskResult.Url)
+	assert.InDelta(t, 2.51, taskResult.BillingUnits, 0.0000001)
+}
+
+func TestAdjustBillingOnCompleteScalesUpstreamUsageByConfiguredPrice(t *testing.T) {
+	originalQuotaPerUnit := common.QuotaPerUnit
+	t.Cleanup(func() {
+		common.QuotaPerUnit = originalQuotaPerUnit
+	})
+	common.QuotaPerUnit = 500000
+
+	task := &model.Task{
+		Properties: model.Properties{OriginModelName: "grok-imagine-video"},
+		PrivateData: model.TaskPrivateData{
+			BillingContext: &model.TaskBillingContext{
+				ModelPrice:      0.05 / 0.6,
+				GroupRatio:      0.6,
+				OriginModelName: "grok-imagine-video",
+			},
+		},
+	}
+
+	quota, clamp := (&TaskAdaptor{}).AdjustBillingOnCompleteWithClamp(task, &relaycommon.TaskInfo{BillingUnits: 0.28})
+
+	require.Nil(t, clamp)
+	assert.Equal(t, 140000, quota)
 }

@@ -32,6 +32,28 @@ func TestValidateMultipartDirectNormalizesImageField(t *testing.T) {
 	require.Equal(t, constant.TaskActionGenerate, info.Action)
 }
 
+func TestValidateMultipartDirectCopiesTopLevelVideoFieldsToMetadata(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	body := strings.NewReader(`{"model":"grok-imagine-video-1.5","prompt":"animate","image":"https://example.com/first.png","resolution":"1080p","aspect_ratio":"16:9"}`)
+	request := httptest.NewRequest(http.MethodPost, "/v1/video/generations", body)
+	request.Header.Set("Content-Type", "application/json")
+	context, _ := gin.CreateTestContext(httptest.NewRecorder())
+	context.Request = request
+	info := &RelayInfo{
+		TaskRelayInfo: &TaskRelayInfo{},
+	}
+
+	taskErr := ValidateMultipartDirect(context, info)
+
+	require.Nil(t, taskErr)
+	storedReq, err := GetTaskRequest(context)
+	require.NoError(t, err)
+	require.Equal(t, "1080p", storedReq.Resolution)
+	require.Equal(t, "16:9", storedReq.AspectRatio)
+	require.Equal(t, "1080p", storedReq.Metadata["resolution"])
+	require.Equal(t, "16:9", storedReq.Metadata["aspect_ratio"])
+}
+
 // TestTaskDurationBounds guards the billing invariant that user-supplied
 // video duration (a quota multiplier via OtherRatio "seconds") is bounded, so
 // it can never overflow quota calculation into a negative charge.

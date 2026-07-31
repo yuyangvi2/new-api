@@ -2,8 +2,10 @@ package xai
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -34,15 +36,15 @@ type videoInfo struct {
 }
 
 type responseTask struct {
-	ID        string     `json:"id,omitempty"`
-	RequestID string     `json:"request_id,omitempty"`
-	Object    string     `json:"object,omitempty"`
-	Model     string     `json:"model,omitempty"`
-	Status    string     `json:"status,omitempty"`
-	Progress  int        `json:"progress,omitempty"`
-	CreatedAt int64      `json:"created_at,omitempty"`
-	Usage     any        `json:"usage,omitempty"`
-	Video     *videoInfo `json:"video,omitempty"`
+	ID        string         `json:"id,omitempty"`
+	RequestID string         `json:"request_id,omitempty"`
+	Object    string         `json:"object,omitempty"`
+	Model     string         `json:"model,omitempty"`
+	Status    string         `json:"status,omitempty"`
+	Progress  int            `json:"progress,omitempty"`
+	CreatedAt int64          `json:"created_at,omitempty"`
+	Usage     map[string]any `json:"usage,omitempty"`
+	Video     *videoInfo     `json:"video,omitempty"`
 	Error     *struct {
 		Message string `json:"message"`
 		Type    string `json:"type,omitempty"`
@@ -245,7 +247,100 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 	if resTask.Progress > 0 && resTask.Progress < 100 {
 		taskResult.Progress = fmt.Sprintf("%d%%", resTask.Progress)
 	}
+	if resTask.Video != nil && strings.TrimSpace(resTask.Video.URL) != "" {
+		taskResult.Url = strings.TrimSpace(resTask.Video.URL)
+	}
+	if costUSD, ok := xaiUsageCostUSD(resTask.Usage); ok {
+		taskResult.BillingUnits = costUSD
+	}
 	return &taskResult, nil
+}
+
+func (a *TaskAdaptor) AdjustBillingOnComplete(task *model.Task, taskResult *relaycommon.TaskInfo) int {
+	quota, _ := a.AdjustBillingOnCompleteWithClamp(task, taskResult)
+	return quota
+}
+
+func (a *TaskAdaptor) AdjustBillingOnCompleteWithClamp(task *model.Task, taskResult *relaycommon.TaskInfo) (int, *common.QuotaClamp) {
+	if task == nil || taskResult == nil || taskResult.BillingUnits <= 0 {
+		return 0, nil
+	}
+	basePriceUSD, ok := xaiBaseOutputSecondPrice(xaiTaskModelName(task))
+	if !ok || basePriceUSD <= 0 {
+		return 0, nil
+	}
+	bc := task.PrivateData.BillingContext
+	if bc == nil || bc.ModelPrice <= 0 || bc.GroupRatio <= 0 {
+		return 0, nil
+	}
+	priceScale := bc.ModelPrice / basePriceUSD
+	return common.QuotaFromFloatChecked(taskResult.BillingUnits * priceScale * bc.GroupRatio * common.QuotaPerUnit)
+}
+
+func xaiTaskModelName(task *model.Task) string {
+	if task.PrivateData.BillingContext != nil && task.PrivateData.BillingContext.OriginModelName != "" {
+		return task.PrivateData.BillingContext.OriginModelName
+	}
+	if task.Properties.OriginModelName != "" {
+		return task.Properties.OriginModelName
+	}
+	return task.Properties.UpstreamModelName
+}
+
+func xaiBaseOutputSecondPrice(modelName string) (float64, bool) {
+	switch strings.ToLower(strings.TrimSpace(modelName)) {
+	case "grok-imagine-video":
+		return 0.05, true
+	case "grok-imagine-video-1.5":
+		return 0.08, true
+	default:
+		return 0, false
+	}
+}
+
+func xaiUsageCostUSD(usage map[string]any) (float64, bool) {
+	if len(usage) == 0 {
+		return 0, false
+	}
+	if ticks, ok := xaiNumericField(usage["cost_in_usd_ticks"]); ok && ticks > 0 {
+		return ticks / 10_000_000_000.0, true
+	}
+	if cost, ok := xaiNumericField(usage["cost_in_usd"]); ok && cost > 0 {
+		return cost, true
+	}
+	return 0, false
+}
+
+func xaiNumericField(value any) (float64, bool) {
+	var f float64
+	switch v := value.(type) {
+	case float64:
+		f = v
+	case float32:
+		f = float64(v)
+	case int:
+		f = float64(v)
+	case int64:
+		f = float64(v)
+	case json.Number:
+		parsed, err := strconv.ParseFloat(v.String(), 64)
+		if err != nil {
+			return 0, false
+		}
+		f = parsed
+	case string:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+		if err != nil {
+			return 0, false
+		}
+		f = parsed
+	default:
+		return 0, false
+	}
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, false
+	}
+	return f, true
 }
 
 func (a *TaskAdaptor) ConvertToOpenAIVideo(task *model.Task) ([]byte, error) {

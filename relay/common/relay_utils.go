@@ -56,6 +56,22 @@ func createTaskError(err error, code string, statusCode int, localError bool) *d
 }
 
 func storeTaskRequest(c *gin.Context, info *RelayInfo, action string, requestObj TaskSubmitReq) {
+	if requestObj.Resolution != "" {
+		if requestObj.Metadata == nil {
+			requestObj.Metadata = make(map[string]interface{})
+		}
+		if _, exists := requestObj.Metadata["resolution"]; !exists {
+			requestObj.Metadata["resolution"] = requestObj.Resolution
+		}
+	}
+	if requestObj.AspectRatio != "" {
+		if requestObj.Metadata == nil {
+			requestObj.Metadata = make(map[string]interface{})
+		}
+		if _, exists := requestObj.Metadata["aspect_ratio"]; !exists {
+			requestObj.Metadata["aspect_ratio"] = requestObj.AspectRatio
+		}
+	}
 	info.Action = action
 	c.Set("task_request", requestObj)
 }
@@ -102,12 +118,14 @@ func validateMultipartTaskRequest(c *gin.Context, info *RelayInfo, action string
 
 	formData := c.Request.PostForm
 	req = TaskSubmitReq{
-		Prompt:   formData.Get("prompt"),
-		Model:    formData.Get("model"),
-		Mode:     formData.Get("mode"),
-		Image:    formData.Get("image"),
-		Size:     formData.Get("size"),
-		Metadata: make(map[string]interface{}),
+		Prompt:      formData.Get("prompt"),
+		Model:       formData.Get("model"),
+		Mode:        formData.Get("mode"),
+		Image:       formData.Get("image"),
+		Size:        formData.Get("size"),
+		Resolution:  formData.Get("resolution"),
+		AspectRatio: formData.Get("aspect_ratio"),
+		Metadata:    make(map[string]interface{}),
 	}
 
 	if durationStr := formData.Get("seconds"); durationStr != "" {
@@ -212,6 +230,8 @@ func isKnownTaskField(field string) bool {
 		"image":           true,
 		"images":          true,
 		"size":            true,
+		"resolution":      true,
+		"aspect_ratio":    true,
 		"duration":        true,
 		"input_reference": true, // Sora 特有字段
 	}
