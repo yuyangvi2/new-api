@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/types"
@@ -289,6 +290,14 @@ func TestEstimateBillingUsesVolcengineBasePriceForUserCharge(t *testing.T) {
 	})
 
 	assert.Empty(t, ratios)
+}
+
+func TestAdjustBillingOnCompleteKeepsPrechargedQuota(t *testing.T) {
+	quota := (&TaskAdaptor{}).AdjustBillingOnComplete(&model.Task{Quota: 123649}, &relaycommon.TaskInfo{
+		TotalTokens: 40594,
+	})
+
+	assert.Equal(t, 123649, quota)
 }
 
 func TestParseTaskResultMapsStatusesAndLastFrame(t *testing.T) {
