@@ -23,6 +23,7 @@ import type { DisplayPricingUnit, PricingModel } from '../types'
 export type DisplayPricingEntry = {
   key: string
   label: string
+  labelKey?: string
   formatted: string
   numericPrice: number
   unit: DisplayPricingUnit
@@ -45,6 +46,48 @@ export type TieredSecondPricingStep = {
   toSecond?: number
 }
 
+const DISPLAY_PRICING_LABEL_ALIASES: ReadonlyArray<
+  readonly [source: string, key: string]
+> = [
+  ['Reference to Video', 'Reference to Video'],
+  ['Text to Video', 'Text to Video'],
+  ['Voice selection', 'Voice selection'],
+  ['Not specified', 'Not specified'],
+  ['High quality', 'High quality'],
+  ['With sound', 'With sound'],
+  ['No sound', 'No sound'],
+  ['Resolution', 'Resolution'],
+  ['Specified', 'Specified'],
+  ['Standard', 'Standard'],
+  ['Sound', 'Sound'],
+  ['Mode', 'Mode'],
+  ['参考生视频', 'Reference to Video'],
+  ['文生视频', 'Text to Video'],
+  ['指定音色', 'Voice selection'],
+  ['未指定', 'Not specified'],
+  ['高品质', 'High quality'],
+  ['有声', 'With sound'],
+  ['无声', 'No sound'],
+  ['分辨率', 'Resolution'],
+  ['指定', 'Specified'],
+  ['标准', 'Standard'],
+  ['声音', 'Sound'],
+  ['模式', 'Mode'],
+]
+
+export function localizeDisplayPricingLabel(
+  label: string,
+  translate: (key: string) => string
+): string {
+  const directTranslation = translate(label)
+  if (directTranslation !== label) return directTranslation
+
+  return DISPLAY_PRICING_LABEL_ALIASES.reduce(
+    (localizedLabel, [source, key]) =>
+      localizedLabel.replaceAll(source, translate(key)),
+    label
+  )
+}
 
 function normalizedModelName(model: PricingModel): string {
   return model.model_name.trim().toLowerCase()
@@ -72,6 +115,7 @@ function getBuiltinDisplayPricingEntries(
     return {
       key,
       label,
+      labelKey: label,
       formatted: formatDisplayPricingValue(numericPrice),
       numericPrice,
       unit,

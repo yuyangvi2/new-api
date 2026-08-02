@@ -61,7 +61,10 @@ import { cn } from '@/lib/utils'
 
 import { DEFAULT_TOKEN_UNIT } from '../pricing/constants'
 import { usePricingData } from '../pricing/hooks/use-pricing-data'
-import { getDisplayPricingEntries } from '../pricing/lib/display-pricing'
+import {
+  getDisplayPricingEntries,
+  localizeDisplayPricingLabel,
+} from '../pricing/lib/display-pricing'
 import {
   getDynamicDisplayGroupRatio,
   getDynamicPricingSummary,
@@ -611,7 +614,7 @@ function MarketPricePanel(props: {
         )}
       >
         <span className='text-muted-foreground min-w-0 truncate text-xs leading-4 font-bold'>
-          {entry.labelKey ? t(entry.labelKey) : entry.label}
+          {localizeDisplayPricingLabel(entry.labelKey ?? entry.label ?? '', t)}
         </span>
         <span className='shrink-0 text-right whitespace-nowrap'>
           <span
@@ -663,7 +666,10 @@ function MarketPricePanel(props: {
                   className='flex items-center justify-between gap-4'
                 >
                   <span>
-                    {entry.labelKey ? t(entry.labelKey) : entry.label}
+                    {localizeDisplayPricingLabel(
+                      entry.labelKey ?? entry.label ?? '',
+                      t
+                    )}
                   </span>
                   <span className='font-mono'>
                     {entry.formatted} {renderUnit(entry)}
@@ -683,7 +689,10 @@ function MarketPricePanel(props: {
                   className='flex items-center justify-between gap-4'
                 >
                   <span>
-                    {entry.labelKey ? t(entry.labelKey) : entry.label}
+                    {localizeDisplayPricingLabel(
+                      entry.labelKey ?? entry.label ?? '',
+                      t
+                    )}
                   </span>
                   <span className='font-mono'>
                     {entry.formatted} {renderUnit(entry)}

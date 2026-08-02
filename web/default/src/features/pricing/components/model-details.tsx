@@ -66,6 +66,7 @@ import {
   getDisplayPricingEntries,
   getTieredSecondPricingEntries,
   isWeightedFactorsDisplayPricingModel,
+  localizeDisplayPricingLabel,
 } from '../lib/display-pricing'
 import {
   getDynamicPriceEntries,
@@ -478,9 +479,9 @@ function ModelBackendProviderSection(props: { model: PricingModel }) {
   const { t } = useTranslation()
   const model = props.model
   const groups = normalizeCatalogItems(model.enable_groups)
-  const endpoints = normalizeCatalogItems(model.supported_endpoint_types).filter(
-    (endpoint) => endpoint !== 'openai-video'
-  )
+  const endpoints = normalizeCatalogItems(
+    model.supported_endpoint_types
+  ).filter((endpoint) => endpoint !== 'openai-video')
   const tags = parseTags(model.tags)
   const cells: React.ReactNode[] = []
 
@@ -691,7 +692,7 @@ function PriceSection(props: {
           {visibleSteps.map((step) => (
             <div key={step.key} className='bg-muted/20 rounded-lg border p-3'>
               <div className='text-muted-foreground text-xs'>
-                {entry.label} · {step.label}
+                {localizeDisplayPricingLabel(entry.label, t)} · {step.label}
               </div>
               <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
                 {step.formatted}
@@ -900,7 +901,7 @@ function DisplayPricingTieredSecondsSection(props: { model: PricingModel }) {
   const rows = entries.flatMap((entry) =>
     entry.steps.map((step) => ({
       key: `${entry.key}:${step.key}`,
-      profile: entry.label,
+      profile: localizeDisplayPricingLabel(entry.label, t),
       step,
     }))
   )
@@ -990,7 +991,7 @@ function DisplayPricingFactorsSection(props: { model: PricingModel }) {
             >
               <div className='space-y-2 px-3 py-3'>
                 <div className='text-foreground text-sm font-semibold'>
-                  {factor.label || factor.field}
+                  {localizeDisplayPricingLabel(factor.label || factor.field, t)}
                 </div>
                 <div className='flex flex-wrap gap-2'>
                   <Badge variant='outline' className='text-[11px]'>
@@ -1020,7 +1021,11 @@ function DisplayPricingFactorsSection(props: { model: PricingModel }) {
                     className:
                       'text-muted-foreground py-2 text-[10px] font-medium tracking-wider uppercase',
                     cellClassName: 'py-2.5',
-                    cell: (value) => value.label || value.value,
+                    cell: (value) =>
+                      localizeDisplayPricingLabel(
+                        value.label || value.value,
+                        t
+                      ),
                   },
                   {
                     id: 'weight',
