@@ -3,6 +3,7 @@ package relayconvert
 import (
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
@@ -205,6 +206,38 @@ func TestResponsesResponseToChatCompletionsPreservesTextAndToolCalls(t *testing.
 	assert.Equal(t, "lookup", toolCalls[0].Function.Name)
 	assert.Equal(t, `{"q":"x"}`, toolCalls[0].Function.Arguments)
 	assert.Equal(t, 7, usage.TotalTokens)
+}
+
+func TestResponsesResponseToChatCompletionsUsesChatUsageShape(t *testing.T) {
+	resp := &dto.OpenAIResponsesResponse{
+		ID:        "resp_1",
+		CreatedAt: 123,
+		Model:     "gpt-test",
+		Status:    []byte(`"completed"`),
+		Output: []dto.ResponsesOutput{{
+			Type:      responsesOutputTypeFunctionCall,
+			ID:        "fc_1",
+			CallId:    "call_1",
+			Name:      "lookup",
+			Arguments: []byte(`{"q":"x"}`),
+		}},
+		Usage: &dto.Usage{InputTokens: 3, OutputTokens: 4, TotalTokens: 7},
+	}
+
+	chat, usage, err := ResponsesResponseToChatCompletionsResponse(resp, "chatcmpl_1")
+	require.NoError(t, err)
+	require.NotNil(t, usage)
+
+	body, err := common.Marshal(chat)
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), gjson.GetBytes(body, "usage.prompt_tokens").Int())
+	assert.Equal(t, int64(4), gjson.GetBytes(body, "usage.completion_tokens").Int())
+	assert.Equal(t, int64(7), gjson.GetBytes(body, "usage.total_tokens").Int())
+	assert.False(t, gjson.GetBytes(body, "usage.input_tokens").Exists())
+	assert.False(t, gjson.GetBytes(body, "usage.output_tokens").Exists())
+	assert.False(t, gjson.GetBytes(body, "usage.input_tokens_details").Exists())
+	assert.False(t, gjson.GetBytes(body, "usage.claude_cache_creation_5_m_tokens").Exists())
+	assert.False(t, gjson.GetBytes(body, "usage.claude_cache_creation_1_h_tokens").Exists())
 }
 
 func TestResponsesResponseToChatCompletionsPreservesReasoningSummary(t *testing.T) {

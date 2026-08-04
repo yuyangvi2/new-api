@@ -137,11 +137,9 @@ func UsageFromResponsesUsage(src *dto.Usage) *dto.Usage {
 	}
 	if src.InputTokens != 0 {
 		usage.PromptTokens = src.InputTokens
-		usage.InputTokens = src.InputTokens
 	}
 	if src.OutputTokens != 0 {
 		usage.CompletionTokens = src.OutputTokens
-		usage.OutputTokens = src.OutputTokens
 	}
 	if src.TotalTokens != 0 {
 		usage.TotalTokens = src.TotalTokens
