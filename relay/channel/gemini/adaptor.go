@@ -42,6 +42,7 @@ func (a *Adaptor) ConvertGeminiRequest(c *gin.Context, info *relaycommon.RelayIn
 			}
 		}
 	}
+	preferVisibleOutputForSmallGeminiBudget(request, info.UpstreamModelName)
 	return request, nil
 }
 

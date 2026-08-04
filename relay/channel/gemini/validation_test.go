@@ -128,6 +128,65 @@ func TestValidateGeminiCompatibleOpenAIRequestRejectsUnsupportedSilentDrops(t *t
 	}
 }
 
+func TestSmallGeminiOutputBudgetPrefersVisibleText(t *testing.T) {
+	c := newGeminiTestContext(t)
+	info := newGeminiRelayInfo()
+	request := dto.GeneralOpenAIRequest{
+		Model:               "gemini-3.5-flash",
+		MaxCompletionTokens: common.GetPointer(uint(64)),
+		Messages: []dto.Message{
+			{Role: "user", Content: "Reply with exactly: pong"},
+		},
+	}
+
+	got, err := CovertOpenAI2Gemini(c, request, info)
+	require.NoError(t, err)
+	require.NotNil(t, got.GenerationConfig.ThinkingConfig)
+	require.NotNil(t, got.GenerationConfig.ThinkingConfig.ThinkingBudget)
+	assert.Equal(t, 0, *got.GenerationConfig.ThinkingConfig.ThinkingBudget)
+}
+
+func TestSmallGeminiOutputBudgetPreservesExplicitThinking(t *testing.T) {
+	request := &dto.GeminiChatRequest{
+		Contents: []dto.GeminiChatContent{{
+			Parts: []dto.GeminiPart{{Text: "Reply with exactly: pong"}},
+		}},
+		GenerationConfig: dto.GeminiChatGenerationConfig{
+			MaxOutputTokens: common.GetPointer(uint(64)),
+			ThinkingConfig: &dto.GeminiThinkingConfig{
+				ThinkingBudget: common.GetPointer(32),
+			},
+		},
+	}
+	info := newGeminiRelayInfo()
+
+	got, err := (&Adaptor{}).ConvertGeminiRequest(newGeminiTestContext(t), info, request)
+	require.NoError(t, err)
+	converted := got.(*dto.GeminiChatRequest)
+	require.NotNil(t, converted.GenerationConfig.ThinkingConfig)
+	require.NotNil(t, converted.GenerationConfig.ThinkingConfig.ThinkingBudget)
+	assert.Equal(t, 32, *converted.GenerationConfig.ThinkingConfig.ThinkingBudget)
+}
+
+func TestNativeSmallGeminiOutputBudgetPrefersVisibleText(t *testing.T) {
+	request := &dto.GeminiChatRequest{
+		Contents: []dto.GeminiChatContent{{
+			Parts: []dto.GeminiPart{{Text: "Reply with exactly: pong"}},
+		}},
+		GenerationConfig: dto.GeminiChatGenerationConfig{
+			MaxOutputTokens: common.GetPointer(uint(64)),
+		},
+	}
+	info := newGeminiRelayInfo()
+
+	got, err := (&Adaptor{}).ConvertGeminiRequest(newGeminiTestContext(t), info, request)
+	require.NoError(t, err)
+	converted := got.(*dto.GeminiChatRequest)
+	require.NotNil(t, converted.GenerationConfig.ThinkingConfig)
+	require.NotNil(t, converted.GenerationConfig.ThinkingConfig.ThinkingBudget)
+	assert.Equal(t, 0, *converted.GenerationConfig.ThinkingConfig.ThinkingBudget)
+}
+
 func TestConvertOpenAI2GeminiPreservesCompatibleContractFields(t *testing.T) {
 	c := newGeminiTestContext(t)
 	info := newGeminiRelayInfo()

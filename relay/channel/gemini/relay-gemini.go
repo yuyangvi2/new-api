@@ -65,6 +65,12 @@ const (
 	flash25MaxBudget     = 24576
 	flash25LiteMinBudget = 512
 	flash25LiteMaxBudget = 24576
+
+	// Gemini 3.x defaults to thinking. Very small output budgets can be consumed
+	// entirely by thoughts, producing empty/truncated visible text for basic
+	// compatibility probes. If the caller did not explicitly configure thinking,
+	// prefer visible output for these tiny requests.
+	geminiSmallOutputNoThinkingLimit = 64
 )
 
 func isNew25ProModel(modelName string) bool {
@@ -75,6 +81,27 @@ func isNew25ProModel(modelName string) bool {
 
 func is25FlashLiteModel(modelName string) bool {
 	return strings.HasPrefix(modelName, "gemini-2.5-flash-lite")
+}
+
+func isGeminiDefaultThinkingModel(modelName string) bool {
+	trimmedModel := strings.TrimPrefix(modelName, "models/")
+	return strings.HasPrefix(trimmedModel, "gemini-3")
+}
+
+func preferVisibleOutputForSmallGeminiBudget(request *dto.GeminiChatRequest, modelName string) {
+	if request == nil || !isGeminiDefaultThinkingModel(modelName) {
+		return
+	}
+	if request.GenerationConfig.ThinkingConfig != nil {
+		return
+	}
+	maxOutputTokens := request.GenerationConfig.MaxOutputTokens
+	if maxOutputTokens == nil || *maxOutputTokens == 0 || *maxOutputTokens > geminiSmallOutputNoThinkingLimit {
+		return
+	}
+	request.GenerationConfig.ThinkingConfig = &dto.GeminiThinkingConfig{
+		ThinkingBudget: common.GetPointer(0),
+	}
 }
 
 // clampThinkingBudget 根据模型名称将预算限制在允许的范围内
@@ -369,6 +396,7 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 	if !adaptorWithExtraBody {
 		ThinkingAdaptor(&geminiRequest, info, textRequest)
 	}
+	preferVisibleOutputForSmallGeminiBudget(&geminiRequest, info.UpstreamModelName)
 
 	safetySettings := make([]dto.GeminiChatSafetySettings, 0, len(SafetySettingList))
 	for _, category := range SafetySettingList {

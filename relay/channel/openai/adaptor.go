@@ -314,6 +314,13 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 	isOModel := dto.IsOpenAIReasoningOModel(info.UpstreamModelName)
 	isGPT5Model := dto.IsOpenAIGPT5Model(info.UpstreamModelName)
 	if isOModel || isGPT5Model {
+		if isGPT5Model {
+			if err := service.ValidateOpenAIGPT5ChatCompletionsRequest(info.UpstreamModelName, request); err != nil {
+				return nil, err
+			}
+			service.ApplyOpenAIGPT5ChatCompletionsCompatibility(info.UpstreamModelName, request)
+		}
+
 		if lo.FromPtrOr(request.MaxCompletionTokens, uint(0)) == 0 && lo.FromPtrOr(request.MaxTokens, uint(0)) != 0 {
 			request.MaxCompletionTokens = request.MaxTokens
 			request.MaxTokens = nil
@@ -323,11 +330,10 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 			request.Temperature = nil
 		}
 
-		// gpt-5系列模型适配 归零不再支持的参数
+		// gpt-5系列模型适配 归零不再支持的采样参数
 		if isGPT5Model {
 			request.Temperature = nil
 			request.TopP = nil
-			request.LogProbs = nil
 		}
 
 		// 转换模型推理力度后缀
@@ -599,6 +605,10 @@ func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommo
 			request.Reasoning.Effort = effort
 		}
 		request.Model = originModel
+	}
+	if dto.IsOpenAIGPT5Model(request.Model) {
+		request.Temperature = nil
+		request.TopP = nil
 	}
 	if info != nil && request.Reasoning != nil && request.Reasoning.Effort != "" {
 		info.ReasoningEffort = request.Reasoning.Effort

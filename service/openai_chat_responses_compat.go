@@ -28,3 +28,15 @@ func ResponsesFinishReasonFromStatus(resp *dto.OpenAIResponsesResponse) (string,
 func ExtractOutputTextFromResponses(resp *dto.OpenAIResponsesResponse) string {
 	return relayconvert.ExtractOutputTextFromResponses(resp)
 }
+
+func ValidateOpenAIGPT5ChatCompletionsRequest(model string, req *dto.GeneralOpenAIRequest) error {
+	return relayconvert.ValidateOpenAIGPT5ChatCompletionsRequest(model, req)
+}
+
+func ApplyOpenAIGPT5ChatCompletionsCompatibility(model string, req *dto.GeneralOpenAIRequest) {
+	relayconvert.ApplyOpenAIGPT5ChatCompletionsCompatibility(model, req)
+}
+
+func ShouldOpenAIGPT5ChatCompletionsUseResponses(model string, req *dto.GeneralOpenAIRequest) bool {
+	return relayconvert.ShouldOpenAIGPT5ChatCompletionsUseResponses(model, req)
+}
