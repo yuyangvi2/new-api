@@ -70,11 +70,20 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 	}
 	adaptor.Init(info)
 
+	if dto.IsOpenAIGPT5Model(info.UpstreamModelName) {
+		if err := service.ValidateOpenAIGPT5ChatCompletionsRequest(info.UpstreamModelName, request); err != nil {
+			return types.NewErrorWithStatusCode(err, types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+		}
+		service.ApplyOpenAIGPT5ChatCompletionsCompatibility(info.UpstreamModelName, request)
+	}
+
 	passThroughGlobal := model_setting.GetGlobalSettings().PassThroughRequestEnabled
+	useResponsesForChat := service.ShouldChatCompletionsUseResponsesGlobal(info.ChannelId, info.ChannelType, info.OriginModelName) ||
+		service.ShouldOpenAIGPT5ChatCompletionsUseResponses(info.UpstreamModelName, request)
 	if info.RelayMode == relayconstant.RelayModeChatCompletions &&
 		!passThroughGlobal &&
 		!info.ChannelSetting.PassThroughBodyEnabled &&
-		service.ShouldChatCompletionsUseResponsesGlobal(info.ChannelId, info.ChannelType, info.OriginModelName) {
+		useResponsesForChat {
 		applySystemPromptIfNeeded(c, info, request)
 		usage, newApiErr := chatCompletionsViaResponses(c, info, adaptor, request)
 		if newApiErr != nil {

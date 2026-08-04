@@ -10,6 +10,127 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+func TestGPT5ChatCompatibilityValidationRejectsSilentDrops(t *testing.T) {
+	logprobs := true
+	topLogprobs := 2
+	n := 2
+
+	tests := []struct {
+		name    string
+		req     dto.GeneralOpenAIRequest
+		wantErr string
+	}{
+		{
+			name: "logprobs",
+			req: dto.GeneralOpenAIRequest{
+				LogProbs: &logprobs,
+			},
+			wantErr: "logprobs is not supported",
+		},
+		{
+			name: "top logprobs",
+			req: dto.GeneralOpenAIRequest{
+				TopLogProbs: &topLogprobs,
+			},
+			wantErr: "top_logprobs is not supported",
+		},
+		{
+			name: "multiple choices",
+			req: dto.GeneralOpenAIRequest{
+				N: &n,
+			},
+			wantErr: "n must be 1",
+		},
+		{
+			name: "stop",
+			req: dto.GeneralOpenAIRequest{
+				Stop: []any{"STOP"},
+			},
+			wantErr: "stop is not supported",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateOpenAIGPT5ChatCompletionsRequest("gpt-5.5", &tt.req)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func TestGPT5SmallChatBudgetDefaultsReasoningEffortNone(t *testing.T) {
+	req := &dto.GeneralOpenAIRequest{
+		MaxCompletionTokens: lo.ToPtr(uint(8)),
+	}
+
+	ApplyOpenAIGPT5ChatCompletionsCompatibility("gpt-5.5", req)
+
+	assert.Equal(t, "none", req.ReasoningEffort)
+}
+
+func TestGPT5SmallChatBudgetPreservesExplicitReasoningEffort(t *testing.T) {
+	req := &dto.GeneralOpenAIRequest{
+		MaxCompletionTokens: lo.ToPtr(uint(8)),
+		ReasoningEffort:     "low",
+	}
+
+	ApplyOpenAIGPT5ChatCompletionsCompatibility("gpt-5.5", req)
+
+	assert.Equal(t, "low", req.ReasoningEffort)
+}
+
+func TestGPT5ForcedFunctionToolChoiceUsesResponses(t *testing.T) {
+	req := &dto.GeneralOpenAIRequest{
+		ToolChoice: map[string]any{
+			"type": "function",
+			"function": map[string]any{
+				"name": "get_current_weather",
+			},
+		},
+	}
+
+	assert.True(t, ShouldOpenAIGPT5ChatCompletionsUseResponses("gpt-5.5", req))
+}
+
+func TestChatCompletionsRequestToResponsesRequestConvertsForcedFunctionToolChoice(t *testing.T) {
+	req := &dto.GeneralOpenAIRequest{
+		Model: "gpt-5.5",
+		Tools: []dto.ToolCallRequest{{
+			Type: "function",
+			Function: dto.FunctionRequest{
+				Name: "get_current_weather",
+				Parameters: map[string]any{
+					"type": "object",
+				},
+			},
+		}},
+		ToolChoice: map[string]any{
+			"type": "function",
+			"function": map[string]any{
+				"name": "get_current_weather",
+			},
+		},
+	}
+
+	got, err := ChatCompletionsRequestToResponsesRequest(req)
+	require.NoError(t, err)
+	assert.Equal(t, "function", gjson.GetBytes(got.ToolChoice, "type").String())
+	assert.Equal(t, "get_current_weather", gjson.GetBytes(got.ToolChoice, "name").String())
+}
+
+func TestChatCompletionsRequestToResponsesRequestRaisesTinyMaxOutputFloor(t *testing.T) {
+	req := &dto.GeneralOpenAIRequest{
+		Model:               "gpt-5.5",
+		MaxCompletionTokens: lo.ToPtr(uint(8)),
+	}
+
+	got, err := ChatCompletionsRequestToResponsesRequest(req)
+	require.NoError(t, err)
+	require.NotNil(t, got.MaxOutputTokens)
+	assert.Equal(t, uint(16), *got.MaxOutputTokens)
+}
+
 func TestChatCompletionsRequestToResponsesRequestInstructionsAndTools(t *testing.T) {
 	req := &dto.GeneralOpenAIRequest{
 		Model: "gpt-test",

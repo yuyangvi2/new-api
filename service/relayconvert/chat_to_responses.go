@@ -11,6 +11,101 @@ import (
 	"github.com/samber/lo"
 )
 
+const gpt5SmallChatMaxCompletionTokensLimit = 16
+
+func ValidateOpenAIGPT5ChatCompletionsRequest(model string, req *dto.GeneralOpenAIRequest) error {
+	if req == nil || !dto.IsOpenAIGPT5Model(model) {
+		return nil
+	}
+	if req.LogProbs != nil && *req.LogProbs {
+		return errors.New("logprobs is not supported for gpt-5 chat compatibility")
+	}
+	if req.TopLogProbs != nil {
+		return errors.New("top_logprobs is not supported for gpt-5 chat compatibility")
+	}
+	if req.N != nil && *req.N != 1 {
+		return errors.New("n must be 1 for gpt-5 chat compatibility")
+	}
+	if hasChatStopSequences(req.Stop) {
+		return errors.New("stop is not supported for gpt-5 chat compatibility")
+	}
+	return nil
+}
+
+func ApplyOpenAIGPT5ChatCompletionsCompatibility(model string, req *dto.GeneralOpenAIRequest) {
+	if req == nil || !dto.IsOpenAIGPT5Model(model) {
+		return
+	}
+	if strings.TrimSpace(req.ReasoningEffort) != "" {
+		return
+	}
+	maxCompletionTokens := req.GetMaxTokens()
+	if maxCompletionTokens <= 0 || maxCompletionTokens > gpt5SmallChatMaxCompletionTokensLimit {
+		return
+	}
+	req.ReasoningEffort = "none"
+}
+
+func ShouldOpenAIGPT5ChatCompletionsUseResponses(model string, req *dto.GeneralOpenAIRequest) bool {
+	if req == nil || !dto.IsOpenAIGPT5Model(model) {
+		return false
+	}
+	return isForcedFunctionToolChoice(req.ToolChoice)
+}
+
+func hasChatStopSequences(stop any) bool {
+	switch value := stop.(type) {
+	case nil:
+		return false
+	case string:
+		return strings.TrimSpace(value) != ""
+	case []string:
+		return len(value) > 0
+	case []any:
+		return len(value) > 0
+	default:
+		var values []any
+		data, err := common.Marshal(value)
+		if err == nil && common.Unmarshal(data, &values) == nil {
+			return len(values) > 0
+		}
+		var text string
+		if err == nil && common.Unmarshal(data, &text) == nil {
+			return strings.TrimSpace(text) != ""
+		}
+		return true
+	}
+}
+
+func isForcedFunctionToolChoice(toolChoice any) bool {
+	if toolChoice == nil {
+		return false
+	}
+	choice, ok := toolChoice.(map[string]any)
+	if !ok {
+		data, err := common.Marshal(toolChoice)
+		if err != nil || common.Unmarshal(data, &choice) != nil {
+			return false
+		}
+	}
+	choiceType, _ := choice["type"].(string)
+	if choiceType != "function" {
+		return false
+	}
+	if name, ok := choice["name"].(string); ok && strings.TrimSpace(name) != "" {
+		return true
+	}
+	function, ok := choice["function"].(map[string]any)
+	if !ok {
+		data, err := common.Marshal(choice["function"])
+		if err != nil || common.Unmarshal(data, &function) != nil {
+			return false
+		}
+	}
+	name, _ := function["name"].(string)
+	return strings.TrimSpace(name) != ""
+}
+
 func normalizeChatImageURLToString(v any) any {
 	switch vv := v.(type) {
 	case string:
@@ -363,9 +458,11 @@ func ChatCompletionsRequestToResponsesRequest(req *dto.GeneralOpenAIRequest) (*d
 		maxOutputTokens = maxCompletionTokens
 	}
 	// OpenAI Responses API rejects max_output_tokens < 16 when explicitly provided.
-	//if maxOutputTokens > 0 && maxOutputTokens < 16 {
-	//	maxOutputTokens = 16
-	//}
+	// Keep Chat Completions compatibility for tiny max_completion_tokens requests
+	// by raising only the upstream Responses budget floor.
+	if maxOutputTokens > 0 && maxOutputTokens < 16 {
+		maxOutputTokens = 16
+	}
 
 	var topP *float64
 	if req.TopP != nil {
