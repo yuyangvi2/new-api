@@ -49,7 +49,7 @@ func GeminiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 		)
 	}
 
-	chatResp := responseGeminiChat2OpenAI(c, &geminiResponse)
+	chatResp := responseGeminiChat2OpenAI(c, info, &geminiResponse)
 	chatResp.Model = info.UpstreamModelName
 	usage := buildUsageFromGeminiMetadata(geminiResponse.UsageMetadata, info.GetEstimatePromptTokens())
 	chatResp.Usage = usage

@@ -31,6 +31,9 @@ func ClaudeToOpenAIRequest(claudeRequest dto.ClaudeRequest, info *relaycommon.Re
 	if claudeRequest.Stream != nil {
 		openAIRequest.Stream = lo.ToPtr(lo.FromPtr(claudeRequest.Stream))
 	}
+	if len(claudeRequest.ExtraBody) > 0 {
+		openAIRequest.ExtraBody = claudeRequest.ExtraBody
+	}
 
 	isOpenRouter := info.ChannelType == constant.ChannelTypeOpenRouter
 
@@ -87,6 +90,9 @@ func ClaudeToOpenAIRequest(claudeRequest dto.ClaudeRequest, info *relaycommon.Re
 		openAITools = append(openAITools, openAITool)
 	}
 	openAIRequest.Tools = openAITools
+	if claudeRequest.ToolChoice != nil {
+		openAIRequest.ToolChoice = claudeToolChoiceToOpenAI(claudeRequest.ToolChoice)
+	}
 
 	// Convert messages
 	openAIMessages := make([]dto.Message, 0)
@@ -157,12 +163,17 @@ func ClaudeToOpenAIRequest(claudeRequest dto.ClaudeRequest, info *relaycommon.Re
 					}
 					mediaMessages = append(mediaMessages, message)
 				case "image":
-					// Handle image conversion (base64 to URL or keep as is)
-					imageData := fmt.Sprintf("data:%s;base64,%s", mediaMsg.Source.MediaType, mediaMsg.Source.Data)
+					if mediaMsg.Source == nil {
+						continue
+					}
+					imageData := mediaMsg.Source.Url
+					if imageData == "" {
+						imageData = fmt.Sprintf("data:%s;base64,%s", mediaMsg.Source.MediaType, common.Interface2String(mediaMsg.Source.Data))
+					}
 					//textContent += fmt.Sprintf("[Image: %s]", imageData)
 					mediaMessage := dto.MediaContent{
 						Type:     "image_url",
-						ImageUrl: &dto.MessageImageUrl{Url: imageData},
+						ImageUrl: &dto.MessageImageUrl{Url: imageData, MimeType: mediaMsg.Source.MediaType},
 					}
 					mediaMessages = append(mediaMessages, mediaMessage)
 				case "tool_use":
@@ -423,7 +434,8 @@ func StreamResponseOpenAI2Claude(openAIResponse *dto.ChatCompletionsStreamRespon
 					Type:  "message_delta",
 					Usage: buildClaudeUsageFromOpenAIUsage(oaiUsage),
 					Delta: &dto.ClaudeMediaMessage{
-						StopReason: common.GetPointer[string](stopReasonOpenAI2Claude(info.FinishReason)),
+						StopReason:   common.GetPointer[string](stopReasonOpenAI2Claude(info.FinishReason)),
+						StopSequence: claudeStopSequencePointer(info),
 					},
 				})
 			}
@@ -604,6 +616,13 @@ func StreamResponseOpenAI2Claude(openAIResponse *dto.ChatCompletionsStreamRespon
 	return claudeResponses
 }
 
+func claudeStopSequencePointer(info *relaycommon.RelayInfo) *string {
+	if info == nil || info.MatchedStopSequence == "" {
+		return nil
+	}
+	return common.GetPointer(info.MatchedStopSequence)
+}
+
 func ResponseOpenAI2Claude(openAIResponse *dto.OpenAITextResponse, info *relaycommon.RelayInfo) *dto.ClaudeResponse {
 	var stopReason string
 	contents := make([]dto.ClaudeMediaMessage, 0)
@@ -641,9 +660,45 @@ func ResponseOpenAI2Claude(openAIResponse *dto.OpenAITextResponse, info *relayco
 	}
 	claudeResponse.Content = contents
 	claudeResponse.StopReason = stopReason
+	if stopReason == "stop_sequence" {
+		claudeResponse.StopSequence = claudeStopSequencePointer(info)
+	}
 	claudeResponse.Usage = buildClaudeUsageFromOpenAIUsage(&openAIResponse.Usage)
 
 	return claudeResponse
+}
+
+func claudeToolChoiceToOpenAI(toolChoice any) any {
+	choice, err := common.Any2Type[dto.ClaudeToolChoice](toolChoice)
+	if err != nil {
+		// If toolChoice is already a simple string like "auto", "none", pass it through
+		if str, ok := toolChoice.(string); ok {
+			return str
+		}
+		// Log warning for unexpected format but don't fail
+		common.SysError(fmt.Sprintf("claudeToolChoiceToOpenAI: unexpected tool_choice format: %v, error: %v", toolChoice, err))
+		return toolChoice
+	}
+	switch choice.Type {
+	case "none":
+		return "none"
+	case "auto":
+		return "auto"
+	case "any":
+		return "required"
+	case "tool":
+		if strings.TrimSpace(choice.Name) == "" {
+			return "required"
+		}
+		return map[string]any{
+			"type": "function",
+			"function": map[string]any{
+				"name": choice.Name,
+			},
+		}
+	default:
+		return toolChoice
+	}
 }
 
 func stopReasonOpenAI2Claude(reason string) string {

@@ -42,11 +42,25 @@ func TestMaxTokensBounds(t *testing.T) {
 		require.Contains(t, err.Error(), "max_tokens is invalid")
 	})
 
+	t.Run("openai explicit zero max_tokens rejected", func(t *testing.T) {
+		c := newJSONContext(t, `{"model":"gpt-4o","messages":[{"role":"user","content":"hi"}],"max_tokens":0}`)
+		_, err := GetAndValidateTextRequest(c, relayconstant.RelayModeChatCompletions)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "max_tokens must be greater than 0")
+	})
+
 	t.Run("claude max_tokens overflow rejected", func(t *testing.T) {
 		c := newJSONContext(t, `{"model":"claude-sonnet-4","messages":[{"role":"user","content":"hi"}],"max_tokens":`+hugeN+`}`)
 		_, err := GetAndValidateClaudeRequest(c)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "max_tokens is invalid")
+	})
+
+	t.Run("claude explicit zero max_tokens rejected", func(t *testing.T) {
+		c := newJSONContext(t, `{"model":"claude-sonnet-4","messages":[{"role":"user","content":"hi"}],"max_tokens":0}`)
+		_, err := GetAndValidateClaudeRequest(c)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "max_tokens must be greater than 0")
 	})
 
 	t.Run("claude normal max_tokens accepted", func(t *testing.T) {
@@ -61,6 +75,13 @@ func TestMaxTokensBounds(t *testing.T) {
 		_, err := GetAndValidateGeminiRequest(c)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "maxOutputTokens is invalid")
+	})
+
+	t.Run("gemini explicit zero maxOutputTokens rejected", func(t *testing.T) {
+		c := newJSONContext(t, `{"contents":[{"parts":[{"text":"hi"}]}],"generationConfig":{"maxOutputTokens":0}}`)
+		_, err := GetAndValidateGeminiRequest(c)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "maxOutputTokens must be greater than 0")
 	})
 
 	t.Run("responses max_output_tokens overflow rejected", func(t *testing.T) {

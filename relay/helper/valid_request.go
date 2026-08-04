@@ -279,6 +279,12 @@ func GetAndValidateClaudeRequest(c *gin.Context) (textRequest *dto.ClaudeRequest
 	if exceedsMaxTokensLimit(textRequest.MaxTokens, textRequest.MaxTokensToSample) {
 		return nil, errors.New("max_tokens is invalid")
 	}
+	if textRequest.MaxTokens != nil && *textRequest.MaxTokens == 0 {
+		return nil, errors.New("max_tokens must be greater than 0")
+	}
+	if textRequest.MaxTokensToSample != nil && *textRequest.MaxTokensToSample == 0 {
+		return nil, errors.New("max_tokens_to_sample must be greater than 0")
+	}
 
 	//if textRequest.Stream {
 	//	relayInfo.IsStream = true
@@ -303,6 +309,12 @@ func GetAndValidateTextRequest(c *gin.Context, relayMode int) (*dto.GeneralOpenA
 
 	if exceedsMaxTokensLimit(textRequest.MaxTokens, textRequest.MaxCompletionTokens) {
 		return nil, errors.New("max_tokens is invalid")
+	}
+	if textRequest.MaxTokens != nil && *textRequest.MaxTokens == 0 {
+		return nil, errors.New("max_tokens must be greater than 0")
+	}
+	if textRequest.MaxCompletionTokens != nil && *textRequest.MaxCompletionTokens == 0 {
+		return nil, errors.New("max_completion_tokens must be greater than 0")
 	}
 	if textRequest.Model == "" {
 		return nil, errors.New("model is required")
@@ -356,6 +368,9 @@ func GetAndValidateGeminiRequest(c *gin.Context) (*dto.GeminiChatRequest, error)
 	}
 	if exceedsMaxTokensLimit(request.GenerationConfig.MaxOutputTokens) {
 		return nil, errors.New("maxOutputTokens is invalid")
+	}
+	if request.GenerationConfig.MaxOutputTokens != nil && *request.GenerationConfig.MaxOutputTokens == 0 {
+		return nil, errors.New("maxOutputTokens must be greater than 0")
 	}
 
 	//if c.Query("alt") == "sse" {
