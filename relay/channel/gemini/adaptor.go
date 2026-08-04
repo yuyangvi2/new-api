@@ -46,6 +46,9 @@ func (a *Adaptor) ConvertGeminiRequest(c *gin.Context, info *relaycommon.RelayIn
 }
 
 func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayInfo, req *dto.ClaudeRequest) (any, error) {
+	if err := validateGeminiCompatibleClaudeRequest(req); err != nil {
+		return nil, err
+	}
 	adaptor := openai.Adaptor{}
 	oaiReq, err := adaptor.ConvertClaudeRequest(c, info, req)
 	if err != nil {
@@ -214,6 +217,9 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *rel
 func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.GeneralOpenAIRequest) (any, error) {
 	if request == nil {
 		return nil, errors.New("request is nil")
+	}
+	if err := validateGeminiCompatibleOpenAIRequest(request); err != nil {
+		return nil, err
 	}
 
 	geminiRequest, err := CovertOpenAI2Gemini(c, *request, info)

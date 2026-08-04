@@ -52,6 +52,12 @@ var geminiSupportedMimeTypes = map[string]bool{
 
 const thoughtSignatureBypassValue = "context_engineering_is_the_way_to_go"
 
+// Context keys for Gemini-specific request state
+const (
+	contextKeyGeminiStopSequences  = "gemini_stop_sequences"
+	contextKeyGeminiToolChoiceNone = "gemini_tool_choice_none"
+)
+
 // Gemini 允许的思考预算范围
 const (
 	pro25MinBudget       = 128
@@ -214,6 +220,9 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 	if maxTokens := textRequest.GetMaxTokens(); maxTokens > 0 {
 		geminiRequest.GenerationConfig.MaxOutputTokens = common.GetPointer(maxTokens)
 	}
+	if textRequest.N != nil && *textRequest.N > 1 {
+		geminiRequest.GenerationConfig.CandidateCount = textRequest.N
+	}
 
 	if textRequest.Seed != nil && *textRequest.Seed != 0 {
 		geminiSeed := int64(lo.FromPtr(textRequest.Seed))
@@ -236,6 +245,8 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 			stopSequences = stopSequences[:5]
 		}
 		geminiRequest.GenerationConfig.StopSequences = stopSequences
+		info.StopSequences = stopSequences
+		c.Set(contextKeyGeminiStopSequences, stopSequences)
 	}
 
 	adaptorWithExtraBody := false
@@ -315,6 +326,9 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 						}
 					}
 				}
+			}
+			if cachedContent, ok := googleBody["cached_content"].(string); ok {
+				geminiRequest.CachedContent = cachedContent
 			}
 
 			// check error param name like imageConfig, should be image_config
@@ -428,6 +442,9 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 		// Object format: {"type": "function", "function": {"name": "xxx"}} -> "ANY" + allowedFunctionNames
 		if textRequest.ToolChoice != nil {
 			geminiRequest.ToolConfig = convertToolChoiceToGeminiConfig(textRequest.ToolChoice)
+			if isOpenAIToolChoiceNone(textRequest.ToolChoice) {
+				c.Set(contextKeyGeminiToolChoiceNone, true)
+			}
 		}
 	}
 
@@ -438,8 +455,11 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 			// 先将json.RawMessage解析
 			var jsonSchema dto.FormatJsonSchema
 			if err := common.Unmarshal(textRequest.ResponseFormat.JsonSchema, &jsonSchema); err == nil {
-				cleanedSchema := removeAdditionalPropertiesWithDepth(jsonSchema.Schema, 0)
-				geminiRequest.GenerationConfig.ResponseSchema = cleanedSchema
+				schemaBytes, marshalErr := common.Marshal(jsonSchema.Schema)
+				if marshalErr != nil {
+					return nil, fmt.Errorf("failed to marshal response_format.json_schema.schema: %w", marshalErr)
+				}
+				geminiRequest.GenerationConfig.ResponseJsonSchema = schemaBytes
 			}
 		}
 	}
@@ -495,6 +515,8 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 		}
 		shouldAttachThoughtSignature := attachThoughtSignature && (message.Role == "assistant" || message.Role == "model")
 		signatureAttached := false
+		messageName := normalizeMessageName(message.Name)
+		nameAttached := false
 		// isToolCall := false
 		if message.ToolCalls != nil {
 			// message.Role = "model"
@@ -527,9 +549,14 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 				if part.Text == "" {
 					continue
 				}
+				partText := part.Text
+				if messageName != "" && !nameAttached && (message.Role == "user" || message.Role == "") {
+					partText = fmt.Sprintf("Message from %s:\n%s", messageName, partText)
+					nameAttached = true
+				}
 				// check markdown image ![image](data:image/jpeg;base64,xxxxxxxxxxxx)
 				// 使用字符串查找而非正则，避免大文本性能问题
-				text := part.Text
+				text := partText
 				hasMarkdownImage := false
 				for {
 					// 快速检查是否包含 markdown 图片标记
@@ -582,7 +609,7 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 				// 添加剩余文本或原始文本（如果没有找到 markdown 图片）
 				if !hasMarkdownImage {
 					parts = append(parts, dto.GeminiPart{
-						Text: part.Text,
+						Text: partText,
 					})
 				}
 			} else {
@@ -599,6 +626,9 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 				if _, ok := geminiSupportedMimeTypes[strings.ToLower(mimeType)]; !ok {
 					return nil, fmt.Errorf("mime type is not supported by Gemini: '%s', url: '%s', supported types are: %v", mimeType, source.GetIdentifier(), getSupportedMimeTypesList())
 				}
+				if part.Type == dto.ContentTypeImageURL && !strings.HasPrefix(strings.ToLower(mimeType), "image/") {
+					return nil, fmt.Errorf("image_url media type must be an image MIME type, got '%s'", mimeType)
+				}
 
 				parts = append(parts, dto.GeminiPart{
 					InlineData: &dto.GeminiInlineData{
@@ -611,6 +641,8 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 
 		// 如果需要附加签名但还没有附加（没有 tool_calls 或 tool_calls 为空），
 		// 则在第一个文本 part 上附加 thoughtSignature
+		parts = prependMessageNameIfNeeded(parts, messageName, message.Role)
+
 		if shouldAttachThoughtSignature && !signatureAttached && len(parts) > 0 {
 			for i := range parts {
 				if parts[i].Text != "" {
@@ -1061,15 +1093,15 @@ func buildUsageFromGeminiMetadata(metadata dto.GeminiUsageMetadata, fallbackProm
 	return usage
 }
 
-func responseGeminiChat2OpenAI(c *gin.Context, response *dto.GeminiChatResponse) *dto.OpenAITextResponse {
+func responseGeminiChat2OpenAI(c *gin.Context, info *relaycommon.RelayInfo, response *dto.GeminiChatResponse) *dto.OpenAITextResponse {
 	fullTextResponse := dto.OpenAITextResponse{
 		Id:      helper.GetResponseID(c),
 		Object:  "chat.completion",
 		Created: common.GetTimestamp(),
 		Choices: make([]dto.OpenAITextResponseChoice, 0, len(response.Candidates)),
 	}
-	isToolCall := false
 	for _, candidate := range response.Candidates {
+		isToolCall := false
 		choice := dto.OpenAITextResponseChoice{
 			Index: int(candidate.Index),
 			Message: dto.Message{
@@ -1154,13 +1186,28 @@ func responseGeminiChat2OpenAI(c *gin.Context, response *dto.GeminiChatResponse)
 				choice.Message.SetToolCalls(toolCalls)
 				isToolCall = true
 			}
-			choice.Message.SetStringContent(content.String())
+			textContent := content.String()
+			if matchedStop := applyStopSequencesToText(&textContent, info.StopSequences); matchedStop != "" {
+				info.MatchedStopSequence = matchedStop
+				if info.RelayFormat == types.RelayFormatClaude {
+					choice.FinishReason = "stop_sequence"
+				} else {
+					choice.FinishReason = constant.FinishReasonStop
+				}
+			}
+			choice.Message.SetStringContent(textContent)
 
 		}
 		if candidate.FinishReason != nil {
 			switch *candidate.FinishReason {
 			case "STOP":
 				choice.FinishReason = constant.FinishReasonStop
+				if info.RelayFormat == types.RelayFormatClaude && len(info.StopSequences) > 0 {
+					if info.MatchedStopSequence == "" {
+						info.MatchedStopSequence = info.StopSequences[0]
+					}
+					choice.FinishReason = "stop_sequence"
+				}
 			case "MAX_TOKENS":
 				choice.FinishReason = constant.FinishReasonLength
 			case "SAFETY":
@@ -1192,6 +1239,65 @@ func responseGeminiChat2OpenAI(c *gin.Context, response *dto.GeminiChatResponse)
 		fullTextResponse.Choices = append(fullTextResponse.Choices, choice)
 	}
 	return &fullTextResponse
+}
+
+func applyStopSequencesToText(text *string, stopSequences []string) string {
+	if text == nil || *text == "" || len(stopSequences) == 0 {
+		return ""
+	}
+	bestIndex := -1
+	matched := ""
+	for _, stop := range stopSequences {
+		if stop == "" {
+			continue
+		}
+		idx := strings.Index(*text, stop)
+		if idx < 0 {
+			continue
+		}
+		if bestIndex == -1 || idx < bestIndex {
+			bestIndex = idx
+			matched = stop
+			// Early exit optimization: if we found a match at position 0, we can't find earlier
+			if bestIndex == 0 {
+				break
+			}
+		}
+	}
+	if bestIndex >= 0 {
+		*text = (*text)[:bestIndex]
+	}
+	return matched
+}
+
+// normalizeMessageName sanitizes and returns the message name for display.
+// Returns empty string if the name is nil or whitespace-only.
+func normalizeMessageName(name *string) string {
+	if name == nil {
+		return ""
+	}
+	normalized := strings.TrimSpace(*name)
+	normalized = strings.NewReplacer("\r", " ", "\n", " ", "\t", " ").Replace(normalized)
+	return normalized
+}
+
+// prependMessageNameIfNeeded adds "Message from {name}:" prefix to the first text part
+// if the message has a name and is a user message.
+func prependMessageNameIfNeeded(parts []dto.GeminiPart, messageName string, role string) []dto.GeminiPart {
+	if messageName == "" || (role != "user" && role != "") {
+		return parts
+	}
+	if len(parts) == 0 {
+		return parts
+	}
+	// Check if we already attached the name inline in a text part
+	for _, part := range parts {
+		if part.Text != "" && strings.HasPrefix(part.Text, "Message from "+messageName+":") {
+			return parts // Already attached inline
+		}
+	}
+	// Prepend a separate part with the name
+	return append([]dto.GeminiPart{{Text: fmt.Sprintf("Message from %s:", messageName)}}, parts...)
 }
 
 func streamResponseGeminiChat2OpenAI(geminiResponse *dto.GeminiChatResponse) (*dto.ChatCompletionsStreamResponse, bool) {
@@ -1548,7 +1654,28 @@ func GeminiChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 		}
 		return &usage, nil
 	}
-	fullTextResponse := responseGeminiChat2OpenAI(c, &geminiResponse)
+	if c.GetBool(contextKeyGeminiToolChoiceNone) && geminiResponseHasFunctionCall(&geminiResponse) {
+		newAPIError := types.NewOpenAIError(
+			errors.New("Gemini returned a tool call even though tool_choice=none was requested"),
+			types.ErrorCodeBadResponseBody,
+			http.StatusBadGateway,
+		)
+		service.ResetStatusCode(newAPIError, c.GetString("status_code_mapping"))
+		switch info.RelayFormat {
+		case types.RelayFormatClaude:
+			c.JSON(newAPIError.StatusCode, gin.H{
+				"type":  "error",
+				"error": newAPIError.ToClaudeError(),
+			})
+		default:
+			c.JSON(newAPIError.StatusCode, gin.H{
+				"error": newAPIError.ToOpenAIError(),
+			})
+		}
+		usage := buildUsageFromGeminiMetadata(geminiResponse.UsageMetadata, info.GetEstimatePromptTokens())
+		return &usage, nil
+	}
+	fullTextResponse := responseGeminiChat2OpenAI(c, info, &geminiResponse)
 	fullTextResponse.Model = info.UpstreamModelName
 	usage := buildUsageFromGeminiMetadata(geminiResponse.UsageMetadata, info.GetEstimatePromptTokens())
 

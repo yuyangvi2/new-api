@@ -115,6 +115,8 @@ type RelayInfo struct {
 	IsFirstRequest         bool
 	AudioUsage             bool
 	ReasoningEffort        string
+	StopSequences          []string
+	MatchedStopSequence    string
 	UserSetting            dto.UserSetting
 	UserEmail              string
 	UserQuota              int
