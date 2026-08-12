@@ -23,6 +23,19 @@ import { DEFAULT_SYSTEM_NAME, DEFAULT_LOGO } from '@/lib/constants'
 
 export type CurrencyDisplayType = 'USD' | 'CNY' | 'TOKENS' | 'CUSTOM'
 
+/**
+ * User-side currency override for model-price display. `system` follows the
+ * admin-configured `quotaDisplayType`; `USD`/`CNY` force that currency when
+ * the admin display type is USD or CNY. TOKENS and CUSTOM ignore the override.
+ */
+export type CurrencyOverride = 'system' | 'USD' | 'CNY'
+
+export function parseCurrencyOverride(value: unknown): CurrencyOverride {
+  return value === 'USD' || value === 'CNY' || value === 'system'
+    ? value
+    : 'system'
+}
+
 export interface CurrencyConfig {
   /** Whether to render quota values as currency instead of raw units */
   displayInCurrency: boolean
@@ -60,9 +73,12 @@ interface SystemConfigState {
   config: SystemConfig
   loading: boolean
   loadedLogoUrl: string
+  /** User-side billing-currency override; 'system' defers to admin settings */
+  currencyOverride: CurrencyOverride
   setConfig: (config: Partial<SystemConfig>) => void
   setLoadedLogoUrl: (url: string) => void
   setLoading: (loading: boolean) => void
+  setCurrencyOverride: (override: CurrencyOverride) => void
 }
 
 /**
@@ -79,6 +95,7 @@ export const useSystemConfigStore = create<SystemConfigState>()(
       },
       loading: true,
       loadedLogoUrl: DEFAULT_LOGO,
+      currencyOverride: 'system',
       setConfig: (newConfig) =>
         set((state) => ({
           config: {
@@ -92,13 +109,24 @@ export const useSystemConfigStore = create<SystemConfigState>()(
         })),
       setLoadedLogoUrl: (url) => set({ loadedLogoUrl: url }),
       setLoading: (loading) => set({ loading }),
+      setCurrencyOverride: (currencyOverride) =>
+        set({ currencyOverride: parseCurrencyOverride(currencyOverride) }),
     }),
     {
       name: 'system-config-storage',
       partialize: (state) => ({
         config: state.config,
         loadedLogoUrl: state.loadedLogoUrl,
+        currencyOverride: state.currencyOverride,
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<SystemConfigState> | undefined
+        return {
+          ...currentState,
+          ...persisted,
+          currencyOverride: parseCurrencyOverride(persisted?.currencyOverride),
+        }
+      },
     }
   )
 )

@@ -40,6 +40,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { CurrencyToggle } from '@/components/currency-toggle'
 import { PublicLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -1003,34 +1004,37 @@ export function Market() {
             <div className='bg-background/65 space-y-4 rounded-2xl border p-3 sm:p-4'>
               <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
                 <h2 className='text-lg font-bold'>{t('Available models')}</h2>
-                <Select
-                  value={sortBy}
-                  onValueChange={(value) => {
-                    if (value !== null) {
-                      setSortBy(value as MarketSortOption)
-                    }
-                  }}
-                >
-                  <SelectTrigger
-                    className='bg-card h-9 w-full rounded-full sm:w-[190px]'
-                    aria-label={t('Sort')}
+                <div className='flex items-center gap-2'>
+                  <CurrencyToggle />
+                  <Select
+                    value={sortBy}
+                    onValueChange={(value) => {
+                      if (value !== null) {
+                        setSortBy(value as MarketSortOption)
+                      }
+                    }}
                   >
-                    <SelectValue>
-                      {t(
-                        MARKET_SORT_OPTIONS.find(
-                          (option) => option.value === sortBy
-                        )?.label ?? 'Recommended'
-                      )}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
-                    {MARKET_SORT_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {t(option.label)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    <SelectTrigger
+                      className='bg-card h-9 w-full rounded-full sm:w-[190px]'
+                      aria-label={t('Sort')}
+                    >
+                      <SelectValue>
+                        {t(
+                          MARKET_SORT_OPTIONS.find(
+                            (option) => option.value === sortBy
+                          )?.label ?? 'Recommended'
+                        )}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      {MARKET_SORT_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {t(option.label)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className='relative'>

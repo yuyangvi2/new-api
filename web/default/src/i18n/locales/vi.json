@@ -5573,6 +5573,9 @@
     "Zhipu": "Zhipu",
     "Zhipu GLM, Moonshot, MiMo, MiniMax, Kling, Vidu, Grok, Doubao and Qwen": "Zhipu GLM, Moonshot, MiMo, MiniMax, Kling, Vidu, Grok, Doubao and Qwen",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Toggle billing currency": "Chuyển đổi đơn vị tiền tệ",
+    "Show prices in USD": "Hiển thị giá bằng USD",
+    "Show prices in CNY at the configured exchange rate": "Hiển thị giá bằng CNY theo tỷ giá đã cấu hình"
   }
 }
