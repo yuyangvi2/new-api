@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { PricingApiParameter, PricingModel } from '../types'
+import type { PricingModel } from '../types'
 import {
   hashStringToSeed,
   randomInRange,
@@ -733,43 +733,6 @@ const IMAGE_PARAMS: SupportedParameter[] = [
   },
 ]
 
-const GROK_IMAGINE_IMAGE_PARAMS: SupportedParameter[] = [
-  {
-    name: 'prompt',
-    type: 'string',
-    required: true,
-    descriptionKey: 'Text description of the desired image',
-  },
-  {
-    name: 'n',
-    type: 'integer',
-    defaultValue: 1,
-    range: '1 ~ 10',
-    descriptionKey: 'Number of images to generate',
-  },
-  {
-    name: 'aspect_ratio',
-    type: 'enum',
-    enumValues: ['1:1', '3:4', '4:3', '9:16', '16:9', '2:3', '3:2'],
-    defaultValue: '1:1',
-    descriptionKey: 'Output aspect ratio',
-  },
-  {
-    name: 'resolution',
-    type: 'enum',
-    enumValues: ['1k', '2k'],
-    defaultValue: '1k',
-    descriptionKey: 'Resolution',
-  },
-  {
-    name: 'response_format',
-    type: 'enum',
-    enumValues: ['url', 'b64_json'],
-    defaultValue: 'url',
-    descriptionKey: 'How to deliver the resulting image',
-  },
-]
-
 const VIDEO_PARAMS: SupportedParameter[] = [
   {
     name: 'prompt',
@@ -796,303 +759,6 @@ const VIDEO_PARAMS: SupportedParameter[] = [
     range: '8 ~ 60',
     defaultValue: 24,
     descriptionKey: 'Frames per second',
-  },
-]
-
-const GROK_IMAGINE_TEXT_VIDEO_PARAMS: SupportedParameter[] = [
-  {
-    name: 'prompt',
-    type: 'string',
-    required: true,
-    descriptionKey: 'Text description of the desired video',
-  },
-  {
-    name: 'duration',
-    type: 'integer',
-    range: '6 ~ 15',
-    defaultValue: 8,
-    descriptionKey: 'Video length in seconds',
-  },
-  {
-    name: 'aspect_ratio',
-    type: 'enum',
-    enumValues: ['16:9', '9:16'],
-    defaultValue: '16:9',
-    descriptionKey: 'Output aspect ratio',
-  },
-  {
-    name: 'resolution',
-    type: 'enum',
-    enumValues: ['480p', '720p'],
-    defaultValue: '720p',
-    descriptionKey: 'Resolution',
-  },
-]
-
-const GROK_IMAGINE_IMAGE_VIDEO_PARAMS: SupportedParameter[] = [
-  {
-    name: 'prompt',
-    type: 'string',
-    required: true,
-    descriptionKey: 'Text description of the desired video',
-  },
-  {
-    name: 'image',
-    type: 'string',
-    required: true,
-    descriptionKey: 'Input image',
-  },
-  {
-    name: 'duration',
-    type: 'integer',
-    range: '6 ~ 15',
-    defaultValue: 8,
-    descriptionKey: 'Video length in seconds',
-  },
-  {
-    name: 'aspect_ratio',
-    type: 'enum',
-    enumValues: ['16:9', '9:16'],
-    defaultValue: '16:9',
-    descriptionKey: 'Output aspect ratio',
-  },
-  {
-    name: 'resolution',
-    type: 'enum',
-    enumValues: ['480p', '720p', '1080p'],
-    defaultValue: '720p',
-    descriptionKey: 'Resolution',
-  },
-]
-
-const KLING_TEXT_VIDEO_PARAMS: SupportedParameter[] = [
-  {
-    name: 'prompt',
-    type: 'string',
-    required: true,
-    descriptionKey: 'Text description of the desired video',
-  },
-  {
-    name: 'duration',
-    type: 'integer',
-    range: '5 / 10, v3.0: 3 ~ 15',
-    defaultValue: 5,
-    descriptionKey: 'Video length in seconds',
-  },
-  {
-    name: 'metadata.AspectRatio',
-    type: 'enum',
-    enumValues: ['16:9', '9:16', '1:1'],
-    defaultValue: '16:9',
-    descriptionKey:
-      'Text-to-video aspect ratio; accepts 16:9, 9:16, or 1:1.',
-  },
-  {
-    name: 'mode',
-    type: 'enum',
-    enumValues: ['std', 'pro'],
-    descriptionKey:
-      'For text-to-video, v1.0 and v1.5 use pro; v1.6 supports std/pro; v2+ usually omits mode.',
-  },
-  {
-    name: 'metadata.NegativePrompt',
-    type: 'string',
-    descriptionKey: 'Kling negative prompt',
-  },
-  {
-    name: 'metadata.CfgScale',
-    type: 'number',
-    range: '0 ~ 1',
-    defaultValue: 0.5,
-    descriptionKey: 'Guidance scale; not supported by some Kling v2 models',
-  },
-  {
-    name: 'metadata.Sound',
-    type: 'enum',
-    enumValues: ['on', 'off'],
-    defaultValue: 'off',
-    descriptionKey: 'Sound generation switch',
-  },
-  {
-    name: 'metadata.MultiShot',
-    type: 'boolean',
-    descriptionKey: 'Whether to enable multi-shot generation',
-  },
-  {
-    name: 'metadata.ShotType',
-    type: 'enum',
-    enumValues: ['auto', 'customize'],
-    descriptionKey: 'Shot type for multi-shot generation',
-  },
-  {
-    name: 'metadata.MultiPrompt',
-    type: 'array',
-    descriptionKey: 'Prompt list for customized multi-shot generation',
-  },
-  {
-    name: 'metadata.LogoAdd',
-    type: 'boolean',
-    descriptionKey: 'Whether to add the AI-generated content logo',
-  },
-  {
-    name: 'metadata.LogoParam',
-    type: 'object',
-    descriptionKey: 'Logo configuration object',
-  },
-  {
-    name: 'metadata.CameraControl',
-    type: 'object',
-    descriptionKey: 'Camera control object',
-  },
-  {
-    name: 'metadata.CallbackUrl',
-    type: 'string',
-    descriptionKey: 'Callback URL for provider task notifications',
-  },
-  {
-    name: 'metadata.ExternalTaskId',
-    type: 'string',
-    descriptionKey: 'Caller-provided task id for provider-side tracing',
-  },
-]
-
-const KLING_IMAGE_VIDEO_PARAMS: SupportedParameter[] = [
-  {
-    name: 'prompt',
-    type: 'string',
-    required: true,
-    descriptionKey: 'Text description of the desired video',
-  },
-  {
-    name: 'image',
-    type: 'string',
-    required: true,
-    descriptionKey: 'Input image URL or base64. Required for Kling image-to-video.',
-  },
-  {
-    name: 'duration',
-    type: 'integer',
-    range: '5 / 10, v3.0: 3 ~ 15',
-    defaultValue: 5,
-    descriptionKey: 'Video length in seconds',
-  },
-  {
-    name: 'mode',
-    type: 'enum',
-    enumValues: ['std', 'pro', '4k'],
-    descriptionKey:
-      'Image-to-video generation mode; 4k is available only on supported Kling versions.',
-  },
-  {
-    name: 'metadata.NegativePrompt',
-    type: 'string',
-    descriptionKey: 'Kling negative prompt',
-  },
-  {
-    name: 'metadata.CfgScale',
-    type: 'number',
-    range: '0 ~ 1',
-    defaultValue: 0.5,
-    descriptionKey: 'Guidance scale; not supported by some Kling v2 models',
-  },
-  {
-    name: 'metadata.Sound',
-    type: 'enum',
-    enumValues: ['on', 'off'],
-    defaultValue: 'off',
-    descriptionKey: 'Sound generation switch',
-  },
-  {
-    name: 'metadata.MultiShot',
-    type: 'boolean',
-    descriptionKey: 'Whether to enable multi-shot generation',
-  },
-  {
-    name: 'metadata.ShotType',
-    type: 'enum',
-    enumValues: ['auto', 'customize'],
-    descriptionKey: 'Shot type for multi-shot generation',
-  },
-  {
-    name: 'metadata.MultiPrompt',
-    type: 'array',
-    descriptionKey: 'Prompt list for customized multi-shot generation',
-  },
-  {
-    name: 'metadata.LogoAdd',
-    type: 'boolean',
-    descriptionKey: 'Whether to add the AI-generated content logo',
-  },
-  {
-    name: 'metadata.LogoParam',
-    type: 'object',
-    descriptionKey: 'Logo configuration object',
-  },
-  {
-    name: 'metadata.ImageTail',
-    type: 'string',
-    descriptionKey: 'Tail-frame image URL or base64',
-  },
-  {
-    name: 'metadata.StaticMask',
-    type: 'string',
-    descriptionKey: 'Static mask image URL or base64 for motion brush',
-  },
-  {
-    name: 'metadata.DynamicMasks',
-    type: 'array',
-    descriptionKey: 'Dynamic mask list for motion brush trajectories',
-  },
-  {
-    name: 'metadata.CameraControl',
-    type: 'object',
-    descriptionKey: 'Camera control object',
-  },
-  {
-    name: 'metadata.ElementList',
-    type: 'array',
-    descriptionKey: 'Reference subject list; supports up to three elements',
-  },
-  {
-    name: 'metadata.CallbackUrl',
-    type: 'string',
-    descriptionKey: 'Callback URL for provider task notifications',
-  },
-  {
-    name: 'metadata.ExternalTaskId',
-    type: 'string',
-    descriptionKey: 'Caller-provided task id for provider-side tracing',
-  },
-]
-
-const VIDU_VIDEO_PARAMS: SupportedParameter[] = [
-  {
-    name: 'prompt',
-    type: 'string',
-    required: true,
-    descriptionKey: 'Text description of the desired video',
-  },
-  {
-    name: 'images',
-    type: 'array',
-    descriptionKey:
-      'Vidu image URL list. VCLM Vidu requires URLs for image-to-video.',
-  },
-  {
-    name: 'duration',
-    type: 'integer',
-    defaultValue: 5,
-    descriptionKey: 'Provider-specific video length',
-  },
-  {
-    name: 'metadata.CallbackUrl',
-    type: 'string',
-    descriptionKey: 'Callback URL for provider task notifications',
-  },
-  {
-    name: 'metadata.ExternalTaskId',
-    type: 'string',
-    descriptionKey: 'Caller-provided task id for provider-side tracing',
   },
 ]
 
@@ -1229,76 +895,8 @@ const SEEDANCE_VIDEO_PARAMS: SupportedParameter[] = [
 
 type ApiCategory = 'reasoning' | 'embedding' | 'image' | 'video' | 'chat'
 
-function isGrokImagineVideoModel(model: PricingModel): boolean {
-  return /grok-imagine-video/i.test(model.model_name)
-}
-
-function isGrokImagineVideo15Model(model: PricingModel): boolean {
-  return /grok-imagine-video-1\.5/i.test(model.model_name)
-}
-
-function buildGrokImagineVideoParameters(
-  model: PricingModel
-): SupportedParameter[] {
-  return isGrokImagineVideo15Model(model)
-    ? GROK_IMAGINE_IMAGE_VIDEO_PARAMS
-    : GROK_IMAGINE_TEXT_VIDEO_PARAMS
-}
-
-function isGrokImagineImageModel(model: PricingModel): boolean {
-  return /(?:^|[-_])grok-imagine(?:$|-image)|grok-2-image/i.test(
-    model.model_name
-  )
-}
-
-function isKlingVideoModel(model: PricingModel): boolean {
-  return /kling/i.test(model.model_name)
-}
-
-function isKlingTextOnlyModel(model: PricingModel): boolean {
-  return model.model_name.trim().toLowerCase() === 'kling-v1-5'
-}
-
-function buildKlingVideoParameters(model: PricingModel): SupportedParameter[] {
-  return isKlingTextOnlyModel(model)
-    ? KLING_TEXT_VIDEO_PARAMS
-    : KLING_IMAGE_VIDEO_PARAMS
-}
-
-function isViduVideoModel(model: PricingModel): boolean {
-  return /vidu/i.test(model.model_name)
-}
-
 function isSeedanceVideoModel(model: PricingModel): boolean {
   return /seedance|doubao-seedance/i.test(model.model_name)
-}
-
-function normalizeConfiguredParameters(
-  params?: PricingApiParameter[]
-): SupportedParameter[] {
-  if (!Array.isArray(params) || params.length === 0) {
-    return []
-  }
-
-  return params.flatMap((param) => {
-    const name = param.name?.trim()
-    const type = param.type?.trim() as SupportedParameter['type']
-    if (!name || !type) {
-      return []
-    }
-
-    return [
-      {
-        name,
-        type,
-        required: param.required,
-        defaultValue: param.defaultValue,
-        range: param.range,
-        enumValues: param.enumValues,
-        descriptionKey: param.descriptionKey?.trim() || name,
-      },
-    ]
-  })
 }
 
 /**
@@ -1333,21 +931,77 @@ function apiCategoryOf(model: PricingModel): ApiCategory {
 export function buildSupportedParameters(
   model: PricingModel
 ): SupportedParameter[] {
-  const configuredParams = normalizeConfiguredParameters(model.api_parameters)
-  if (configuredParams.length > 0) return configuredParams
-
-  if (isGrokImagineVideoModel(model)) {
-    return buildGrokImagineVideoParameters(model)
-  }
-  if (isGrokImagineImageModel(model)) return GROK_IMAGINE_IMAGE_PARAMS
-  if (isKlingVideoModel(model)) return buildKlingVideoParameters(model)
-  if (isViduVideoModel(model)) return VIDU_VIDEO_PARAMS
-  if (isSeedanceVideoModel(model)) return SEEDANCE_VIDEO_PARAMS
-
   const cat = apiCategoryOf(model)
-  if (cat === 'reasoning') return REASONING_PARAMS
-  if (cat === 'embedding') return EMBEDDING_PARAMS
-  if (cat === 'image') return IMAGE_PARAMS
-  if (cat === 'video') return VIDEO_PARAMS
+  if (cat === 'reasoning') {
+    return REASONING_PARAMS
+  }
+  if (cat === 'embedding') {
+    return EMBEDDING_PARAMS
+  }
+  if (cat === 'image') {
+    return IMAGE_PARAMS
+  }
+  if (cat === 'video' && isSeedanceVideoModel(model)) {
+    return SEEDANCE_VIDEO_PARAMS
+  }
+  if (cat === 'video') {
+    return VIDEO_PARAMS
+  }
   return COMMON_CHAT_PARAMS
+}
+
+export type RateLimit = {
+  group: string
+  rpm: number
+  tpm: number
+  rpd: number
+}
+
+/** Build per-group RPM / TPM / RPD limits for the model. */
+export function buildRateLimits(model: PricingModel): RateLimit[] {
+  const groups = (model.enable_groups ?? []).filter((g) => g && g !== 'auto')
+  const targets = groups.length > 0 ? groups : ['default']
+  const cat = apiCategoryOf(model)
+  const baseSeed = hashStringToSeed(`${model.model_name}:rl`)
+  const isHeavy = cat === 'image' || cat === 'video'
+  const isLight = cat === 'embedding'
+  let baseRpm = 500
+  let baseTpm = 200_000
+  let baseRpd = 10_000
+  if (isHeavy) {
+    baseRpm = 60
+    baseTpm = 0
+    baseRpd = 1_000
+  } else if (isLight) {
+    baseRpm = 5_000
+    baseTpm = 1_000_000
+    baseRpd = 100_000
+  }
+
+  return [...targets]
+    .sort((a, b) => a.localeCompare(b))
+    .map((group) => {
+      const rand = seededRandom(baseSeed ^ hashStringToSeed(group))
+      const tier = 0.6 + rand() * 1.4
+      return {
+        group,
+        rpm: Math.round((baseRpm * tier) / 10) * 10,
+        tpm: baseTpm === 0 ? 0 : Math.round((baseTpm * tier) / 1_000) * 1_000,
+        rpd: Math.round((baseRpd * tier) / 100) * 100,
+      }
+    })
+}
+
+/** Format an integer rate-limit value compactly. */
+export function formatRateLimit(value: number): string {
+  if (value <= 0) {
+    return '—'
+  }
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}M`
+  }
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}K`
+  }
+  return value.toLocaleString()
 }

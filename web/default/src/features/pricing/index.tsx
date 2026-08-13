@@ -48,20 +48,16 @@ import { LoadingSkeleton, ModelDetailsDrawer } from './components'
 import { EXCLUDED_GROUPS, FILTER_ALL, getEndpointTypeLabels } from './constants'
 import { usePricingData } from './hooks/use-pricing-data'
 import {
-  formatDisplayBasePrice,
-  getDisplayPricingEntries,
-  getTieredSecondPricingEntries,
-} from './lib/display-pricing'
-import {
   getDynamicDisplayGroupRatio,
   getDynamicPricingSummary,
 } from './lib/dynamic-price'
 import { parseTags } from './lib/filters'
+import { isTokenBasedModel } from './lib/model-helpers'
 import {
-  isSecondBilledFixedPriceModel,
-  isTokenBasedModel,
-} from './lib/model-helpers'
-import { formatPrice, formatRequestPrice } from './lib/price'
+  formatPrice,
+  formatRequestPrice,
+  getFixedPriceUnitLabel,
+} from './lib/price'
 import type { PricingModel, TokenUnit } from './types'
 
 type PricingModality = 'all' | 'text' | 'video' | 'image' | 'audio'
@@ -284,58 +280,6 @@ function PriceSummary(props: {
   selectedGroup: string
 }) {
   const { t } = useTranslation()
-  const displayGroupRatio = getDynamicDisplayGroupRatio(
-    props.model,
-    props.selectedGroup
-  )
-  const tieredSecondEntries = getTieredSecondPricingEntries(
-    props.model,
-    displayGroupRatio
-  )
-  const displayPricingEntries = getDisplayPricingEntries(
-    props.model,
-    displayGroupRatio
-  )
-
-  if (tieredSecondEntries.length > 0) {
-    const primaryTier = tieredSecondEntries[0]
-    const visibleSteps = primaryTier.steps.slice(0, 2)
-
-    return (
-      <div className='flex flex-wrap gap-x-4 gap-y-1'>
-        {visibleSteps.map((step) => (
-          <span key={step.key} className='text-muted-foreground text-xs'>
-            {primaryTier.label} · {step.label}{' '}
-            <span className='font-mono font-semibold text-orange-600 dark:text-orange-300'>
-              {step.formatted}
-            </span>
-            /s
-          </span>
-        ))}
-      </div>
-    )
-  }
-
-  if (displayPricingEntries.length > 0) {
-    const basePrice = formatDisplayBasePrice(props.model, displayGroupRatio)
-    let unitSuffix = `/ ${t('request')}`
-    if (displayPricingEntries[0].unit === 'second') {
-      unitSuffix = '/s'
-    } else if (displayPricingEntries[0].unit === 'image') {
-      unitSuffix = `/ ${t('image')}`
-    }
-
-    return (
-      <span className='text-muted-foreground text-xs'>
-        {t('Default combination')}{' '}
-        <span className='font-mono font-semibold text-orange-600 dark:text-orange-300'>
-          {basePrice}
-        </span>{' '}
-        {unitSuffix}
-      </span>
-    )
-  }
-
   const isDynamicPricing =
     props.model.billing_mode === 'tiered_expr' &&
     Boolean(props.model.billing_expr)
@@ -345,7 +289,10 @@ function PriceSummary(props: {
         showRechargePrice: false,
         priceRate: props.priceRate,
         usdExchangeRate: props.usdExchangeRate,
-        groupRatioMultiplier: displayGroupRatio,
+        groupRatioMultiplier: getDynamicDisplayGroupRatio(
+          props.model,
+          props.selectedGroup
+        ),
       })
     : null
 
@@ -429,10 +376,6 @@ function PriceSummary(props: {
     )
   }
 
-  const fixedPriceUnitSuffix = isSecondBilledFixedPriceModel(props.model)
-    ? '/s'
-    : `/ ${t('request')}`
-
   return (
     <span className='text-muted-foreground text-xs'>
       <span className='font-mono font-semibold text-orange-600 dark:text-orange-300'>
@@ -444,7 +387,7 @@ function PriceSummary(props: {
           props.selectedGroup
         )}
       </span>{' '}
-      {fixedPriceUnitSuffix}
+      / {getFixedPriceUnitLabel(t, props.model)}
     </span>
   )
 }

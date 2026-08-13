@@ -20,11 +20,15 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
 import { useStatus } from '@/hooks/use-status'
+import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { getPricing } from '../api'
 
 export function usePricingData() {
   const { status } = useStatus()
+  // Subscribe so pricing cards/tables re-render when the USD/CNY toggle
+  // changes. Formatters read the override from the store at call time.
+  useSystemConfigStore((state) => state.currencyOverride)
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['pricing'],

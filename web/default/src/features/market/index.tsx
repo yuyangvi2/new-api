@@ -40,6 +40,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { CurrencyToggle } from '@/components/currency-toggle'
 import { PublicLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -62,16 +63,11 @@ import { cn } from '@/lib/utils'
 import { DEFAULT_TOKEN_UNIT } from '../pricing/constants'
 import { usePricingData } from '../pricing/hooks/use-pricing-data'
 import {
-  getDisplayPricingEntries,
-  localizeDisplayPricingLabel,
-} from '../pricing/lib/display-pricing'
-import {
   getDynamicDisplayGroupRatio,
   getDynamicPricingSummary,
 } from '../pricing/lib/dynamic-price'
 import {
   getDisplayGroupRatio,
-  isSecondBilledFixedPriceModel,
   isTokenBasedModel,
 } from '../pricing/lib/model-helpers'
 import {
@@ -155,11 +151,6 @@ function compareMarketModels(
 function getMarketSortPrice(model: IndexedMarketModel): number {
   const groupRatio = getDisplayGroupRatio(model)
 
-  const displayPricingEntries = getDisplayPricingEntries(model, groupRatio)
-  if (displayPricingEntries.length > 0) {
-    return displayPricingEntries[0]?.numericPrice ?? Number.POSITIVE_INFINITY
-  }
-
   if (model.billing_mode === 'tiered_expr' && model.billing_expr) {
     const summary = getDynamicPricingSummary(model, {
       tokenUnit: DEFAULT_TOKEN_UNIT,
@@ -239,11 +230,9 @@ function modelSignals(model: MarketModel): string[] {
 
 type MarketPriceEntry = {
   key: string
-  label?: string
-  labelKey?: string
+  labelKey: string
   formatted: string
-  unit: 'M' | 'request' | 'second' | 'image'
-  numericPrice?: number
+  unit: 'M' | 'request'
 }
 
 function formatCompactTokenCount(value?: number): string | null {
@@ -274,7 +263,7 @@ function getSavingPercent(groupRatio: number): number | null {
 }
 
 function isMutedPriceEntry(entry: MarketPriceEntry): boolean {
-  const normalizedLabel = (entry.labelKey ?? entry.label ?? '').toLowerCase()
+  const normalizedLabel = entry.labelKey.toLowerCase()
   return entry.key.includes('cache') || normalizedLabel.includes('cache')
 }
 
@@ -328,26 +317,7 @@ function MarketPricePanel(props: {
   const officialEntries: MarketPriceEntry[] = []
   let primaryFallback: ReactNode | null = null
 
-  const displayPricingEntries = getDisplayPricingEntries(
-    model,
-    displayGroupRatio
-  )
-
-  if (displayPricingEntries.length > 0) {
-    primaryEntries.push(...displayPricingEntries.slice(0, 2))
-    extraEntries.push(...displayPricingEntries.slice(2))
-
-    if (savingPercent !== null) {
-      officialEntries.push(
-        ...getDisplayPricingEntries(model, 1)
-          .slice(0, 2)
-          .map((entry) => ({
-            ...entry,
-            key: `official-${entry.key}`,
-          }))
-      )
-    }
-  } else if (dynamicSummary?.isSpecialExpression) {
+  if (dynamicSummary?.isSpecialExpression) {
     primaryFallback = t('Special billing expression')
   } else if (dynamicSummary) {
     const visibleDynamicEntries = dynamicSummary.primaryEntries.length
@@ -546,25 +516,22 @@ function MarketPricePanel(props: {
       )
     }
   } else {
-    const unit = isSecondBilledFixedPriceModel(model) ? 'second' : 'request'
-    const labelKey = unit === 'second' ? 'Per Second' : 'Per Request'
-
     primaryEntries.push({
       key: 'request',
-      labelKey,
+      labelKey: 'Per Request',
       formatted: formatRequestPrice(
         model,
         false,
         props.priceRate,
         props.usdExchangeRate
       ),
-      unit,
+      unit: 'request',
     })
 
     if (savingPercent !== null) {
       officialEntries.push({
         key: 'official-request',
-        labelKey,
+        labelKey: 'Per Request',
         formatted: formatFixedPrice(
           model,
           '__base',
@@ -573,7 +540,7 @@ function MarketPricePanel(props: {
           props.usdExchangeRate,
           { __base: 1 }
         ),
-        unit,
+        unit: 'request',
       })
     }
   }
@@ -587,16 +554,8 @@ function MarketPricePanel(props: {
   const officialLine = officialEntries.length > 0 && savingPercent !== null
 
   const renderUnit = (entry: MarketPriceEntry) => {
-    if (entry.unit === 'second') {
-      return '/s'
-    }
-
     if (entry.unit === 'request') {
       return `/ ${t('request')}`
-    }
-
-    if (entry.unit === 'image') {
-      return `/ ${t('image')}`
     }
 
     return '/ 1M'
@@ -614,7 +573,7 @@ function MarketPricePanel(props: {
         )}
       >
         <span className='text-muted-foreground min-w-0 truncate text-xs leading-4 font-bold'>
-          {localizeDisplayPricingLabel(entry.labelKey ?? entry.label ?? '', t)}
+          {t(entry.labelKey)}
         </span>
         <span className='shrink-0 text-right whitespace-nowrap'>
           <span
@@ -665,12 +624,7 @@ function MarketPricePanel(props: {
                   key={entry.key}
                   className='flex items-center justify-between gap-4'
                 >
-                  <span>
-                    {localizeDisplayPricingLabel(
-                      entry.labelKey ?? entry.label ?? '',
-                      t
-                    )}
-                  </span>
+                  <span>{t(entry.labelKey)}</span>
                   <span className='font-mono'>
                     {entry.formatted} {renderUnit(entry)}
                   </span>
@@ -688,12 +642,7 @@ function MarketPricePanel(props: {
                   key={entry.key}
                   className='flex items-center justify-between gap-4'
                 >
-                  <span>
-                    {localizeDisplayPricingLabel(
-                      entry.labelKey ?? entry.label ?? '',
-                      t
-                    )}
-                  </span>
+                  <span>{t(entry.labelKey)}</span>
                   <span className='font-mono'>
                     {entry.formatted} {renderUnit(entry)}
                   </span>
@@ -1055,34 +1004,37 @@ export function Market() {
             <div className='bg-background/65 space-y-4 rounded-2xl border p-3 sm:p-4'>
               <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
                 <h2 className='text-lg font-bold'>{t('Available models')}</h2>
-                <Select
-                  value={sortBy}
-                  onValueChange={(value) => {
-                    if (value !== null) {
-                      setSortBy(value as MarketSortOption)
-                    }
-                  }}
-                >
-                  <SelectTrigger
-                    className='bg-card h-9 w-full rounded-full sm:w-[190px]'
-                    aria-label={t('Sort')}
+                <div className='flex items-center gap-2'>
+                  <CurrencyToggle />
+                  <Select
+                    value={sortBy}
+                    onValueChange={(value) => {
+                      if (value !== null) {
+                        setSortBy(value as MarketSortOption)
+                      }
+                    }}
                   >
-                    <SelectValue>
-                      {t(
-                        MARKET_SORT_OPTIONS.find(
-                          (option) => option.value === sortBy
-                        )?.label ?? 'Recommended'
-                      )}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
-                    {MARKET_SORT_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {t(option.label)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    <SelectTrigger
+                      className='bg-card h-9 w-full rounded-full sm:w-[190px]'
+                      aria-label={t('Sort')}
+                    >
+                      <SelectValue>
+                        {t(
+                          MARKET_SORT_OPTIONS.find(
+                            (option) => option.value === sortBy
+                          )?.label ?? 'Recommended'
+                        )}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      {MARKET_SORT_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {t(option.label)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className='relative'>

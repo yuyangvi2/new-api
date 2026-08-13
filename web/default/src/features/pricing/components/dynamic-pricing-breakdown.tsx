@@ -22,8 +22,8 @@ import { useTranslation } from 'react-i18next'
 
 import { StaticDataTable } from '@/components/data-table'
 import { Badge } from '@/components/ui/badge'
+import { useBillingCurrencyConfig } from '@/lib/currency'
 import { cn } from '@/lib/utils'
-import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import {
   BILLING_PRICING_VARS,
@@ -161,7 +161,7 @@ export function DynamicPricingBreakdown({
 }: DynamicPricingBreakdownProps) {
   const { t } = useTranslation()
   const expr = billingExpr || ''
-  const currency = useSystemConfigStore((s) => s.config.currency)
+  const currency = useBillingCurrencyConfig()
 
   const { symbol, rate } = useMemo(() => {
     if (currency.quotaDisplayType === 'CNY') {

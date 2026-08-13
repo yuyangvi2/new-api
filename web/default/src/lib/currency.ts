@@ -78,11 +78,15 @@ For commercial licensing, please contact support@quantumnous.com
  * 4. **Billing displays**: Use formatBillingCurrencyFromUSD() to avoid token display
  * 5. **Effective exchange rate**: When quotaDisplayType is 'USD', use rate of 1 regardless of config
  */
+import { useShallow } from 'zustand/react/shallow'
+
 import {
   useSystemConfigStore,
   DEFAULT_CURRENCY_CONFIG,
   type CurrencyConfig,
   type CurrencyDisplayType,
+  type CurrencyOverride,
+  parseCurrencyOverride,
 } from '@/stores/system-config-store'
 
 export interface CurrencyFormatOptions {
@@ -103,11 +107,17 @@ export interface CurrencyFormatOptions {
   showSymbol?: boolean
   /** Locale used for number formatting (defaults to the runtime locale) */
   locale?: Intl.LocalesArgument | undefined
+  /**
+   * Override the billing-display currency for this call only.
+   * Honored only by formatBillingCurrencyFromUSD; quota/balance/payment
+   * formatters always follow the admin-configured display type.
+   */
+  currencyOverride?: CurrencyOverride
 }
 
 type ResolvedCurrencyFormatOptions = Omit<
   Required<CurrencyFormatOptions>,
-  'locale'
+  'locale' | 'currencyOverride'
 > & {
   locale: Intl.LocalesArgument | undefined
 }
@@ -159,9 +169,15 @@ export function parseCurrencyDisplayType(
   return isCurrencyDisplayType(value) ? value : fallback
 }
 
-function getConfig(): CurrencyConfig {
-  const { config } = useSystemConfigStore.getState()
-  const currency = config?.currency ?? DEFAULT_CURRENCY_CONFIG
+function getAdminCurrencyConfig(): CurrencyConfig {
+  const currency =
+    useSystemConfigStore.getState().config?.currency ?? DEFAULT_CURRENCY_CONFIG
+  return sanitizeCurrencyConfig(currency)
+}
+
+function sanitizeCurrencyConfig(
+  currency: CurrencyConfig | undefined
+): CurrencyConfig {
   return {
     ...DEFAULT_CURRENCY_CONFIG,
     ...currency,
@@ -182,6 +198,42 @@ function getConfig(): CurrencyConfig {
       currency?.customCurrencySymbol?.trim() ||
       DEFAULT_CURRENCY_CONFIG.customCurrencySymbol,
   }
+}
+
+/**
+ * Admin-configured display currency only. Used by quota/balance/payment
+ * formatters so a pricing USD/CNY toggle cannot change wallet amounts.
+ */
+function getConfig(): CurrencyConfig {
+  return getAdminCurrencyConfig()
+}
+
+/**
+ * Billing/pricing display currency: admin config plus an optional user
+ * USD/CNY override. TOKENS and CUSTOM admin modes ignore the override so
+ * token-only sites and custom currencies stay intact.
+ */
+function getBillingConfig(override?: CurrencyOverride): CurrencyConfig {
+  const { currencyOverride } = useSystemConfigStore.getState()
+  return applyBillingCurrencyOverride(
+    getAdminCurrencyConfig(),
+    override ?? currencyOverride
+  )
+}
+
+function applyBillingCurrencyOverride(
+  config: CurrencyConfig,
+  override: CurrencyOverride
+): CurrencyConfig {
+  const activeOverride = parseCurrencyOverride(override)
+  if (
+    activeOverride === 'system' ||
+    config.quotaDisplayType === 'TOKENS' ||
+    config.quotaDisplayType === 'CUSTOM'
+  ) {
+    return config
+  }
+  return { ...config, quotaDisplayType: activeOverride }
 }
 
 function getDisplayMeta(config: CurrencyConfig): DisplayMeta {
@@ -391,7 +443,8 @@ export function formatCurrencyFromUSD(
 ): string {
   if (amountUSD == null || Number.isNaN(amountUSD)) return '-'
 
-  const { config, meta } = getCurrencyDisplay()
+  const config = getConfig()
+  const meta = getDisplayMeta(config)
   const merged = mergeOptions(options)
 
   if (meta.kind === 'tokens') {
@@ -454,7 +507,7 @@ export function formatBillingCurrencyFromUSD(
 ): string {
   if (amountUSD == null || Number.isNaN(amountUSD)) return '-'
 
-  const { config } = getCurrencyDisplay()
+  const config = getBillingConfig(options?.currencyOverride)
   const meta = getBillingDisplayMeta(config)
   const merged = mergeOptions(options)
   const value =
@@ -499,7 +552,7 @@ export function formatQuotaWithCurrency(
 ): string {
   if (quota == null || Number.isNaN(quota)) return '-'
 
-  const { config } = getCurrencyDisplay()
+  const config = getConfig()
   const amountUSD = quota / config.quotaPerUnit
   return formatCurrencyFromUSD(amountUSD, options)
 }
@@ -609,9 +662,59 @@ export function formatLocalCurrencyAmount(
 ): string {
   if (amount == null || Number.isNaN(amount)) return '-'
 
-  const { config } = getCurrencyDisplay()
+  const config = getConfig()
   const meta = getBillingDisplayMeta(config)
   const merged = mergeOptions(options)
 
   return formatCurrencyValue(amount, merged, meta)
+}
+
+/**
+ * Resolve the billing-display currency config (admin config + user override)
+ * reactively. Use when rendering model/API prices so the USD/CNY toggle is
+ * honored. Quota/balance/payment UIs should keep reading admin config.
+ *
+ * TOKENS and CUSTOM admin modes ignore the override. Billing formatters still
+ * map TOKENS -> USD via getBillingDisplayMeta, matching
+ * formatBillingCurrencyFromUSD.
+ */
+export function useBillingCurrencyConfig(): CurrencyConfig {
+  const currency = useSystemConfigStore(
+    useShallow((state) => state.config.currency)
+  )
+  const currencyOverride = useSystemConfigStore(
+    (state) => state.currencyOverride
+  )
+  return applyBillingCurrencyOverride(
+    sanitizeCurrencyConfig(currency),
+    currencyOverride
+  )
+}
+
+/**
+ * Current user-side billing-currency override and setter.
+ * Setting the same currency as the admin config writes back `'system'`.
+ */
+export function useCurrencyOverride(): {
+  override: CurrencyOverride
+  setOverride: (override: CurrencyOverride) => void
+} {
+  const override = useSystemConfigStore((state) => state.currencyOverride)
+  const setCurrencyOverride = useSystemConfigStore(
+    (state) => state.setCurrencyOverride
+  )
+  const quotaDisplayType = useSystemConfigStore(
+    (state) => state.config.currency.quotaDisplayType
+  )
+
+  const setOverride = (next: CurrencyOverride) => {
+    const parsed = parseCurrencyOverride(next)
+    if (parsed !== 'system' && parsed === quotaDisplayType) {
+      setCurrencyOverride('system')
+      return
+    }
+    setCurrencyOverride(parsed)
+  }
+
+  return { override, setOverride }
 }

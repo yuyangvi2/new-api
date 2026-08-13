@@ -404,7 +404,7 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*
 	if err := taskcommon.UnmarshalMetadata(req.Metadata, payload); err != nil {
 		return nil, err
 	}
-	if req.Duration != 0 {
+	if req.Duration > 0 {
 		payload.Duration = &req.Duration
 	} else if sec, err := strconv.Atoi(strings.TrimSpace(req.Seconds)); err == nil && sec > 0 {
 		payload.Duration = &sec

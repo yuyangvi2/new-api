@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import {
   ChevronRight,
+  Gauge,
   KeyRound,
   ScrollText,
   Sigma,
@@ -42,7 +43,9 @@ import { getApiBaseAddress } from '@/lib/server-address'
 
 import { getEndpointTypeLabels } from '../constants'
 import {
+  buildRateLimits,
   buildSupportedParameters,
+  formatRateLimit,
   type SupportedParameter,
 } from '../lib/mock-stats'
 import { replaceModelInPath } from '../lib/model-helpers'
@@ -79,58 +82,6 @@ type SampleContext = {
   modelName: string
   endpointType: string
   endpointPath: string
-}
-
-function isGrokImagineVideoModelName(modelName: string): boolean {
-  return /grok-imagine-video/i.test(modelName)
-}
-
-function isGrokImagineVideo15ModelName(modelName: string): boolean {
-  return /grok-imagine-video-1\.5/i.test(modelName)
-}
-
-function isGrokImagineImageModelName(modelName: string): boolean {
-  return /(?:^|[-_])grok-imagine(?:$|-image)|grok-2-image/i.test(modelName)
-}
-
-function isKlingVideoModelName(modelName: string): boolean {
-  return /kling/i.test(modelName)
-}
-
-function getKlingTextMode(modelName: string): string | undefined {
-  const normalized = modelName.trim().toLowerCase()
-  if (normalized === 'kling-v1' || normalized === 'kling-v1-5') {
-    return 'pro'
-  }
-  if (normalized === 'kling-v1-6') {
-    return 'std'
-  }
-  return undefined
-}
-
-function prefersKlingTextSample(modelName: string): boolean {
-  return modelName.trim().toLowerCase() === 'kling-v1-5'
-}
-
-function isViduVideoModelName(modelName: string): boolean {
-  return /vidu/i.test(modelName)
-}
-
-function isSeedanceVideoModelName(modelName: string): boolean {
-  return /seedance|doubao-seedance/i.test(modelName)
-}
-
-function prefersViduTextSample(modelName: string): boolean {
-  return /^(viduq2|viduq1|vidu1\.5|vidu2\.0)$/i.test(modelName.trim())
-}
-
-function usesOpenAIVideoGuide(modelName: string): boolean {
-  return (
-    isGrokImagineVideoModelName(modelName) ||
-    isKlingVideoModelName(modelName) ||
-    isViduVideoModelName(modelName) ||
-    isSeedanceVideoModelName(modelName)
-  )
 }
 
 function buildChatSample(lang: Lang, ctx: SampleContext): string {
@@ -405,73 +356,37 @@ function buildEmbeddingSample(lang: Lang, ctx: SampleContext): string {
 function buildImageSample(lang: Lang, ctx: SampleContext): string {
   const url = `${ctx.baseUrl}${ctx.endpointPath}`
   const prompt = 'A serene koi pond at sunset, ukiyo-e style.'
-  const isGrokImagineImage = isGrokImagineImageModelName(ctx.modelName)
-  const body = isGrokImagineImage
-    ? {
-        model: ctx.modelName,
-        prompt,
-        n: 1,
-        aspect_ratio: '1:1',
-        resolution: '1k',
-        response_format: 'url',
-      }
-    : { model: ctx.modelName, prompt, size: '1024x1024', n: 1 }
 
   if (lang === 'curl') {
-    const bodyJson = JSON.stringify(body, null, 2)
+    const body = JSON.stringify(
+      { model: ctx.modelName, prompt, size: '1024x1024', n: 1 },
+      null,
+      2
+    )
     return [
       `curl ${url} \\`,
       `  -H "Authorization: Bearer $${ctx.apiKeyEnv}" \\`,
       `  -H "Content-Type: application/json" \\`,
-      `  -d '${bodyJson.replaceAll('\n', '\n     ')}'`,
+      `  -d '${body.replaceAll('\n', '\n     ')}'`,
     ].join('\n')
   }
   if (lang === 'python') {
-    const fields = isGrokImagineImage
-      ? [
-          `    model="${ctx.modelName}",`,
-          `    prompt="${prompt}",`,
-          `    n=1,`,
-          `    aspect_ratio="1:1",`,
-          `    resolution="1k",`,
-          `    response_format="url",`,
-        ]
-      : [
-          `    model="${ctx.modelName}",`,
-          `    prompt="${prompt}",`,
-          `    size="1024x1024",`,
-          `    n=1,`,
-        ]
-
     return [
       'from openai import OpenAI',
       '',
       `client = OpenAI(base_url="${ctx.baseUrl}/v1", api_key="<YOUR_API_KEY>")`,
       '',
       'response = client.images.generate(',
-      ...fields,
+      `    model="${ctx.modelName}",`,
+      `    prompt="${prompt}",`,
+      `    size="1024x1024",`,
+      `    n=1,`,
       ')',
       '',
       'print(response.data[0].url)',
     ].join('\n')
   }
   if (lang === 'typescript') {
-    const fields = isGrokImagineImage
-      ? [
-          `  model: '${ctx.modelName}',`,
-          `  prompt: '${prompt}',`,
-          `  n: 1,`,
-          `  aspect_ratio: '1:1',`,
-          `  resolution: '1k',`,
-          `  response_format: 'url',`,
-        ]
-      : [
-          `  model: '${ctx.modelName}',`,
-          `  prompt: '${prompt}',`,
-          `  size: '1024x1024',`,
-          `  n: 1,`,
-        ]
-
     return [
       `import OpenAI from 'openai'`,
       '',
@@ -481,13 +396,15 @@ function buildImageSample(lang: Lang, ctx: SampleContext): string {
       `})`,
       '',
       `const response = await client.images.generate({`,
-      ...fields,
+      `  model: '${ctx.modelName}',`,
+      `  prompt: '${prompt}',`,
+      `  size: '1024x1024',`,
+      `  n: 1,`,
       `})`,
       '',
       `console.log(response.data[0].url)`,
     ].join('\n')
   }
-  const bodyJson = JSON.stringify(body, null, 2)
   return [
     `const response = await fetch('${url}', {`,
     `  method: 'POST',`,
@@ -495,7 +412,12 @@ function buildImageSample(lang: Lang, ctx: SampleContext): string {
     `    Authorization: \`Bearer \${process.env.${ctx.apiKeyEnv}}\`,`,
     `    'Content-Type': 'application/json',`,
     `  },`,
-    `  body: JSON.stringify(${bodyJson.replaceAll('\n', '\n  ')}),`,
+    `  body: JSON.stringify({`,
+    `    model: '${ctx.modelName}',`,
+    `    prompt: '${prompt}',`,
+    `    size: '1024x1024',`,
+    `    n: 1,`,
+    `  }),`,
     `})`,
     '',
     `const data = await response.json()`,
@@ -503,90 +425,30 @@ function buildImageSample(lang: Lang, ctx: SampleContext): string {
   ].join('\n')
 }
 
+function isSeedanceVideoModel(modelName: string): boolean {
+  return /seedance|doubao-seedance/i.test(modelName)
+}
+
 function buildVideoSample(lang: Lang, ctx: SampleContext): string {
   const url = `${ctx.baseUrl}${ctx.endpointPath}`
-  let body: Record<string, unknown> = {
-    model: ctx.modelName,
-    prompt: 'Cinematic motion of a futuristic city at sunset.',
-    duration: 8,
-  }
-
-  if (isSeedanceVideoModelName(ctx.modelName)) {
-    const prompt =
-      'Create a 10 second night city video with a slow push-in camera move and neon lights reflected on wet streets.'
-    body = {
-      model: ctx.modelName,
-      content: [{ type: 'text', text: prompt }],
-      generate_audio: true,
-      ratio: '16:9',
-      resolution: '720p',
-      duration: 10,
-      watermark: false,
-    }
-  } else if (isGrokImagineVideoModelName(ctx.modelName)) {
-    body = isGrokImagineVideo15ModelName(ctx.modelName)
-      ? {
-          model: ctx.modelName,
-          prompt: 'Add smooth cinematic camera motion to the product photo.',
-          image: 'https://example.com/input.jpg',
-          duration: 8,
-          aspect_ratio: '16:9',
-          resolution: '720p',
-        }
-      : {
-          model: ctx.modelName,
-          prompt: 'Cinematic motion of a futuristic city at sunset.',
-          duration: 8,
-          aspect_ratio: '16:9',
-          resolution: '720p',
-        }
-  } else if (isKlingVideoModelName(ctx.modelName)) {
-    if (prefersKlingTextSample(ctx.modelName)) {
-      body = {
+  const prompt =
+    'Create a 10 second night city video with a slow push-in camera move and neon lights reflected on wet streets.'
+  const body = isSeedanceVideoModel(ctx.modelName)
+    ? {
         model: ctx.modelName,
-        prompt: 'A cinematic product video of an orange pencil on a clean white desk.',
-        duration: 5,
-        mode: 'pro',
-        metadata: {
-          AspectRatio: '16:9',
-          NegativePrompt: 'text, watermark, distorted objects',
-          CfgScale: 0.5,
-        },
+        content: [{ type: 'text', text: prompt }],
+        generate_audio: true,
+        ratio: '16:9',
+        resolution: '720p',
+        duration: 10,
+        watermark: false,
       }
-    } else {
-      body = {
+    : {
         model: ctx.modelName,
-        prompt: 'Add subtle cinematic motion to the product photo.',
-        image: 'https://example.com/input.jpg',
-        duration: 5,
-        mode: 'std',
-        metadata: {
-          NegativePrompt: 'text, watermark, distorted objects',
-          CfgScale: 0.5,
-        },
+        prompt,
+        seconds: '10',
+        size: '1280x720',
       }
-
-      const mode = getKlingTextMode(ctx.modelName)
-      if (mode) {
-        body.mode = mode
-      }
-    }
-  } else if (isViduVideoModelName(ctx.modelName)) {
-    body = {
-      model: ctx.modelName,
-      prompt: 'A product shot of an orange pencil on a clean white desk.',
-      duration: 5,
-      metadata: {
-        CallbackUrl: 'https://example.com/callback',
-        ExternalTaskId: 'demo-vidu-001',
-      },
-    }
-
-    if (!prefersViduTextSample(ctx.modelName)) {
-      body.images = ['https://example.com/input.jpg']
-    }
-  }
-
   const bodyJson = JSON.stringify(body, null, 2)
 
   if (lang === 'curl') {
@@ -597,10 +459,12 @@ function buildVideoSample(lang: Lang, ctx: SampleContext): string {
       `  -d '${bodyJson.replaceAll('\n', '\n     ')}'`,
     ].join('\n')
   }
-
   if (lang === 'python') {
     return [
+      'import json',
       'import requests',
+      '',
+      `payload = json.loads('''${bodyJson}''')`,
       '',
       `response = requests.post(`,
       `    "${url}",`,
@@ -608,13 +472,12 @@ function buildVideoSample(lang: Lang, ctx: SampleContext): string {
       `        "Authorization": "Bearer <YOUR_API_KEY>",`,
       `        "Content-Type": "application/json",`,
       `    },`,
-      `    json=${bodyJson.replaceAll('\n', '\n    ')},`,
+      `    json=payload,`,
       `)`,
       `response.raise_for_status()`,
       `print(response.json())`,
     ].join('\n')
   }
-
   if (lang === 'typescript') {
     return [
       `const response = await fetch('${url}', {`,
@@ -623,14 +486,13 @@ function buildVideoSample(lang: Lang, ctx: SampleContext): string {
       `    Authorization: \`Bearer \${process.env.${ctx.apiKeyEnv}}\`,`,
       `    'Content-Type': 'application/json',`,
       `  },`,
-      `  body: JSON.stringify(${bodyJson.replaceAll('\n', '\n  ')}),`,
+      `  body: JSON.stringify(${bodyJson.replaceAll('\n', '\n    ')}),`,
       `})`,
       '',
-      `const data = await response.json()`,
-      `console.log(data)`,
+      `if (!response.ok) throw new Error(await response.text())`,
+      `console.log(await response.json())`,
     ].join('\n')
   }
-
   return [
     `const response = await fetch('${url}', {`,
     `  method: 'POST',`,
@@ -638,11 +500,11 @@ function buildVideoSample(lang: Lang, ctx: SampleContext): string {
     `    Authorization: \`Bearer \${process.env.${ctx.apiKeyEnv}}\`,`,
     `    'Content-Type': 'application/json',`,
     `  },`,
-    `  body: JSON.stringify(${bodyJson.replaceAll('\n', '\n  ')}),`,
+    `  body: JSON.stringify(${bodyJson.replaceAll('\n', '\n    ')}),`,
     `})`,
     '',
-    `const data = await response.json()`,
-    `console.log(data)`,
+    `if (!response.ok) throw new Error(await response.text())`,
+    `console.log(await response.json())`,
   ].join('\n')
 }
 
@@ -687,7 +549,7 @@ function CodeSamplesSection(props: {
 
   const endpoints = useMemo(() => {
     const types = props.model.supported_endpoint_types || []
-    const configuredEndpoints = types
+    return types
       .map((type) => {
         const info = props.endpointMap[type] || {}
         let path = info.path || ''
@@ -697,30 +559,6 @@ function CodeSamplesSection(props: {
         return { type, path, method: info.method || 'POST' }
       })
       .filter((e) => Boolean(e.path))
-
-    if (usesOpenAIVideoGuide(props.model.model_name || '')) {
-      const videoEndpointIndex = configuredEndpoints.findIndex(
-        (endpoint) => endpoint.type === 'openai-video'
-      )
-      if (videoEndpointIndex === 0) {
-        return configuredEndpoints
-      }
-      if (videoEndpointIndex > 0) {
-        const videoEndpoint = configuredEndpoints[videoEndpointIndex]
-        return [
-          videoEndpoint,
-          ...configuredEndpoints.filter(
-            (_, index) => index !== videoEndpointIndex
-          ),
-        ]
-      }
-      return [
-        { type: 'openai-video', path: '/v1/videos', method: 'POST' },
-        ...configuredEndpoints,
-      ]
-    }
-
-    return configuredEndpoints
   }, [props.model, props.endpointMap])
 
   const [endpointType, setEndpointType] = useState<string>(
@@ -878,19 +716,11 @@ function ParamRangeCell(props: { param: SupportedParameter }) {
   if (defaultValue !== undefined) {
     return (
       <div className='flex flex-col items-start gap-1'>
-        <div className='flex flex-wrap items-center gap-1'>
+        <div className='flex items-center gap-1'>
           <span className='text-muted-foreground text-sm'>=</span>
           <code className='bg-muted rounded px-1.5 py-0.5 font-mono text-sm'>
             {String(defaultValue)}
           </code>
-          {enumValues?.map((v) => (
-            <code
-              key={v}
-              className='bg-muted text-muted-foreground rounded px-1.5 py-0.5 font-mono text-sm'
-            >
-              {v}
-            </code>
-          ))}
         </div>
         {range && (
           <span className='text-muted-foreground font-mono text-sm leading-5'>
@@ -920,6 +750,65 @@ function ParamRangeCell(props: { param: SupportedParameter }) {
     )
   }
   return <span className='text-muted-foreground/60 text-sm'>—</span>
+}
+
+// ---------------------------------------------------------------------------
+// Rate-limits table
+// ---------------------------------------------------------------------------
+
+function RateLimitsSection(props: { model: PricingModel }) {
+  const { t } = useTranslation()
+  const limits = useMemo(() => buildRateLimits(props.model), [props.model])
+
+  if (limits.length === 0) return null
+
+  return (
+    <section>
+      <SectionTitle icon={Gauge}>{t('Rate limits')}</SectionTitle>
+      <StaticDataTable
+        className={tableStyles.sectionContainer}
+        headerRowClassName={tableStyles.mutedHeaderRow}
+        data={limits}
+        getRowKey={(limit) => limit.group}
+        getRowClassName={() => 'hover:bg-muted/20'}
+        columns={[
+          {
+            id: 'group',
+            header: t('Group'),
+            className: 'h-9',
+            cellClassName: 'py-2 font-mono',
+            cell: (limit) => limit.group,
+          },
+          {
+            id: 'rpm',
+            header: 'RPM',
+            className: 'h-9 text-right',
+            cellClassName: tableStyles.topNumericCell,
+            cell: (limit) => formatRateLimit(limit.rpm),
+          },
+          {
+            id: 'tpm',
+            header: 'TPM',
+            className: 'h-9 text-right',
+            cellClassName: tableStyles.topNumericCell,
+            cell: (limit) => formatRateLimit(limit.tpm),
+          },
+          {
+            id: 'rpd',
+            header: 'RPD',
+            className: 'h-9 text-right',
+            cellClassName: tableStyles.topNumericCell,
+            cell: (limit) => formatRateLimit(limit.rpd),
+          },
+        ]}
+      />
+      <p className='text-muted-foreground mt-2 text-[11px] leading-relaxed'>
+        {t(
+          'RPM = requests per minute, TPM = tokens per minute, RPD = requests per day. Limits apply per token group.'
+        )}
+      </p>
+    </section>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -969,6 +858,7 @@ export function ModelDetailsApi(props: {
       <CodeSamplesSection model={props.model} endpointMap={props.endpointMap} />
       <AuthSection />
       <SupportedParametersSection model={props.model} />
+      <RateLimitsSection model={props.model} />
     </div>
   )
 }

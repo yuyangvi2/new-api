@@ -58,19 +58,18 @@ function formatJsonValidationError(
     )
   }
 
-  let message = t('JSON is invalid. Please check the syntax.')
-  if (error.line && error.column) {
-    message = t('JSON is invalid at line {{line}}, column {{column}}.', {
-      line: error.line,
-      column: error.column,
-    })
-  } else if (error.position !== undefined) {
-    message = t('JSON is invalid at position {{position}}.', {
-      position: error.position,
-    })
-  }
-
-  const parts = [message]
+  const parts = [
+    error.line && error.column
+      ? t('JSON is invalid at line {{line}}, column {{column}}.', {
+          line: error.line,
+          column: error.column,
+        })
+      : error.position !== undefined
+        ? t('JSON is invalid at position {{position}}.', {
+            position: error.position,
+          })
+        : t('JSON is invalid. Please check the syntax.'),
+  ]
 
   if (error.missingCommaLine) {
     parts.push(
@@ -101,7 +100,6 @@ function createJsonStringField(
 const createModelSchema = (t: Translate) =>
   z.object({
     ModelPrice: createJsonStringField(t),
-    ModelPriceUnit: createJsonStringField(t),
     ModelRatio: createJsonStringField(t),
     CacheRatio: createJsonStringField(t),
     CreateCacheRatio: createJsonStringField(t),
@@ -172,7 +170,6 @@ export function RatioSettingsCard({
 
   const modelNormalizedDefaults = useRef({
     ModelPrice: normalizeJsonString(modelDefaults.ModelPrice),
-    ModelPriceUnit: normalizeJsonString(modelDefaults.ModelPriceUnit),
     ModelRatio: normalizeJsonString(modelDefaults.ModelRatio),
     CacheRatio: normalizeJsonString(modelDefaults.CacheRatio),
     CreateCacheRatio: normalizeJsonString(modelDefaults.CreateCacheRatio),
@@ -210,7 +207,6 @@ export function RatioSettingsCard({
     defaultValues: {
       ...modelDefaults,
       ModelPrice: formatJsonForTextarea(modelDefaults.ModelPrice),
-      ModelPriceUnit: formatJsonForTextarea(modelDefaults.ModelPriceUnit),
       ModelRatio: formatJsonForTextarea(modelDefaults.ModelRatio),
       CacheRatio: formatJsonForTextarea(modelDefaults.CacheRatio),
       CreateCacheRatio: formatJsonForTextarea(modelDefaults.CreateCacheRatio),
@@ -244,7 +240,6 @@ export function RatioSettingsCard({
   useEffect(() => {
     modelNormalizedDefaults.current = {
       ModelPrice: normalizeJsonString(modelDefaults.ModelPrice),
-      ModelPriceUnit: normalizeJsonString(modelDefaults.ModelPriceUnit),
       ModelRatio: normalizeJsonString(modelDefaults.ModelRatio),
       CacheRatio: normalizeJsonString(modelDefaults.CacheRatio),
       CreateCacheRatio: normalizeJsonString(modelDefaults.CreateCacheRatio),
@@ -263,7 +258,6 @@ export function RatioSettingsCard({
     modelForm.reset({
       ...modelDefaults,
       ModelPrice: formatJsonForTextarea(modelDefaults.ModelPrice),
-      ModelPriceUnit: formatJsonForTextarea(modelDefaults.ModelPriceUnit),
       ModelRatio: formatJsonForTextarea(modelDefaults.ModelRatio),
       CacheRatio: formatJsonForTextarea(modelDefaults.CacheRatio),
       CreateCacheRatio: formatJsonForTextarea(modelDefaults.CreateCacheRatio),
@@ -308,7 +302,6 @@ export function RatioSettingsCard({
     async (values: ModelFormValues) => {
       const normalized = {
         ModelPrice: normalizeJsonString(values.ModelPrice),
-        ModelPriceUnit: normalizeJsonString(values.ModelPriceUnit),
         ModelRatio: normalizeJsonString(values.ModelRatio),
         CacheRatio: normalizeJsonString(values.CacheRatio),
         CreateCacheRatio: normalizeJsonString(values.CreateCacheRatio),
@@ -435,7 +428,6 @@ export function RatioSettingsCard({
       <UpstreamRatioSync
         modelRatios={{
           ModelPrice: modelDefaults.ModelPrice,
-          ModelPriceUnit: modelDefaults.ModelPriceUnit,
           ModelRatio: modelDefaults.ModelRatio,
           CompletionRatio: modelDefaults.CompletionRatio,
           CacheRatio: modelDefaults.CacheRatio,

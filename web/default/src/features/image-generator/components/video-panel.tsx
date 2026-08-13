@@ -57,12 +57,11 @@ import { uploadReferenceMedia } from '../api'
 import {
   detectModelFamily,
   estimateSeedanceVideoTokens,
+  FAMILY_PARAMS,
   getSeedancePricePerMillionCNY,
   getSeedanceOutputSize,
   getSeedanceResolutionOptions,
   getUsableVideoImage,
-  getVideoDurationOptions,
-  getVideoFamilyParams,
   getVideoModelVariantState,
   isSeedanceVideoModel,
   isToAPIsSeedanceVideoModel,
@@ -75,7 +74,9 @@ import {
   SEEDANCE_REFERENCE_IMAGE_LIMIT,
   SEEDANCE_REFERENCE_VIDEO_LIMIT,
   SEEDANCE_REFERENCE_VIDEO_DURATION_LIMIT,
+  SEEDANCE_VIDEO_DURATIONS,
   SEEDANCE_VIDEO_RATIO_PRESETS,
+  VIDEO_DURATIONS,
   videoModelAllowsImageUpload,
   videoModelRequiresImage,
   videoModelSupportsImageInput,
@@ -126,10 +127,7 @@ export function VideoPanel({
   const { t } = useTranslation()
 
   const family = useMemo(() => detectModelFamily(config.model), [config.model])
-  const familyParams = useMemo(
-    () => getVideoFamilyParams(family, config.model),
-    [config.model, family]
-  )
+  const familyParams = useMemo(() => FAMILY_PARAMS[family], [family])
   const availableVariantModels = useMemo(
     () => variantModels.map((m) => m.value),
     [variantModels]
@@ -175,7 +173,6 @@ export function VideoPanel({
     referenceVideos.length > 0 &&
     (effectiveInputVideoDuration < 0 ||
       effectiveInputVideoDuration > SEEDANCE_REFERENCE_VIDEO_DURATION_LIMIT)
-  const promptText = config.prompt.trim()
   const referenceImageError = hasTooManyReferenceImages
     ? t('Maximum {{count}} URLs', {
         count: SEEDANCE_REFERENCE_IMAGE_LIMIT,
@@ -203,7 +200,6 @@ export function VideoPanel({
     !hasTooManyReferenceVideos &&
     !hasTooManyReferenceAudios &&
     !hasInvalidInputVideoDuration &&
-    promptText.length > 0 &&
     !isGenerating
   const resolutionParam = familyParams.find(
     (param) => param.key === 'resolution' && param.type === 'select'
@@ -215,7 +211,9 @@ export function VideoPanel({
         : (resolutionParam?.options ?? []),
     [config.model, isSeedanceVideo, resolutionParam?.options]
   )
-  const durationOptions = getVideoDurationOptions(config.model)
+  const durationOptions = isSeedanceVideo
+    ? SEEDANCE_VIDEO_DURATIONS
+    : VIDEO_DURATIONS
   const advancedParams = familyParams.filter(
     (param) => param.key !== 'resolution'
   )
@@ -332,32 +330,6 @@ export function VideoPanel({
   ])
 
   useEffect(() => {
-    if (durationOptions.includes(config.duration)) return
-    updateConfig('duration', durationOptions[0] ?? 5)
-  }, [config.duration, durationOptions, updateConfig])
-
-  useEffect(() => {
-    let nextMetadata: Record<string, unknown> | undefined
-
-    for (const param of familyParams) {
-      if (param.type !== 'select' || !param.options) continue
-      const currentValue = config.metadata[param.key]
-      if (currentValue === undefined || currentValue === null) continue
-      const currentText = String(currentValue)
-      const isSupported = param.options.some(
-        (option) => option.value === currentText
-      )
-      if (isSupported) continue
-      nextMetadata = nextMetadata ?? { ...config.metadata }
-      nextMetadata[param.key] = param.default
-    }
-
-    if (nextMetadata) {
-      updateConfig('metadata', nextMetadata)
-    }
-  }, [config.metadata, familyParams, updateConfig])
-
-  useEffect(() => {
     if (!config.image) return
     if (getUsableVideoImage(config.model, config.image)) return
     updateConfig('image', '')
@@ -401,10 +373,10 @@ export function VideoPanel({
           </div>
         )}
 
-        {/* Motion prompt */}
+        {/* Motion prompt (optional) */}
         <div className='space-y-2'>
           <Label className='text-sm font-medium'>
-            {t('Motion prompt')}
+            {t('Motion prompt (optional)')}
           </Label>
           <Textarea
             value={config.prompt}
@@ -419,9 +391,7 @@ export function VideoPanel({
 
         {showImageInput && (
           <div className='space-y-2'>
-            <Label className='text-sm font-medium'>
-              {requiresImage ? t('Input image') : t('Input image (optional)')}
-            </Label>
+            <Label className='text-sm font-medium'>{t('Input image')}</Label>
             <ImageSourceInput
               value={config.image}
               sourceType={config.imageSourceType}

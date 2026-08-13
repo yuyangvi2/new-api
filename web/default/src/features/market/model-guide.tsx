@@ -36,7 +36,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ModelDetailsContent } from '@/features/pricing/components/model-details'
 import { DEFAULT_TOKEN_UNIT } from '@/features/pricing/constants'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
-import { getDisplayBillingUnitLabelKey } from '@/features/pricing/lib/model-helpers'
 import type { PricingModel } from '@/features/pricing/types'
 import { cn } from '@/lib/utils'
 
@@ -52,11 +51,6 @@ function modelDescription(
   model: PricingModel,
   t: ReturnType<typeof useTranslation>['t']
 ) {
-  if (model.model_name.trim().toLowerCase() === 'grok-imagine-video-1.5') {
-    return t(
-      'Grok Imagine Video 1.5 is xAI image-to-video model for animating an input image into a short video. It supports creative camera motion, product image animation, storyboards, and visual concept validation; pure text-to-video is not supported.'
-    )
-  }
   if (model.description) return model.description
   const provider = model.vendor_name || t('Unknown provider')
   const kind = t(marketKindLabelKey(inferKind(model)))
@@ -211,7 +205,7 @@ function ModelHero(props: {
               variant='secondary'
               className='rounded-full px-3 py-1 shadow-sm'
             >
-              {t(getDisplayBillingUnitLabelKey(model))}
+              {model.quota_type === 0 ? t('Token-based') : t('Per Request')}
             </Badge>
           </div>
         </div>
@@ -226,7 +220,7 @@ function ModelHero(props: {
           <ModelStat
             icon={Database}
             label={t('Billing')}
-            value={t(getDisplayBillingUnitLabelKey(model))}
+            value={model.quota_type === 0 ? t('Token-based') : t('Per Request')}
           />
           <ModelStat
             icon={ShieldCheck}

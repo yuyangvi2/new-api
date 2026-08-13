@@ -18,7 +18,6 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { EXCLUDED_GROUPS, FILTER_ALL, QUOTA_TYPE_VALUES } from '../constants'
 import type { PricingModel } from '../types'
-import { isDisplayPricingModel } from './display-pricing'
 
 // ----------------------------------------------------------------------------
 // Model Helper Utilities
@@ -107,21 +106,4 @@ export function replaceModelInPath(path: string, modelName: string): string {
  */
 export function isTokenBasedModel(model: PricingModel): boolean {
   return model.quota_type === QUOTA_TYPE_VALUES.TOKEN
-}
-
-export function isSecondBilledFixedPriceModel(model: PricingModel): boolean {
-  if (model.quota_type !== QUOTA_TYPE_VALUES.REQUEST) return false
-  return model.model_price_unit === 'second'
-}
-
-export function getDisplayBillingUnitLabelKey(model: PricingModel): string {
-  if (isDisplayPricingModel(model)) {
-    return model.display_pricing?.unit === 'second'
-      ? 'Per Second'
-      : 'Per Request'
-  }
-
-  if (isSecondBilledFixedPriceModel(model)) return 'Per Second'
-
-  return isTokenBasedModel(model) ? 'Token-based' : 'Per Request'
 }

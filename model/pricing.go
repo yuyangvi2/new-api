@@ -36,23 +36,7 @@ type Pricing struct {
 	SupportedEndpointTypes []constant.EndpointType `json:"supported_endpoint_types"`
 	BillingMode            string                  `json:"billing_mode,omitempty"`
 	BillingExpr            string                  `json:"billing_expr,omitempty"`
-	DisplayPricing         map[string]interface{}  `json:"display_pricing,omitempty"`
-	APIParameters          []PricingAPIParameter   `json:"api_parameters,omitempty"`
 	PricingVersion         string                  `json:"pricing_version,omitempty"`
-}
-
-type PricingAPIParameter struct {
-	Name           string      `json:"name"`
-	Type           string      `json:"type"`
-	Required       bool        `json:"required,omitempty"`
-	DefaultValue   interface{} `json:"defaultValue,omitempty"`
-	Range          string      `json:"range,omitempty"`
-	EnumValues     []string    `json:"enumValues,omitempty"`
-	DescriptionKey string      `json:"descriptionKey,omitempty"`
-}
-
-type pricingAPIParameterEnvelope struct {
-	Parameters []PricingAPIParameter `json:"parameters"`
 }
 
 const (
@@ -67,35 +51,6 @@ type PricingVendor struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	Icon        string `json:"icon,omitempty"`
-}
-
-func parsePricingAPIParameters(raw string) []PricingAPIParameter {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return nil
-	}
-
-	var params []PricingAPIParameter
-	if err := common.UnmarshalJsonStr(raw, &params); err != nil {
-		var envelope pricingAPIParameterEnvelope
-		if err := common.UnmarshalJsonStr(raw, &envelope); err != nil {
-			return nil
-		}
-		params = envelope.Parameters
-	}
-
-	normalized := make([]PricingAPIParameter, 0, len(params))
-	for _, param := range params {
-		param.Name = strings.TrimSpace(param.Name)
-		param.Type = strings.TrimSpace(param.Type)
-		param.Range = strings.TrimSpace(param.Range)
-		param.DescriptionKey = strings.TrimSpace(param.DescriptionKey)
-		if param.Name == "" || param.Type == "" {
-			continue
-		}
-		normalized = append(normalized, param)
-	}
-	return normalized
 }
 
 var (
@@ -277,7 +232,7 @@ func updatePricing() {
 			continue
 		}
 		var raw map[string]interface{}
-		if err := common.UnmarshalJsonStr(meta.Endpoints, &raw); err == nil {
+		if err := common.Unmarshal([]byte(meta.Endpoints), &raw); err == nil {
 			endpoints := make([]string, 0, len(raw))
 			for k, v := range raw {
 				switch v.(type) {
@@ -321,7 +276,7 @@ func updatePricing() {
 			continue
 		}
 		var raw map[string]interface{}
-		if err := common.UnmarshalJsonStr(meta.Endpoints, &raw); err == nil {
+		if err := common.Unmarshal([]byte(meta.Endpoints), &raw); err == nil {
 			for k, v := range raw {
 				switch val := v.(type) {
 				case string:
@@ -361,13 +316,6 @@ func updatePricing() {
 			pricing.Icon = meta.Icon
 			pricing.Tags = meta.Tags
 			pricing.VendorID = meta.VendorID
-			if strings.TrimSpace(meta.DisplayPricing) != "" {
-				var displayPricing map[string]interface{}
-				if err := common.UnmarshalJsonStr(meta.DisplayPricing, &displayPricing); err == nil {
-					pricing.DisplayPricing = displayPricing
-				}
-			}
-			pricing.APIParameters = parsePricingAPIParameters(meta.APIParameters)
 		}
 		modelPrice, findPrice := ratio_setting.GetModelPrice(model, false)
 		if findPrice {

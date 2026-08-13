@@ -1,6 +1,7 @@
 package xai
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,81 +10,82 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestEstimateBillingUsesGrokImagineVideo15ResolutionPrice(t *testing.T) {
-	originalQuotaPerUnit := common.QuotaPerUnit
-	t.Cleanup(func() { common.QuotaPerUnit = originalQuotaPerUnit })
-	common.QuotaPerUnit = 1_000_000
-
+func TestValidateRequestRequiresImageForGrokImagineVideo15(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-	ctx.Set("task_request", relaycommon.TaskSubmitReq{
-		Model:    "grok-imagine-video-1.5",
-		Image:    "https://example.com/input.jpg",
-		Duration: 8,
-		Metadata: map[string]any{"resolution": "720p"},
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(
+		http.MethodPost,
+		"/v1/videos/generations",
+		strings.NewReader(`{"model":"grok-imagine-video-1.5","prompt":"animate this"}`),
+	)
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	taskErr := (&TaskAdaptor{}).ValidateRequestAndSetAction(c, &relaycommon.RelayInfo{
+		TaskRelayInfo: &relaycommon.TaskRelayInfo{},
 	})
-
-	ratios := (&TaskAdaptor{}).EstimateBilling(ctx, &relaycommon.RelayInfo{
-		OriginModelName: "grok-imagine-video-1.5",
-		PriceData: types.PriceData{
-			Quota:          80_000,
-			GroupRatioInfo: types.GroupRatioInfo{GroupRatio: 1},
-		},
-	})
-
-	got, ok := ratios["xai_imagine_price"]
-	require.True(t, ok)
-	assert.InDelta(t, 1.13/0.08, got, 0.000001)
-}
-
-func TestValidateRequestRejectsVideo15WithoutImage(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	req := httptest.NewRequest(http.MethodPost, "/v1/video/generations", strings.NewReader(`{
-		"model":"grok-imagine-video-1.5",
-		"prompt":"animate it",
-		"duration":8
-	}`))
-	req.Header.Set("Content-Type", "application/json")
-	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-	ctx.Request = req
-	info := &relaycommon.RelayInfo{OriginModelName: "grok-imagine-video-1.5", TaskRelayInfo: &relaycommon.TaskRelayInfo{}}
-
-	taskErr := (&TaskAdaptor{}).ValidateRequestAndSetAction(ctx, info)
 
 	require.NotNil(t, taskErr)
-	assert.Contains(t, taskErr.Message, "image is required")
+	assert.Equal(t, "missing_image", taskErr.Code)
+	assert.Equal(t, http.StatusBadRequest, taskErr.StatusCode)
+	assert.True(t, taskErr.LocalError)
 }
 
-func TestValidateRequestPreservesTopLevelResolution(t *testing.T) {
+func TestEstimateBillingUsesDurationResolutionAndInputImage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	req := httptest.NewRequest(http.MethodPost, "/v1/video/generations", strings.NewReader(`{
-		"model":"grok-imagine-video-1.5",
-		"prompt":"animate it",
-		"image":"https://example.com/input.jpg",
-		"duration":6,
-		"resolution":"480p",
-		"aspect_ratio":"16:9"
-	}`))
-	req.Header.Set("Content-Type", "application/json")
-	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-	ctx.Request = req
-	info := &relaycommon.RelayInfo{OriginModelName: "grok-imagine-video-1.5", TaskRelayInfo: &relaycommon.TaskRelayInfo{}}
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(
+		http.MethodPost,
+		"/v1/videos/generations",
+		strings.NewReader(`{"model":"grok-imagine-video-1.5","prompt":"animate","image":"https://example.com/a.png","duration":10,"metadata":{"resolution":"1080p"}}`),
+	)
+	c.Request.Header.Set("Content-Type", "application/json")
+	info := &relaycommon.RelayInfo{
+		ChannelMeta:   &relaycommon.ChannelMeta{UpstreamModelName: "grok-imagine-video-1.5"},
+		TaskRelayInfo: &relaycommon.TaskRelayInfo{},
+	}
 
-	taskErr := (&TaskAdaptor{}).ValidateRequestAndSetAction(ctx, info)
-	require.Nil(t, taskErr)
-	storedReq, err := relaycommon.GetTaskRequest(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, "480p", storedReq.Metadata["resolution"])
-	assert.Equal(t, "16:9", storedReq.Metadata["aspect_ratio"])
+	require.Nil(t, (&TaskAdaptor{}).ValidateRequestAndSetAction(c, info))
+	ratios := (&TaskAdaptor{}).EstimateBilling(c, info)
+
+	require.Contains(t, ratios, "xai_imagine_price")
+	assert.InDelta(t, 31.375, ratios["xai_imagine_price"], 0.000001)
 }
 
-func TestParseTaskResultExtractsURLAndCostTicks(t *testing.T) {
+func TestBuildRequestBodyPreservesTopLevelResolutionAndAspectRatio(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(
+		http.MethodPost,
+		"/v1/videos/generations",
+		strings.NewReader(`{"model":"grok-imagine-video-1.5","prompt":"animate","image":"https://example.com/a.png","duration":5,"resolution":"1080p","aspect_ratio":"16:9"}`),
+	)
+	c.Request.Header.Set("Content-Type", "application/json")
+	info := &relaycommon.RelayInfo{
+		ChannelMeta:   &relaycommon.ChannelMeta{UpstreamModelName: "grok-imagine-video-1.5"},
+		TaskRelayInfo: &relaycommon.TaskRelayInfo{},
+	}
+	adaptor := &TaskAdaptor{}
+
+	require.Nil(t, adaptor.ValidateRequestAndSetAction(c, info))
+	ratios := adaptor.EstimateBilling(c, info)
+	bodyReader, err := adaptor.BuildRequestBody(c, info)
+	require.NoError(t, err)
+	body, err := io.ReadAll(bodyReader)
+	require.NoError(t, err)
+
+	var payload map[string]any
+	require.NoError(t, common.Unmarshal(body, &payload))
+	assert.Equal(t, "1080p", payload["resolution"])
+	assert.Equal(t, "16:9", payload["aspect_ratio"])
+	assert.InDelta(t, 15.75, ratios["xai_imagine_price"], 0.000001)
+}
+
+func TestParseTaskResultExtractsCostTicks(t *testing.T) {
 	body := []byte(`{
 		"id":"task_upstream",
 		"status":"completed",

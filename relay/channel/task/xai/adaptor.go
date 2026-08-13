@@ -15,7 +15,6 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relay/channel"
 	"github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
-	xaipricing "github.com/QuantumNous/new-api/relay/channel/xai/pricing"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
@@ -33,6 +32,13 @@ type videoInfo struct {
 	Duration          int    `json:"duration,omitempty"`
 	RespectModeration bool   `json:"respect_moderation,omitempty"`
 	URL               string `json:"url,omitempty"`
+}
+
+type xaiVideoPriceSpec struct {
+	baseOutputPriceUSD float64
+	inputImageUSD      float64
+	outputByResolution map[string]float64
+	defaultResolution  string
 }
 
 type responseTask struct {
@@ -58,44 +64,47 @@ type TaskAdaptor struct {
 	baseURL string
 }
 
+const xaiUSDTicksPerDollar = 10_000_000_000.0
+
+var videoPriceSpecs = map[string]xaiVideoPriceSpec{
+	"grok-imagine-video": {
+		baseOutputPriceUSD: 0.05,
+		inputImageUSD:      0.002,
+		defaultResolution:  "720p",
+		outputByResolution: map[string]float64{
+			"480p": 0.05,
+			"720p": 0.07,
+		},
+	},
+	"grok-imagine-video-1.5": {
+		baseOutputPriceUSD: 0.08,
+		inputImageUSD:      0.01,
+		defaultResolution:  "720p",
+		outputByResolution: map[string]float64{
+			"480p":  0.08,
+			"720p":  0.14,
+			"1080p": 0.25,
+		},
+	},
+}
+
 func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo) {
 	a.baseURL = strings.TrimRight(info.ChannelBaseUrl, "/")
 	a.apiKey = info.ApiKey
 }
 
 func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskError {
-	taskErr := relaycommon.ValidateMultipartDirect(c, info)
-	if taskErr != nil {
+	if taskErr := relaycommon.ValidateMultipartDirect(c, info); taskErr != nil {
 		return taskErr
 	}
 	req, err := relaycommon.GetTaskRequest(c)
 	if err != nil {
 		return service.TaskErrorWrapperLocal(err, "invalid_request", http.StatusBadRequest)
 	}
-	mergeXAITopLevelMetadata(c, &req)
-	c.Set("task_request", req)
-	if strings.EqualFold(info.OriginModelName, "grok-imagine-video-1.5") && strings.TrimSpace(req.Image) == "" && len(req.Images) == 0 {
-		return service.TaskErrorWrapperLocal(fmt.Errorf("image is required for grok-imagine-video-1.5"), "invalid_request", http.StatusBadRequest)
+	if req.Model == "grok-imagine-video-1.5" && !req.HasImage() {
+		return service.TaskErrorWrapperLocal(fmt.Errorf("image is required for grok-imagine-video-1.5"), "missing_image", http.StatusBadRequest)
 	}
 	return nil
-}
-
-func mergeXAITopLevelMetadata(c *gin.Context, req *relaycommon.TaskSubmitReq) {
-	if req == nil {
-		return
-	}
-	var raw map[string]any
-	if err := common.UnmarshalBodyReusable(c, &raw); err != nil {
-		return
-	}
-	if req.Metadata == nil {
-		req.Metadata = make(map[string]any)
-	}
-	for _, key := range []string{"resolution", "aspect_ratio"} {
-		if value, ok := raw[key]; ok {
-			req.Metadata[key] = value
-		}
-	}
 }
 
 func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInfo) map[string]float64 {
@@ -103,19 +112,24 @@ func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInf
 	if err != nil {
 		return nil
 	}
-	price, ok := xaipricing.GrokImagineTaskPrice(req, info.OriginModelName)
-	if !ok || info.PriceData.Quota <= 0 {
+	spec, ok := videoPriceSpecs[info.UpstreamModelName]
+	if !ok || spec.baseOutputPriceUSD <= 0 {
 		return nil
 	}
-	groupRatio := info.PriceData.GroupRatioInfo.GroupRatio
-	if groupRatio < 0 {
-		groupRatio = 0
+	seconds := xaiRequestDuration(req)
+	if seconds > relaycommon.MaxTaskDurationSeconds {
+		seconds = relaycommon.MaxTaskDurationSeconds
 	}
-	ratio := price * float64(common.QuotaPerUnit) * groupRatio / float64(info.PriceData.Quota)
-	if ratio == 1.0 {
-		return nil
+	resolution := xaiRequestResolution(req, spec)
+	outputPrice, ok := spec.outputByResolution[resolution]
+	if !ok || outputPrice <= 0 {
+		outputPrice = spec.outputByResolution[spec.defaultResolution]
 	}
-	return map[string]float64{"xai_imagine_price": ratio}
+	estimatedCost := outputPrice * float64(seconds)
+	if req.HasImage() {
+		estimatedCost += spec.inputImageUSD * float64(len(req.Images))
+	}
+	return map[string]float64{"xai_imagine_price": estimatedCost / spec.baseOutputPriceUSD}
 }
 
 func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, error) {
@@ -145,14 +159,20 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 			body["duration"] = seconds
 		}
 	}
+	if req.Size != "" {
+		body["size"] = req.Size
+	}
+	if req.Resolution != "" {
+		body["resolution"] = req.Resolution
+	}
+	if req.AspectRatio != "" {
+		body["aspect_ratio"] = req.AspectRatio
+	}
 	if req.Image != "" {
-		body["image"] = map[string]string{"url": req.Image}
-	} else if len(req.Images) > 0 {
-		if strings.EqualFold(info.OriginModelName, "grok-imagine-video-1.5") {
-			body["image"] = map[string]string{"url": req.Images[0]}
-		} else {
-			body["images"] = req.Images
-		}
+		body["image"] = req.Image
+	}
+	if len(req.Images) > 0 {
+		body["images"] = req.Images
 	}
 	for key, value := range req.Metadata {
 		if key == "size" || key == "model" || key == "prompt" {
@@ -272,12 +292,47 @@ func (a *TaskAdaptor) AdjustBillingOnCompleteWithClamp(task *model.Task, taskRes
 	return common.QuotaFromFloatChecked(taskResult.BillingUnits * bc.GroupRatio * common.QuotaPerUnit)
 }
 
+func xaiRequestDuration(req relaycommon.TaskSubmitReq) int {
+	seconds, _ := strconv.Atoi(req.Seconds)
+	if seconds == 0 {
+		seconds = req.Duration
+	}
+	if seconds <= 0 {
+		return 4
+	}
+	return seconds
+}
+
+func xaiRequestResolution(req relaycommon.TaskSubmitReq, spec xaiVideoPriceSpec) string {
+	if resolution := strings.ToLower(strings.TrimSpace(req.Resolution)); resolution != "" {
+		return resolution
+	}
+	for _, key := range []string{"resolution", "quality"} {
+		if value, ok := req.Metadata[key]; ok {
+			resolution := strings.ToLower(strings.TrimSpace(fmt.Sprint(value)))
+			if resolution != "" {
+				return resolution
+			}
+		}
+	}
+	size := strings.ToLower(strings.TrimSpace(req.Size))
+	switch size {
+	case "854x480", "480x854", "640x480", "480x640":
+		return "480p"
+	case "1280x720", "720x1280":
+		return "720p"
+	case "1920x1080", "1080x1920":
+		return "1080p"
+	}
+	return spec.defaultResolution
+}
+
 func xaiUsageCostUSD(usage map[string]any) (float64, bool) {
 	if len(usage) == 0 {
 		return 0, false
 	}
 	if ticks, ok := xaiNumericField(usage["cost_in_usd_ticks"]); ok && ticks > 0 {
-		return ticks / 10_000_000_000.0, true
+		return ticks / xaiUSDTicksPerDollar, true
 	}
 	if cost, ok := xaiNumericField(usage["cost_in_usd"]); ok && cost > 0 {
 		return cost, true

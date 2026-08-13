@@ -38,7 +38,6 @@ import { StaticDataTable } from '@/components/data-table'
 import { sideDrawerContentClassName } from '@/components/drawer-layout'
 import { GroupBadge } from '@/components/group-badge'
 import { PublicLayout } from '@/components/layout'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -59,15 +58,8 @@ import {
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
-import { DEFAULT_TOKEN_UNIT } from '../constants'
+import { DEFAULT_TOKEN_UNIT, QUOTA_TYPE_VALUES } from '../constants'
 import { usePricingData } from '../hooks/use-pricing-data'
-import {
-  formatDisplayBasePrice,
-  getDisplayPricingEntries,
-  getTieredSecondPricingEntries,
-  isWeightedFactorsDisplayPricingModel,
-  localizeDisplayPricingLabel,
-} from '../lib/display-pricing'
 import {
   getDynamicPriceEntries,
   getDynamicPricingSummary,
@@ -75,15 +67,14 @@ import {
   isDynamicPricingModel,
 } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
+import { getAvailableGroups, isTokenBasedModel } from '../lib/model-helpers'
 import {
-  getAvailableGroups,
-  getDisplayBillingUnitLabelKey,
-  isSecondBilledFixedPriceModel,
-  isTokenBasedModel,
-} from '../lib/model-helpers'
-import { formatFixedPrice, formatGroupPrice } from '../lib/price'
+  formatFixedPrice,
+  formatGroupPrice,
+  getFixedPriceTypeLabel,
+  getFixedPriceUnitLabel,
+} from '../lib/price'
 import type {
-  DisplayPricing,
   ModelCapability,
   PriceType,
   PricingModel,
@@ -131,26 +122,6 @@ const MODALITY_LABEL_KEYS: Record<string, string> = {
 const TOKEN_FORMAT = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 1,
 })
-
-type DisplayPricingUnit = DisplayPricing['unit']
-
-function getDisplayPricingUnitSuffix(
-  unit: DisplayPricingUnit,
-  t: (key: string) => string
-): string {
-  if (unit === 'second') return '/s'
-  if (unit === 'image') return `/ ${t('image')}`
-  return `/ ${t('request')}`
-}
-
-function getDisplayPricingFootnote(
-  unit: DisplayPricingUnit,
-  t: (key: string) => string
-): string {
-  if (unit === 'second') return t('Prices shown per second')
-  if (unit === 'image') return `${t('Prices shown per')} ${t('image')}`
-  return `${t('Prices shown per')} ${t('request')}`
-}
 
 function formatCatalogTokenCount(tokens: number): string {
   if (!Number.isFinite(tokens) || tokens <= 0) return ''
@@ -496,7 +467,9 @@ function ModelBackendProviderSection(props: { model: PricingModel }) {
   cells.push(
     <CatalogInfoCell key='type' label={t('Type')}>
       <CatalogTextValue>
-        {t(getDisplayBillingUnitLabelKey(model))}
+        {model.quota_type === QUOTA_TYPE_VALUES.TOKEN
+          ? t('Token-based')
+          : getFixedPriceTypeLabel(t, model)}
       </CatalogTextValue>
     </CatalogInfoCell>
   )
@@ -592,7 +565,9 @@ function ModelHeader(props: { model: PricingModel }) {
         )}
         <span className='text-muted-foreground/30'>·</span>
         <span className='text-muted-foreground/70'>
-          {t(getDisplayBillingUnitLabelKey(model))}
+          {model.quota_type === QUOTA_TYPE_VALUES.TOKEN
+            ? t('Token-based')
+            : getFixedPriceTypeLabel(t, model)}
         </span>
         {model.billing_mode === 'tiered_expr' && model.billing_expr && (
           <>
@@ -675,62 +650,6 @@ function PriceSection(props: {
         props.model.audio_completion_ratio != null,
     },
   ]
-  const displayPricingEntries = getDisplayPricingEntries(props.model, 1)
-  const tieredSecondEntries = getTieredSecondPricingEntries(props.model, 1)
-  const fixedPriceUnitSuffix = isSecondBilledFixedPriceModel(props.model)
-    ? '/s'
-    : `/ ${t('request')}`
-
-  if (tieredSecondEntries.length > 0) {
-    const entry = tieredSecondEntries[0]
-    const visibleSteps = entry.steps.slice(0, 3)
-
-    return (
-      <section>
-        <SectionTitle>{t('Base Price')}</SectionTitle>
-        <div className='grid grid-cols-1 gap-2 sm:grid-cols-3'>
-          {visibleSteps.map((step) => (
-            <div key={step.key} className='bg-muted/20 rounded-lg border p-3'>
-              <div className='text-muted-foreground text-xs'>
-                {localizeDisplayPricingLabel(entry.label, t)} · {step.label}
-              </div>
-              <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
-                {step.formatted}
-                <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
-                  /s
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    )
-  }
-
-  if (displayPricingEntries.length > 0) {
-    const basePrice = formatDisplayBasePrice(props.model, 1)
-    const unitSuffix = getDisplayPricingUnitSuffix(
-      displayPricingEntries[0].unit,
-      t
-    )
-
-    return (
-      <section>
-        <SectionTitle>{t('Base Price')}</SectionTitle>
-        <div className='bg-muted/20 rounded-lg border p-3'>
-          <div className='text-muted-foreground text-xs'>
-            {t('Default combination')}
-          </div>
-          <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
-            {basePrice}
-            <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
-              {unitSuffix}
-            </span>
-          </div>
-        </div>
-      </section>
-    )
-  }
 
   if (dynamicSummary) {
     if (dynamicSummary.isSpecialExpression) {
@@ -816,7 +735,7 @@ function PriceSection(props: {
         <SectionTitle>{t('Base Price')}</SectionTitle>
         <div className='flex items-baseline justify-between'>
           <span className='text-muted-foreground text-sm'>
-            {t(getDisplayBillingUnitLabelKey(props.model))}
+            {getFixedPriceTypeLabel(t, props.model)}
           </span>
           <span className='text-foreground font-mono text-sm font-semibold tabular-nums'>
             {formatFixedPrice(
@@ -827,9 +746,6 @@ function PriceSection(props: {
               props.usdExchangeRate,
               baseGroupRatioMap
             )}
-            <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
-              {fixedPriceUnitSuffix}
-            </span>
           </span>
         </div>
       </section>
@@ -837,7 +753,6 @@ function PriceSection(props: {
   }
 
   const secondaryItems = secondaryPriceTypes.filter((p) => p.available)
-
   const renderPrice = (type: PriceType) => (
     <>
       {formatGroupPrice(
@@ -888,163 +803,6 @@ function PriceSection(props: {
           </div>
         </div>
       )}
-    </section>
-  )
-}
-
-function DisplayPricingTieredSecondsSection(props: { model: PricingModel }) {
-  const { t } = useTranslation()
-  const entries = getTieredSecondPricingEntries(props.model, 1)
-
-  if (entries.length === 0) return null
-
-  const rows = entries.flatMap((entry) =>
-    entry.steps.map((step) => ({
-      key: `${entry.key}:${step.key}`,
-      profile: localizeDisplayPricingLabel(entry.label, t),
-      step,
-    }))
-  )
-
-  return (
-    <section>
-      <SectionTitle>{t('Second tiers')}</SectionTitle>
-      <StaticDataTable
-        className='-mx-4 rounded-none border-0 sm:mx-0'
-        tableClassName='text-sm'
-        headerRowClassName='hover:bg-transparent'
-        data={rows}
-        getRowKey={(row) => row.key}
-        columns={[
-          {
-            id: 'profile',
-            header: t('Profile'),
-            className:
-              'text-muted-foreground py-2 text-[10px] font-medium tracking-wider uppercase',
-            cellClassName: 'py-2.5',
-            cell: (row) => row.profile,
-          },
-          {
-            id: 'duration',
-            header: t('Duration'),
-            className:
-              'text-muted-foreground py-2 text-[10px] font-medium tracking-wider uppercase',
-            cellClassName: 'py-2.5',
-            cell: (row) => row.step.label,
-          },
-          {
-            id: 'price',
-            header: t('Price'),
-            className:
-              'text-muted-foreground py-2 text-right text-[10px] font-medium tracking-wider uppercase',
-            cellClassName: 'py-2.5 text-right font-mono',
-            cell: (row) => `${row.step.formatted} /s`,
-          },
-        ]}
-      />
-    </section>
-  )
-}
-
-function DisplayPricingFactorsSection(props: { model: PricingModel }) {
-  const { t } = useTranslation()
-  const config = props.model.display_pricing
-
-  if (
-    !isWeightedFactorsDisplayPricingModel(props.model) ||
-    !config ||
-    config.mode !== 'weighted_factors'
-  ) {
-    return null
-  }
-
-  const factors = config.factors.filter(
-    (factor) =>
-      typeof factor.field === 'string' &&
-      typeof factor.label === 'string' &&
-      Array.isArray(factor.values) &&
-      factor.values.length > 0
-  )
-
-  if (factors.length === 0) return null
-
-  return (
-    <section>
-      <SectionTitle>{t('Field multipliers')}</SectionTitle>
-      <p className='text-muted-foreground mb-3 text-sm'>
-        {t(
-          "Each field's multiplier is independent. The displayed price uses the default combination price and the selected value's relative multiplier."
-        )}
-      </p>
-      <div className='space-y-3'>
-        {factors.map((factor) => {
-          const defaultValue = config.base_values[factor.field] || '-'
-          const fieldType =
-            typeof factor.type === 'string' && factor.type.trim()
-              ? factor.type.trim()
-              : 'string'
-
-          return (
-            <div
-              key={factor.field}
-              className='bg-muted/10 overflow-hidden rounded-lg border'
-            >
-              <div className='space-y-2 px-3 py-3'>
-                <div className='text-foreground text-sm font-semibold'>
-                  {localizeDisplayPricingLabel(factor.label || factor.field, t)}
-                </div>
-                <div className='flex flex-wrap gap-2'>
-                  <Badge variant='outline' className='text-[11px]'>
-                    {t('Type: {{type}}', { type: fieldType })}
-                  </Badge>
-                  <Badge variant='secondary' className='text-[11px]'>
-                    {t('Default: {{value}}', { value: defaultValue })}
-                  </Badge>
-                </div>
-              </div>
-              <StaticDataTable
-                className='rounded-none border-x-0 border-b-0'
-                tableClassName='text-sm'
-                headerRowClassName='hover:bg-transparent'
-                data={factor.values.filter(
-                  (value) =>
-                    typeof value.value === 'string' &&
-                    typeof value.label === 'string' &&
-                    Number.isFinite(value.weight) &&
-                    value.weight > 0
-                )}
-                getRowKey={(value) => value.value}
-                columns={[
-                  {
-                    id: 'value',
-                    header: t('Field value'),
-                    className:
-                      'text-muted-foreground py-2 text-[10px] font-medium tracking-wider uppercase',
-                    cellClassName: 'py-2.5',
-                    cell: (value) =>
-                      localizeDisplayPricingLabel(
-                        value.label || value.value,
-                        t
-                      ),
-                  },
-                  {
-                    id: 'weight',
-                    header: t('Multiplier'),
-                    className:
-                      'text-muted-foreground py-2 text-right text-[10px] font-medium tracking-wider uppercase',
-                    cellClassName: 'py-2.5 text-right',
-                    cell: (value) => (
-                      <span className='rounded-full bg-amber-500 px-2 py-0.5 font-mono text-xs font-semibold text-white dark:bg-amber-400 dark:text-amber-950'>
-                        ×{value.weight}
-                      </span>
-                    ),
-                  },
-                ]}
-              />
-            </div>
-          )
-        })}
-      </div>
     </section>
   )
 }
@@ -1138,11 +896,6 @@ function GroupPricingSection(props: {
 
   const isTokenBased = isTokenBasedModel(props.model)
   const tokenUnitLabel = props.tokenUnit === 'K' ? '1K' : '1M'
-  const displayPricingEntries = getDisplayPricingEntries(props.model, 1)
-  const tieredSecondEntries = getTieredSecondPricingEntries(props.model, 1)
-  const fixedPriceUnitSuffix = isSecondBilledFixedPriceModel(props.model)
-    ? '/s'
-    : `/ ${t('request')}`
 
   const extraPriceTypes = useMemo(() => {
     const types: { label: string; type: PriceType }[] = []
@@ -1295,110 +1048,6 @@ function GroupPricingSection(props: {
     )
   }
 
-  if (tieredSecondEntries.length > 0) {
-    const primaryTier = tieredSecondEntries[0]
-
-    return (
-      <section>
-        <SectionTitle>{t('Pricing by Group')}</SectionTitle>
-        <AutoGroupChain model={props.model} autoGroups={props.autoGroups} />
-        <StaticDataTable
-          className='-mx-4 rounded-none border-0 sm:mx-0'
-          tableClassName='text-sm'
-          headerRowClassName='hover:bg-transparent'
-          data={availableGroups}
-          getRowKey={(group) => group}
-          columns={[
-            {
-              id: 'group',
-              header: t('Group'),
-              className: thClass,
-              cellClassName: 'py-2.5',
-              cell: (group) => <GroupBadge group={group} size='sm' />,
-            },
-            {
-              id: 'ratio',
-              header: t('Ratio'),
-              className: thClass,
-              cellClassName: 'text-muted-foreground py-2.5 font-mono',
-              cell: (group) => `${props.groupRatio[group] || 1}x`,
-            },
-            ...primaryTier.steps.map((step, stepIndex) => ({
-              id: step.key,
-              header: step.label,
-              className: `${thClass} text-right`,
-              cellClassName: 'py-2.5 text-right font-mono',
-              cell: (group: string) =>
-                `${
-                  getTieredSecondPricingEntries(
-                    props.model,
-                    props.groupRatio[group] || 1
-                  )[0]?.steps[stepIndex]?.formatted ?? '-'
-                } /s`,
-            })),
-          ]}
-        />
-        <p className='text-muted-foreground/40 mt-1.5 text-[10px]'>
-          {t('Prices shown per second')}
-        </p>
-      </section>
-    )
-  }
-
-  if (displayPricingEntries.length > 0) {
-    const unitSuffix = getDisplayPricingUnitSuffix(
-      displayPricingEntries[0].unit,
-      t
-    )
-    const footnote = getDisplayPricingFootnote(displayPricingEntries[0].unit, t)
-
-    return (
-      <section>
-        <SectionTitle>{t('Pricing by Group')}</SectionTitle>
-        <AutoGroupChain model={props.model} autoGroups={props.autoGroups} />
-        <StaticDataTable
-          className='-mx-4 rounded-none border-0 sm:mx-0'
-          tableClassName='text-sm'
-          headerRowClassName='hover:bg-transparent'
-          data={availableGroups}
-          getRowKey={(group) => group}
-          columns={[
-            {
-              id: 'group',
-              header: t('Group'),
-              className: thClass,
-              cellClassName: 'py-2.5',
-              cell: (group) => <GroupBadge group={group} size='sm' />,
-            },
-            {
-              id: 'ratio',
-              header: t('Ratio'),
-              className: thClass,
-              cellClassName: 'text-muted-foreground py-2.5 font-mono',
-              cell: (group) => `${props.groupRatio[group] || 1}x`,
-            },
-            {
-              id: 'base-price',
-              header: t('Default combination'),
-              className: `${thClass} text-right`,
-              cellClassName: 'py-2.5 text-right font-mono',
-              cell: (group: string) =>
-                `${
-                  formatDisplayBasePrice(
-                    props.model,
-                    props.groupRatio[group] || 1
-                  ) ?? '-'
-                } ${unitSuffix}`,
-            },
-          ]}
-        />
-        <p className='text-muted-foreground/40 mt-1.5 text-[10px]'>
-          {footnote}
-        </p>
-      </section>
-    )
-  }
-
   const renderGroupPrice = (group: string, type: PriceType) =>
     formatGroupPrice(
       props.model,
@@ -1411,14 +1060,14 @@ function GroupPricingSection(props: {
       props.groupRatio
     )
   const renderFixedGroupPrice = (group: string) =>
-    `${formatFixedPrice(
+    formatFixedPrice(
       props.model,
       group,
       showRechargePrice,
       props.priceRate,
       props.usdExchangeRate,
       props.groupRatio
-    )} ${fixedPriceUnitSuffix}`
+    )
 
   return (
     <section>
@@ -1486,9 +1135,9 @@ function GroupPricingSection(props: {
             {t('Prices shown per')} {tokenUnitLabel} tokens
           </p>
         )}
-        {!isTokenBased && isSecondBilledFixedPriceModel(props.model) && (
+        {!isTokenBased && (
           <p className='text-muted-foreground/40 mt-1.5 px-4 text-[10px] sm:px-0'>
-            {t('Prices shown per second')}
+            {t('Prices shown per')} {getFixedPriceUnitLabel(t, props.model)}
           </p>
         )}
       </div>
@@ -1562,8 +1211,6 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
               tokenUnit={props.tokenUnit}
               showRechargePrice={showRechargePrice}
             />
-            <DisplayPricingTieredSecondsSection model={props.model} />
-            <DisplayPricingFactorsSection model={props.model} />
             {isDynamic && (
               <DynamicPricingBreakdown billingExpr={props.model.billing_expr} />
             )}

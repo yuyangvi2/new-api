@@ -1,10 +1,6 @@
 package xai
 
-import (
-	"encoding/json"
-
-	"github.com/QuantumNous/new-api/dto"
-)
+import "github.com/QuantumNous/new-api/dto"
 
 // ChatCompletionResponse represents the response from XAI chat completion API
 type ChatCompletionResponse struct {
@@ -19,13 +15,9 @@ type ChatCompletionResponse struct {
 
 // quality, size or style are not supported by xAI API at the moment.
 type ImageRequest struct {
-	Model       string          `json:"model"`
-	Prompt      string          `json:"prompt" binding:"required"`
-	N           int             `json:"n,omitempty"`
-	AspectRatio string          `json:"aspect_ratio,omitempty"`
-	Resolution  string          `json:"resolution,omitempty"`
-	Image       json.RawMessage `json:"image,omitempty"`
-	Images      json.RawMessage `json:"images,omitempty"`
+	Model  string `json:"model"`
+	Prompt string `json:"prompt" binding:"required"`
+	N      int    `json:"n,omitempty"`
 	// Size           string          `json:"size,omitempty"`
 	// Quality        string          `json:"quality,omitempty"`
 	ResponseFormat string `json:"response_format,omitempty"`

@@ -41,7 +41,7 @@ export type PricingModel = {
   model_ratio: number
   completion_ratio: number
   model_price?: number
-  model_price_unit?: 'request' | 'second'
+  model_price_unit?: 'request' | 'second' | string
   cache_ratio?: number | null
   create_cache_ratio?: number | null
   image_ratio?: number | null
@@ -56,11 +56,8 @@ export type PricingModel = {
   billing_mode?: string
   /** Raw expression describing dynamic / tiered billing */
   billing_expr?: string
-  display_pricing?: DisplayPricing
   /** Pricing version returned by backend, useful for cache busting */
   pricing_version?: string
-  /** Backend-provided API parameter documentation for model guide pages */
-  api_parameters?: PricingApiParameter[]
   /**
    * Optional model metadata fields reserved for backend-provided catalog data.
    * Keep them data-driven; do not synthesize display values on the client.
@@ -76,68 +73,6 @@ export type PricingModel = {
   cover_thumb_url?: string
   yesterday_request_count?: number
 }
-
-export type PricingApiParameter = {
-  name: string
-  type:
-    | 'string'
-    | 'number'
-    | 'integer'
-    | 'boolean'
-    | 'enum'
-    | 'array'
-    | 'object'
-  required?: boolean
-  defaultValue?: string | number | boolean
-  range?: string
-  enumValues?: string[]
-  descriptionKey?: string
-}
-
-export type DisplayPricingFactorValue = {
-  value: string
-  label: string
-  weight: number
-}
-
-export type DisplayPricingFactor = {
-  field: string
-  label: string
-  type?: string
-  values: DisplayPricingFactorValue[]
-}
-
-export type DisplayPricingUnit = 'second' | 'request' | 'image'
-
-export type DisplayPricingWeightedFactors = {
-  mode: 'weighted_factors'
-  unit: DisplayPricingUnit
-  base_price: number
-  base_values: Record<string, string>
-  factors: DisplayPricingFactor[]
-}
-
-export type DisplayPricingSecondStep = {
-  label?: string
-  from_second?: number
-  to_second?: number
-  price: number
-}
-
-export type DisplayPricingTieredSeconds = {
-  mode: 'tiered_seconds'
-  unit: 'second'
-  base_value?: string
-  tiers: {
-    value: string
-    label: string
-    steps: DisplayPricingSecondStep[]
-  }[]
-}
-
-export type DisplayPricing =
-  | DisplayPricingWeightedFactors
-  | DisplayPricingTieredSeconds
 
 /** Input/output modalities supported by a model. */
 export type Modality = 'text' | 'image' | 'audio' | 'video' | 'file'

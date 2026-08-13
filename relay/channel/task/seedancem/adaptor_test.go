@@ -144,20 +144,6 @@ func TestConvertToRequestPayloadUsesOfficialContentFields(t *testing.T) {
 	assert.False(t, *payload.Watermark)
 }
 
-func TestConvertToRequestPayloadPreservesTopLevelNegativeOneDuration(t *testing.T) {
-	adaptor := &TaskAdaptor{}
-	req := &relaycommon.TaskSubmitReq{
-		Prompt:   "test prompt",
-		Model:    "doubao-seedance-2.0",
-		Duration: -1,
-	}
-
-	payload, err := adaptor.convertToRequestPayload(req)
-	require.NoError(t, err)
-	require.NotNil(t, payload.Duration)
-	assert.Equal(t, -1, *payload.Duration)
-}
-
 func TestChannelNameIsPublicAlias(t *testing.T) {
 	assert.Equal(t, "seedance-m", (&TaskAdaptor{}).GetChannelName())
 }
