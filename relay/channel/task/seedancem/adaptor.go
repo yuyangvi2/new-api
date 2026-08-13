@@ -94,6 +94,14 @@ type responseTask struct {
 		Code    string `json:"code"`
 		Message string `json:"message"`
 	} `json:"error"`
+	Code             string `json:"code,omitempty"`
+	Message          string `json:"message,omitempty"`
+	ResponseMetadata struct {
+		Error *struct {
+			Code    string `json:"Code"`
+			Message string `json:"Message"`
+		} `json:"Error,omitempty"`
+	} `json:"ResponseMetadata,omitempty"`
 	CreatedAt int64 `json:"created_at"`
 	UpdatedAt int64 `json:"updated_at"`
 }
@@ -185,6 +193,7 @@ func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInf
 	if err != nil {
 		return nil
 	}
+	req = seedanceMBillingRequest(req)
 	billingModel := seedanceMBillingModel(firstNonEmpty(info.OriginModelName, req.Model, info.UpstreamModelName))
 	quota, _, _, ok := doubaotask.EstimateSeedanceQuotaForRequest(
 		billingModel,
@@ -288,7 +297,21 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 		CompletionTokens: res.Usage.CompletionTokens,
 		TotalTokens:      res.Usage.TotalTokens,
 	}
-	switch strings.ToLower(strings.TrimSpace(res.Status)) {
+	errorReason := firstNonEmpty(res.Error.Message, res.Error.Code, res.Message, res.Code)
+	if res.ResponseMetadata.Error != nil {
+		errorReason = firstNonEmpty(res.ResponseMetadata.Error.Message, res.ResponseMetadata.Error.Code, errorReason)
+	}
+	status := strings.ToLower(strings.TrimSpace(res.Status))
+	if status == "" {
+		if errorReason == "" {
+			return nil, errors.Errorf("seedance_m response missing status: %s", string(respBody))
+		}
+		info.Status = model.TaskStatusFailure
+		info.Progress = taskcommon.ProgressComplete
+		info.Reason = errorReason
+		return info, nil
+	}
+	switch status {
 	case "queued", "pending":
 		info.Status = model.TaskStatusQueued
 		info.Progress = taskcommon.ProgressQueued
@@ -302,10 +325,11 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 	case "failed", "cancelled", "canceled", "expired":
 		info.Status = model.TaskStatusFailure
 		info.Progress = taskcommon.ProgressComplete
-		info.Reason = firstNonEmpty(res.Error.Message, res.Error.Code, res.Status)
+		info.Reason = firstNonEmpty(errorReason, res.Status)
 	default:
-		info.Status = model.TaskStatusInProgress
-		info.Progress = taskcommon.ProgressInProgress
+		info.Status = model.TaskStatusFailure
+		info.Progress = taskcommon.ProgressComplete
+		info.Reason = firstNonEmpty(errorReason, fmt.Sprintf("unknown status: %s", res.Status))
 	}
 	return info, nil
 }
@@ -397,7 +421,10 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*
 func (a *TaskAdaptor) resolveEndpoint(modelName, proxy string) (string, error) {
 	modelName = firstNonEmpty(modelName, "doubao-seedance-2.0")
 	endpoint, err := queryModelMapping(a.baseURL, a.apiKey, modelName, proxy, a.settings)
-	if err == nil && strings.TrimSpace(endpoint) != "" {
+	if err != nil {
+		return "", errors.Wrap(err, "query seedance_m model mapping failed")
+	}
+	if strings.TrimSpace(endpoint) != "" {
 		return strings.TrimSpace(endpoint), nil
 	}
 	return modelName, nil
@@ -411,8 +438,8 @@ func validateSeedanceMRequest(req relaycommon.TaskSubmitReq) error {
 		return fmt.Errorf("prompt or content is required")
 	}
 	if duration, ok := requestDuration(req); ok {
-		if duration != -1 && (duration < 4 || duration > 15) {
-			return fmt.Errorf("duration must be -1 or an integer between 4 and 15")
+		if duration != -1 && (duration < 4 || duration > seedanceMMaxDurationSeconds) {
+			return fmt.Errorf("duration must be -1 or an integer between 4 and %d", seedanceMMaxDurationSeconds)
 		}
 	}
 	if resolution := requestResolution(req); resolution != "" {
@@ -428,8 +455,11 @@ func validateSeedanceMRequest(req relaycommon.TaskSubmitReq) error {
 	if seed, ok := int64FromAny(req.Metadata["seed"]); ok && (seed < -1 || seed > 4294967295) {
 		return fmt.Errorf("seed must be -1 or between 0 and 4294967295")
 	}
-	if frames, ok := intFromAny(req.Metadata["frames"]); ok && frames < 0 {
-		return fmt.Errorf("frames must be non-negative")
+	if frames, ok := intFromAny(req.Metadata["frames"]); ok {
+		maxFrames := seedanceMMaxDurationSeconds * 24
+		if frames < 0 || frames > maxFrames {
+			return fmt.Errorf("frames must be between 0 and %d", maxFrames)
+		}
 	}
 	return nil
 }

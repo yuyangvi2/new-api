@@ -525,7 +525,7 @@ function buildSample(
   if (endpointType === 'image-generation') {
     return buildImageSample(lang, ctx)
   }
-  if (endpointType === 'openai-video') {
+  if (endpointType === 'openai-video' || endpointType === 'seedance') {
     return buildVideoSample(lang, ctx)
   }
   return buildChatSample(lang, ctx)

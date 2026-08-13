@@ -13,4 +13,6 @@ const (
 	defaultBaseURL       = "https://zhenze-huhehaote.cmecloud.cn/api/v3"
 	defaultAssetEndpoint = "https://ecloud.10086.cn"
 	defaultAssetPoolID   = "CIDC-CORE-00"
+
+	seedanceMMaxDurationSeconds = 15
 )

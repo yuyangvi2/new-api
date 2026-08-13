@@ -666,6 +666,8 @@
     "Batch testing models...": "Đang kiểm thử mô hình hàng loạt...",
     "Batch upstream model update": "Cập nhật mô hình thượng nguồn hàng loạt",
     "Batch upstream model updates applied: {{channels}} channels, {{added}} added, {{removed}} removed, {{fails}} failed": "Đã áp dụng cập nhật hàng loạt mô hình upstream: {{channels}} kênh, {{added}} đã thêm, {{removed}} đã xóa, {{fails}} thất bại",
+    "Bearer API key for Seedance Official": "Bearer API key cho Seedance Official",
+    "Bearer API key for SeedanceM": "Bearer API key cho SeedanceM",
     "Bearer token": "Bearer token",
     "Best for single-tenant deployments. Pricing and billing options stay hidden.": "Phù hợp nhất cho triển khai đơn người dùng. Các tùy chọn giá và thanh toán sẽ được ẩn.",
     "Best TTFT": "TTFT tốt nhất",
@@ -4313,7 +4315,10 @@
     "Security Check": "Kiểm tra bảo mật",
     "Security verification": "Xác minh bảo mật",
     "Seed": "Seed",
+    "Seedance": "Seedance",
     "Seedance 2.5": "Seedance 2.5",
+    "Seedance Official": "Seedance Official",
+    "SeedanceM": "SeedanceM",
     "Select": "Chọn",
     "Select a color": "Chọn một màu",
     "Select a group": "Chọn một nhóm",
@@ -4471,7 +4476,9 @@
     "Show only bound providers": "Chỉ hiển thị nhà cung cấp đã liên kết",
     "Show or hide flow columns": "Hiện hoặc ẩn các cột luồng",
     "Show preview": "Hiển thị bản xem trước",
+    "Show prices in CNY at the configured exchange rate": "Hiển thị giá bằng CNY theo tỷ giá đã cấu hình",
     "Show prices in currency instead of quota.": "Hiển thị giá bằng tiền tệ thay vì hạn ngạch.",
+    "Show prices in USD": "Hiển thị giá bằng USD",
     "Show sensitive data": "Hiển thị dữ liệu nhạy cảm",
     "Show setup guide": "Hiển thị hướng dẫn thiết lập",
     "Show source": "Hiển thị nguồn",
@@ -4931,6 +4938,7 @@
     "To Uppercase": "Chuyển chữ hoa",
     "to view this resource.": "để xem tài nguyên này.",
     "Today": "Hôm nay",
+    "Toggle billing currency": "Chuyển đổi đơn vị tiền tệ",
     "Toggle columns": "Chuyển đổi cột",
     "Toggle navigation menu": "Chuyển đổi menu điều hướng",
     "Toggle plan": "Chuyển đổi kế hoạch",
@@ -5573,9 +5581,6 @@
     "Zhipu": "Zhipu",
     "Zhipu GLM, Moonshot, MiMo, MiniMax, Kling, Vidu, Grok, Doubao and Qwen": "Zhipu GLM, Moonshot, MiMo, MiniMax, Kling, Vidu, Grok, Doubao and Qwen",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom",
-    "Toggle billing currency": "Chuyển đổi đơn vị tiền tệ",
-    "Show prices in USD": "Hiển thị giá bằng USD",
-    "Show prices in CNY at the configured exchange rate": "Hiển thị giá bằng CNY theo tỷ giá đã cấu hình"
+    "Zoom": "Zoom"
   }
 }

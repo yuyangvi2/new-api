@@ -6,6 +6,10 @@ import "github.com/QuantumNous/new-api/constant"
 func GetEndpointTypesByChannelType(channelType int, modelName string) []constant.EndpointType {
 	var endpointTypes []constant.EndpointType
 	switch channelType {
+	case constant.ChannelTypeSeedanceOfficial:
+		endpointTypes = []constant.EndpointType{constant.EndpointTypeSeedance}
+	case constant.ChannelTypeSeedanceM:
+		endpointTypes = []constant.EndpointType{constant.EndpointTypeOpenAIVideo}
 	case constant.ChannelTypeJina:
 		endpointTypes = []constant.EndpointType{constant.EndpointTypeJinaRerank}
 	//case constant.ChannelTypeMidjourney, constant.ChannelTypeMidjourneyPlus:
@@ -41,7 +45,7 @@ func GetEndpointTypesByChannelType(channelType int, modelName string) []constant
 		// add to first
 		endpointTypes = append([]constant.EndpointType{constant.EndpointTypeImageGeneration}, endpointTypes...)
 	}
-	if IsOpenAIVideoGenerationModel(modelName) {
+	if channelType != constant.ChannelTypeSeedanceOfficial && IsOpenAIVideoGenerationModel(modelName) {
 		// add to first
 		endpointTypes = append([]constant.EndpointType{constant.EndpointTypeOpenAIVideo}, endpointTypes...)
 	}

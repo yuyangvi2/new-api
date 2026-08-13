@@ -906,7 +906,11 @@ function isSeedanceVideoModel(model: PricingModel): boolean {
  * need to distinguish them so the request-parameter table is accurate.
  */
 function apiCategoryOf(model: PricingModel): ApiCategory {
-  if ((model.supported_endpoint_types ?? []).includes('openai-video')) {
+  if (
+    (model.supported_endpoint_types ?? []).some((endpoint) =>
+      ['openai-video', 'seedance'].includes(endpoint)
+    )
+  ) {
     return 'video'
   }
   const profile = PROFILE_BY_NAME(model.model_name)

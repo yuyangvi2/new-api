@@ -366,7 +366,8 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 		}
 		c.Set("relay_mode", relayMode)
 	} else if strings.Contains(c.Request.URL.Path, "/v1/video/generations") ||
-		strings.Contains(c.Request.URL.Path, "/pg/video/generations") {
+		strings.Contains(c.Request.URL.Path, "/pg/video/generations") ||
+		strings.Contains(c.Request.URL.Path, "/volcengine") {
 		relayMode := relayconstant.RelayModeUnknown
 		if c.Request.Method == http.MethodPost {
 			req, err := getModelFromRequest(c)

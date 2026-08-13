@@ -130,6 +130,21 @@ func requestDuration(req relaycommon.TaskSubmitReq) (int, bool) {
 	return intFromAny(req.Metadata["duration"])
 }
 
+func seedanceMBillingRequest(req relaycommon.TaskSubmitReq) relaycommon.TaskSubmitReq {
+	if req.Duration != 0 || strings.TrimSpace(req.Seconds) != "" {
+		return req
+	}
+	if _, ok := intFromAny(req.Metadata["duration"]); ok {
+		return req
+	}
+	frames, ok := intFromAny(req.Metadata["frames"])
+	if !ok || frames <= 0 {
+		return req
+	}
+	req.Duration = int(math.Ceil(float64(frames) / 24.0))
+	return req
+}
+
 func requestResolution(req relaycommon.TaskSubmitReq) string {
 	resolution := strings.ToLower(strings.TrimSpace(asString(req.Metadata["resolution"])))
 	if resolution == "" && strings.HasSuffix(strings.ToLower(strings.TrimSpace(req.Size)), "p") {
