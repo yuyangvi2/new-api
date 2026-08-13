@@ -72,3 +72,23 @@ func TestSeedancePricePerMillionCNYSupportsFastAlias(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, 37.0, pricePerMillionCNY)
 }
+
+func TestEstimateSeedanceQuotaClampsUntrustedDurationAndRatio(t *testing.T) {
+	quota, tokens, _, ok := EstimateSeedanceQuotaForRequest(
+		"seedance2.0_direct",
+		relaycommon.TaskSubmitReq{
+			Duration: relaycommon.MaxTaskDurationSeconds + 1,
+			Size:     "999999999:1",
+			Metadata: map[string]interface{}{
+				"input_video_duration": float64(relaycommon.MaxTaskDurationSeconds + 1),
+				"resolution":           "720p",
+			},
+		},
+		false,
+		1,
+	)
+
+	require.True(t, ok)
+	assert.Greater(t, quota, 0)
+	assert.Greater(t, tokens, 0)
+}

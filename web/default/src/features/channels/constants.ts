@@ -82,12 +82,14 @@ export const CHANNEL_TYPES = {
   9003: 'vipeak (Wan2.7/Seedance)',
   9004: 'apiz.ai / xskill.ai',
   9005: 'ToAPIs',
+  9006: 'SeedanceM',
+  10001: 'Seedance Official',
 } as const
 
 const CHANNEL_TYPE_DISPLAY_ORDER: number[] = [
   1, 14, 33, 24, 43, 3, 41, 48, 58, 42, 34, 20, 4, 40, 27, 25, 17, 26, 15, 46,
   23, 18, 45, 31, 35, 49, 19, 47, 37, 38, 39, 11, 8, 57, 22, 21, 44, 2, 5, 36,
-  50, 51, 52, 53, 54, 55, 56, 9001, 9002, 9003, 9004, 9005,
+  50, 51, 52, 53, 54, 55, 56, 9001, 9002, 9003, 9004, 9005, 9006, 10001,
 ]
 
 export const CHANNEL_TYPE_OPTIONS: { value: number; label: string }[] = (() => {
@@ -441,6 +443,8 @@ export const TYPE_TO_KEY_PROMPT: Record<number, string> = {
   57: 'Paste Codex OAuth JSON credential (access_token / refresh_token / account_id)',
   9004: 'Bearer API key for apiz.ai / xskill.ai',
   9005: 'Bearer API key',
+  9006: 'Bearer API key for SeedanceM',
+  10001: 'Bearer API key for Seedance Official',
 }
 
 export const CHANNEL_TYPE_WARNINGS: Record<number, string> = {

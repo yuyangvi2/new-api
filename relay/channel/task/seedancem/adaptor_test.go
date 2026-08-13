@@ -208,6 +208,15 @@ func TestValidateSeedanceMRequestBounds(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "frames too large",
+			req: relaycommon.TaskSubmitReq{
+				Prompt: "prompt",
+				Metadata: map[string]any{
+					"frames": float64(seedanceMMaxDurationSeconds*24 + 1),
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -224,6 +233,41 @@ func TestValidateSeedanceMRequestBounds(t *testing.T) {
 			"seed":                    float64(0),
 		},
 	}))
+}
+
+func TestSeedanceMBillingRequestUsesFramesAsDuration(t *testing.T) {
+	req := seedanceMBillingRequest(relaycommon.TaskSubmitReq{
+		Prompt: "prompt",
+		Metadata: map[string]any{
+			"frames": float64(241),
+		},
+	})
+
+	assert.Equal(t, 11, req.Duration)
+}
+
+func TestSeedanceMBillingRequestKeepsExplicitDuration(t *testing.T) {
+	req := seedanceMBillingRequest(relaycommon.TaskSubmitReq{
+		Prompt:   "prompt",
+		Duration: 4,
+		Metadata: map[string]any{
+			"frames": float64(241),
+		},
+	})
+
+	assert.Equal(t, 4, req.Duration)
+}
+
+func TestSeedanceMBillingRequestKeepsExplicitAutoDuration(t *testing.T) {
+	req := seedanceMBillingRequest(relaycommon.TaskSubmitReq{
+		Prompt:   "prompt",
+		Duration: -1,
+		Metadata: map[string]any{
+			"frames": float64(241),
+		},
+	})
+
+	assert.Equal(t, -1, req.Duration)
 }
 
 func TestValidateRequestAcceptsOfficialTopLevelContent(t *testing.T) {
@@ -322,4 +366,33 @@ func TestParseTaskResultMapsStatusesAndLastFrame(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "FAILURE", string(failed.Status))
 	assert.Equal(t, "expired", failed.Reason)
+}
+
+func TestParseTaskResultErrorWithoutStatusFails(t *testing.T) {
+	info, err := (&TaskAdaptor{}).ParseTaskResult([]byte(`{
+		"ResponseMetadata":{"Error":{"Code":"AccessDenied","Message":"invalid api key"}}
+	}`))
+
+	require.NoError(t, err)
+	require.NotNil(t, info)
+	assert.Equal(t, model.TaskStatusFailure, info.Status)
+	assert.Equal(t, "100%", info.Progress)
+	assert.Equal(t, "invalid api key", info.Reason)
+}
+
+func TestParseTaskResultMissingStatusWithoutErrorReturnsError(t *testing.T) {
+	info, err := (&TaskAdaptor{}).ParseTaskResult([]byte(`{"id":"task-3"}`))
+
+	require.Error(t, err)
+	assert.Nil(t, info)
+}
+
+func TestParseTaskResultUnknownStatusFails(t *testing.T) {
+	info, err := (&TaskAdaptor{}).ParseTaskResult([]byte(`{"id":"task-4","status":"paused"}`))
+
+	require.NoError(t, err)
+	require.NotNil(t, info)
+	assert.Equal(t, model.TaskStatusFailure, info.Status)
+	assert.Equal(t, "100%", info.Progress)
+	assert.Equal(t, "unknown status: paused", info.Reason)
 }

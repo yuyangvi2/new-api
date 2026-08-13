@@ -40,7 +40,7 @@ func seedancePricePerMillionCNY(priceTable map[string]map[videoPriceKey]float64,
 
 func EstimateSeedanceVideoTokens(inputDuration float64, outputDuration int, ratio, resolution string) int {
 	longEdge, shortEdge := SeedanceOutputSize(ratio, resolution)
-	seconds := math.Max(0, inputDuration) + math.Max(0, float64(outputDuration))
+	seconds := clampSeedanceDurationFloat(inputDuration) + float64(clampSeedanceDurationInt(outputDuration))
 	return int(math.Round(seconds * float64(longEdge) * float64(shortEdge) * 24 / 1024))
 }
 
@@ -90,17 +90,18 @@ func estimateSeedanceQuotaForRequest(priceTable map[string]map[videoPriceKey]flo
 		}
 	}
 	if outputDuration <= 0 {
-		outputDuration = int(math.Round(floatFromAny(req.Metadata["duration"])))
+		outputDuration = clampSeedanceDurationFloatToInt(floatFromAny(req.Metadata["duration"]))
 	}
 	if outputDuration <= 0 {
 		outputDuration = 5
 	}
+	outputDuration = clampSeedanceDurationInt(outputDuration)
 
-	inputDuration := firstPositiveFloat(
+	inputDuration := clampSeedanceDurationFloat(firstPositiveFloat(
 		req.Metadata["input_video_duration"],
 		req.Metadata["inputVideoDuration"],
 		req.Metadata["input_duration"],
-	)
+	))
 
 	return estimateSeedanceQuota(priceTable, modelName, resolution, ratio, outputDuration, inputDuration, hasVideoInput, groupRatio)
 }
@@ -150,7 +151,7 @@ func parseSeedanceRatio(value string) float64 {
 			width, widthErr := strconv.ParseFloat(parts[0], 64)
 			height, heightErr := strconv.ParseFloat(parts[1], 64)
 			if widthErr == nil && heightErr == nil && width > 0 && height > 0 {
-				return width / height
+				return normalizeSeedanceRatio(width / height)
 			}
 		}
 	}
@@ -167,7 +168,47 @@ func parseSeedanceRatio(value string) float64 {
 	if err != nil || height <= 0 {
 		return 16.0 / 9.0
 	}
-	return width / height
+	return normalizeSeedanceRatio(width / height)
+}
+
+func normalizeSeedanceRatio(ratio float64) float64 {
+	if math.IsNaN(ratio) || math.IsInf(ratio, 0) || ratio <= 0 {
+		return 16.0 / 9.0
+	}
+	if ratio < 0.25 || ratio > 4 {
+		return 16.0 / 9.0
+	}
+	return ratio
+}
+
+func clampSeedanceDurationFloatToInt(value float64) int {
+	if math.IsNaN(value) || math.IsInf(value, 0) || value <= 0 {
+		return 0
+	}
+	if value > relaycommon.MaxTaskDurationSeconds {
+		return relaycommon.MaxTaskDurationSeconds
+	}
+	return int(math.Round(value))
+}
+
+func clampSeedanceDurationFloat(value float64) float64 {
+	if math.IsNaN(value) || math.IsInf(value, 0) || value <= 0 {
+		return 0
+	}
+	if value > relaycommon.MaxTaskDurationSeconds {
+		return float64(relaycommon.MaxTaskDurationSeconds)
+	}
+	return value
+}
+
+func clampSeedanceDurationInt(value int) int {
+	if value <= 0 {
+		return 0
+	}
+	if value > relaycommon.MaxTaskDurationSeconds {
+		return relaycommon.MaxTaskDurationSeconds
+	}
+	return value
 }
 
 func seedanceUSDExchangeRate() float64 {

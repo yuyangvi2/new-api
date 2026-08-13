@@ -167,6 +167,29 @@ export const CHANNEL_TYPE_CONFIGS: Record<number, ChannelTypeConfig> = {
       models: 'seedance-2, seedance-2-fast, seedance-2-mini',
     },
   },
+  9006: {
+    id: 9006,
+    name: CHANNEL_TYPES[9006],
+    icon: 'doubao',
+    defaultBaseUrl: 'https://zhenze-huhehaote.cmecloud.cn/api/v3',
+    hints: {
+      baseUrl: 'Default: https://zhenze-huhehaote.cmecloud.cn/api/v3',
+      key: 'Bearer API key',
+      models: 'doubao-seedance-2.0, doubao-seedance-2-0-260128',
+    },
+  },
+  10001: {
+    id: 10001,
+    name: CHANNEL_TYPES[10001],
+    icon: 'doubao',
+    defaultBaseUrl: 'https://ark.cn-beijing.volces.com',
+    hints: {
+      baseUrl: 'Default: https://ark.cn-beijing.volces.com',
+      key: 'Bearer API key',
+      models:
+        'doubao-seedance-2-0-260128, doubao-seedance-2-0-fast-260128',
+    },
+  },
 }
 
 /**
