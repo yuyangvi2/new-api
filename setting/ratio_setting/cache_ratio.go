@@ -9,6 +9,7 @@ var defaultCacheRatio = map[string]float64{
 	"grok-4.20-reasoning":                 0.16,
 	"grok-4.3":                            0.16,
 	"grok-4.5":                            0.15,
+	"grok-4.6":                            0.25, // official $0.50 cached / $2.00 input
 	"gemini-3-flash-preview":              0.1,
 	"gemini-3-pro-preview":                0.1,
 	"gemini-3.1-pro-preview":              0.1,

@@ -71,3 +71,56 @@ func TestDefaultBillingExprsMatchOfficialListPrices(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdatedTieredExprsCoverCacheAndLongContext(t *testing.T) {
+	tests := []struct {
+		name      string
+		model     string
+		params    billingexpr.TokenParams
+		request   billingexpr.RequestInput
+		wantTier  string
+		wantPrice float64
+	}{
+		{
+			name:  "qwen3.6 flash explicit cache short context",
+			model: "qwen3.6-flash",
+			params: billingexpr.TokenParams{
+				P:   1,
+				C:   1,
+				CR:  1,
+				CC:  1,
+				Len: 256000,
+			},
+			request: billingexpr.RequestInput{
+				Body: []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hello","cache_control":{"type":"ephemeral"}}]}]}`),
+			},
+			wantTier:  "explicit_short_context",
+			wantPrice: 0.165 + 0.99 + 0.0165 + 0.20625,
+		},
+		{
+			name:  "gpt-5.6 sol long context includes cache creation",
+			model: "gpt-5.6-sol",
+			params: billingexpr.TokenParams{
+				P:   1,
+				C:   1,
+				CR:  1,
+				CC:  1,
+				Len: 272001,
+			},
+			wantTier:  "long_context",
+			wantPrice: 10 + 45 + 1 + 12.5,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			expr, ok := defaultBillingExpr[test.model]
+			require.True(t, ok)
+
+			cost, trace, err := billingexpr.RunExprWithRequest(expr, test.params, test.request)
+			require.NoError(t, err)
+			assert.Equal(t, test.wantTier, trace.MatchedTier)
+			assert.InDelta(t, test.wantPrice, cost, 0.000001)
+		})
+	}
+}

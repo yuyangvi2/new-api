@@ -692,7 +692,7 @@ function MarketModelCard(props: {
         </div>
 
         <div className='min-w-0 flex-1'>
-          <div className='flex min-w-0 items-start gap-1.5'>
+          <div className='flex min-w-0 items-start gap-2'>
             <Tooltip>
               <TooltipTrigger render={<div className='min-w-0 flex-1' />}>
                 <Link to={detailHref} className='hover:text-brand block'>
@@ -705,14 +705,24 @@ function MarketModelCard(props: {
                 {model.model_name}
               </TooltipContent>
             </Tooltip>
-            <button
-              type='button'
-              onClick={handleCopy}
-              className='text-muted-foreground hover:text-foreground hover:bg-muted mt-0.5 shrink-0 rounded-md border p-1 transition-colors'
-              aria-label={t('Copy model name')}
-            >
-              <Copy className='size-3.5' />
-            </button>
+            <div className='mt-0.5 flex shrink-0 items-center gap-1.5'>
+              <Link
+                to={detailHref}
+                className='text-muted-foreground hover:text-foreground hover:bg-muted inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs leading-none font-medium transition-colors'
+                aria-label={t('View details')}
+              >
+                {t('Details')}
+                <ChevronRight className='size-3.5' />
+              </Link>
+              <button
+                type='button'
+                onClick={handleCopy}
+                className='text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 rounded-md border p-1 transition-colors'
+                aria-label={t('Copy model name')}
+              >
+                <Copy className='size-3.5' />
+              </button>
+            </div>
           </div>
 
           <div className='text-muted-foreground mt-[7px] flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs'>

@@ -340,6 +340,7 @@ var defaultModelRatio = map[string]float64{
 	"grok-4.20-reasoning":     0.625 / 0.6, // official $1.25 / 1M input tokens after xAI 6折 group ratio
 	"grok-4.3":                0.625 / 0.6, // official $1.25 / 1M input tokens after xAI 6折 group ratio
 	"grok-4.5":                1.0 / 0.6,   // official $2 / 1M input tokens after xAI 6折 group ratio
+	"grok-4.6":                1.0 / 0.6,   // official $2 / 1M input tokens after xAI 6折 group ratio
 	"grok-3-beta":             1.5,
 	"grok-3-mini-beta":        0.15,
 	"grok-2":                  1,
@@ -443,6 +444,7 @@ var defaultCompletionRatio = map[string]float64{
 	"grok-4.20-reasoning":     2,
 	"grok-4.3":                2,
 	"grok-4.5":                3, // official $6 / 1M output tokens vs $2 / 1M input tokens
+	"grok-4.6":                3, // official $6 / 1M output tokens vs $2 / 1M input tokens
 	"gpt-4-gizmo-*":           2,
 	"gpt-4o-gizmo-*":          3,
 	"gpt-4-all":               2,

@@ -24,7 +24,7 @@ import { updateSystemOption } from '../api'
 import type { UpdateOptionRequest } from '../types'
 
 // Configuration keys that require status refresh
-const STATUS_RELATED_KEYS = [
+const STATUS_RELATED_KEYS = new Set([
   'theme.frontend',
   'HeaderNavModules',
   'SidebarModulesAdmin',
@@ -37,7 +37,7 @@ const STATUS_RELATED_KEYS = [
   'general_setting.quota_display_type',
   'general_setting.custom_currency_symbol',
   'general_setting.custom_currency_exchange_rate',
-]
+])
 
 export function useUpdateOption() {
   const queryClient = useQueryClient()
@@ -50,7 +50,7 @@ export function useUpdateOption() {
         queryClient.invalidateQueries({ queryKey: ['system-options'] })
 
         // If updating frontend-display-related config, also refresh status
-        if (STATUS_RELATED_KEYS.includes(variables.key)) {
+        if (STATUS_RELATED_KEYS.has(variables.key)) {
           queryClient.invalidateQueries({ queryKey: ['status'] })
           try {
             window.localStorage.removeItem('status')
@@ -59,13 +59,19 @@ export function useUpdateOption() {
           }
         }
 
-        toast.success(i18next.t('Setting updated successfully'))
+        if (!variables.silent) {
+          toast.success(i18next.t('Setting updated successfully'))
+        }
       } else {
-        toast.error(data.message || i18next.t('Failed to update setting'))
+        if (!variables.silent) {
+          toast.error(data.message || i18next.t('Failed to update setting'))
+        }
       }
     },
-    onError: (error: Error) => {
-      toast.error(error.message || i18next.t('Failed to update setting'))
+    onError: (error: Error, variables) => {
+      if (!variables.silent) {
+        toast.error(error.message || i18next.t('Failed to update setting'))
+      }
     },
   })
 }

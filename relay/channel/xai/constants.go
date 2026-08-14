@@ -6,6 +6,7 @@ var ModelList = []string{
 	"grok-4.20-reasoning",
 	"grok-4.3",
 	"grok-4.5",
+	"grok-4.6",
 	"grok-4-1-fast-reasoning",
 	"grok-4-1-fast-non-reasoning",
 	"grok-code-fast-1",

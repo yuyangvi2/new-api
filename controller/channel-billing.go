@@ -1,12 +1,12 @@
 package controller
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -22,6 +22,16 @@ import (
 )
 
 // https://github.com/songquanpeng/one-api/issues/79
+
+const openAICompatibleUnlimitedBalance = 100000000
+
+type openAICompatibleBalanceUnsupportedError struct {
+	baseURL string
+}
+
+func (e *openAICompatibleBalanceUnsupportedError) Error() string {
+	return fmt.Sprintf("upstream %s returned an unlimited quota placeholder; channel balance was not updated", e.baseURL)
+}
 
 type OpenAISubscriptionResponse struct {
 	Object             string  `json:"object"`
@@ -174,7 +184,7 @@ func updateChannelCloseAIBalance(channel *model.Channel) (float64, error) {
 		return 0, err
 	}
 	response := OpenAICreditGrants{}
-	err = json.Unmarshal(body, &response)
+	err = common.Unmarshal(body, &response)
 	if err != nil {
 		return 0, err
 	}
@@ -189,7 +199,7 @@ func updateChannelOpenAISBBalance(channel *model.Channel) (float64, error) {
 		return 0, err
 	}
 	response := OpenAISBUsageResponse{}
-	err = json.Unmarshal(body, &response)
+	err = common.Unmarshal(body, &response)
 	if err != nil {
 		return 0, err
 	}
@@ -213,7 +223,7 @@ func updateChannelAIProxyBalance(channel *model.Channel) (float64, error) {
 		return 0, err
 	}
 	response := AIProxyUserOverviewResponse{}
-	err = json.Unmarshal(body, &response)
+	err = common.Unmarshal(body, &response)
 	if err != nil {
 		return 0, err
 	}
@@ -232,7 +242,7 @@ func updateChannelAPI2GPTBalance(channel *model.Channel) (float64, error) {
 		return 0, err
 	}
 	response := API2GPTUsageResponse{}
-	err = json.Unmarshal(body, &response)
+	err = common.Unmarshal(body, &response)
 	if err != nil {
 		return 0, err
 	}
@@ -247,7 +257,7 @@ func updateChannelSiliconFlowBalance(channel *model.Channel) (float64, error) {
 		return 0, err
 	}
 	response := SiliconFlowUsageResponse{}
-	err = json.Unmarshal(body, &response)
+	err = common.Unmarshal(body, &response)
 	if err != nil {
 		return 0, err
 	}
@@ -269,7 +279,7 @@ func updateChannelDeepSeekBalance(channel *model.Channel) (float64, error) {
 		return 0, err
 	}
 	response := DeepSeekUsageResponse{}
-	err = json.Unmarshal(body, &response)
+	err = common.Unmarshal(body, &response)
 	if err != nil {
 		return 0, err
 	}
@@ -298,7 +308,7 @@ func updateChannelAIGC2DBalance(channel *model.Channel) (float64, error) {
 		return 0, err
 	}
 	response := APGC2DGPTUsageResponse{}
-	err = json.Unmarshal(body, &response)
+	err = common.Unmarshal(body, &response)
 	if err != nil {
 		return 0, err
 	}
@@ -313,7 +323,7 @@ func updateChannelOpenRouterBalance(channel *model.Channel) (float64, error) {
 		return 0, err
 	}
 	response := OpenRouterCreditResponse{}
-	err = json.Unmarshal(body, &response)
+	err = common.Unmarshal(body, &response)
 	if err != nil {
 		return 0, err
 	}
@@ -343,7 +353,7 @@ func updateChannelMoonshotBalance(channel *model.Channel) (float64, error) {
 	}
 
 	response := MoonshotBalanceResponse{}
-	err = json.Unmarshal(body, &response)
+	err = common.Unmarshal(body, &response)
 	if err != nil {
 		return 0, err
 	}
@@ -354,6 +364,14 @@ func updateChannelMoonshotBalance(channel *model.Channel) (float64, error) {
 	availableBalanceUsd := decimal.NewFromFloat(availableBalanceCny).Div(decimal.NewFromFloat(operation_setting.Price)).InexactFloat64()
 	channel.UpdateBalance(availableBalanceUsd)
 	return availableBalanceUsd, nil
+}
+
+func shouldIgnoreOpenAICompatibleBalance(baseURL string, hardLimitUSD float64) bool {
+	if hardLimitUSD < openAICompatibleUnlimitedBalance {
+		return false
+	}
+	normalizedBaseURL := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	return normalizedBaseURL != strings.TrimRight(constant.ChannelBaseURLs[constant.ChannelTypeOpenAI], "/")
 }
 
 func updateChannelBalance(channel *model.Channel) (float64, error) {
@@ -396,7 +414,7 @@ func updateChannelBalance(channel *model.Channel) (float64, error) {
 		return 0, err
 	}
 	subscription := OpenAISubscriptionResponse{}
-	err = json.Unmarshal(body, &subscription)
+	err = common.Unmarshal(body, &subscription)
 	if err != nil {
 		return 0, err
 	}
@@ -412,11 +430,14 @@ func updateChannelBalance(channel *model.Channel) (float64, error) {
 		return 0, err
 	}
 	usage := OpenAIUsageResponse{}
-	err = json.Unmarshal(body, &usage)
+	err = common.Unmarshal(body, &usage)
 	if err != nil {
 		return 0, err
 	}
 	balance := subscription.HardLimitUSD - usage.TotalUsage/100
+	if shouldIgnoreOpenAICompatibleBalance(baseURL, subscription.HardLimitUSD) {
+		return 0, &openAICompatibleBalanceUnsupportedError{baseURL: baseURL}
+	}
 	channel.UpdateBalance(balance)
 	return balance, nil
 }
@@ -441,6 +462,15 @@ func UpdateChannelBalance(c *gin.Context) {
 	}
 	balance, err := updateChannelBalance(channel)
 	if err != nil {
+		var unsupportedErr *openAICompatibleBalanceUnsupportedError
+		if errors.As(err, &unsupportedErr) {
+			c.JSON(http.StatusOK, gin.H{
+				"success":        false,
+				"message":        unsupportedErr.Error(),
+				"balance_status": "unsupported",
+			})
+			return
+		}
 		common.ApiError(c, err)
 		return
 	}

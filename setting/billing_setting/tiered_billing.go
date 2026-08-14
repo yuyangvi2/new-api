@@ -103,6 +103,14 @@ var defaultBillingMode = map[string]string{
 	"MiniMax/MiniMax-M2.1":   BillingModeTieredExpr,
 	"MiniMax-M2.1-highspeed": BillingModeTieredExpr,
 	"MiniMax-M2":             BillingModeTieredExpr,
+
+	"gpt-5.6-sol": BillingModeTieredExpr,
+
+	"grok-4.20-non-reasoning": BillingModeTieredExpr,
+	"grok-4.20-reasoning":     BillingModeTieredExpr,
+	"grok-4.3":                BillingModeTieredExpr,
+	"grok-4.5":                BillingModeTieredExpr,
+	"grok-4.6":                BillingModeTieredExpr,
 }
 
 var defaultBillingExpr = map[string]string{
@@ -127,8 +135,8 @@ var defaultBillingExpr = map[string]string{
 	"qwen3.5-plus":                  `len <= 128000 ? tier("short_context", p * 0.112045 + c * 0.672269) : len <= 256000 ? tier("mid_context", p * 0.280112 + c * 1.680672) : tier("long_context", p * 0.560224 + c * 3.361345)`,
 	"qwen-plus":                     `len <= 128000 ? tier("short_context", p * 0.112045 + (rt > 0 ? (c + rt) * 1.120448 : c * 0.280112)) : len <= 256000 ? tier("mid_context", p * 0.336134 + (rt > 0 ? (c + rt) * 3.361345 : c * 2.801120)) : tier("long_context", p * 0.672269 + (rt > 0 ? (c + rt) * 8.963585 : c * 6.722689))`,
 	"qwen-plus-latest":              `len <= 128000 ? tier("short_context", p * 0.112045 + (rt > 0 ? (c + rt) * 1.120448 : c * 0.280112)) : len <= 256000 ? tier("mid_context", p * 0.336134 + (rt > 0 ? (c + rt) * 3.361345 : c * 2.801120)) : tier("long_context", p * 0.672269 + (rt > 0 ? (c + rt) * 8.963585 : c * 6.722689))`,
-	"qwen3.6-flash":                 `len <= 256000 ? tier("short_context", p * 0.168067 + c * 1.008403) : tier("long_context", p * 0.672269 + c * 4.033613)`,
-	"qwen3.6-flash-2026-04-16":      `len <= 256000 ? tier("short_context", p * 0.168067 + c * 1.008403) : tier("long_context", p * 0.672269 + c * 4.033613)`,
+	"qwen3.6-flash":                 `(has(param("messages"), "cache_control") || has(param("system"), "cache_control")) ? (len <= 256000 ? tier("explicit_short_context", p * 0.165 + c * 0.99 + cr * 0.0165 + cc * 0.20625) : tier("explicit_long_context", p * 0.66 + c * 3.961 + cr * 0.066 + cc * 0.825)) : (len <= 256000 ? tier("implicit_short_context", p * 0.165 + c * 0.99 + cr * 0.033 + cc * 0.165) : tier("implicit_long_context", p * 0.66 + c * 3.961 + cr * 0.132 + cc * 0.66))`,
+	"qwen3.6-flash-2026-04-16":      `(has(param("messages"), "cache_control") || has(param("system"), "cache_control")) ? (len <= 256000 ? tier("explicit_short_context", p * 0.165 + c * 0.99 + cr * 0.0165 + cc * 0.20625) : tier("explicit_long_context", p * 0.66 + c * 3.961 + cr * 0.066 + cc * 0.825)) : (len <= 256000 ? tier("implicit_short_context", p * 0.165 + c * 0.99 + cr * 0.033 + cc * 0.165) : tier("implicit_long_context", p * 0.66 + c * 3.961 + cr * 0.132 + cc * 0.66))`,
 	"qwen3.5-flash":                 `len <= 128000 ? tier("short_context", p * 0.028011 + c * 0.280112) : len <= 256000 ? tier("mid_context", p * 0.112045 + c * 1.120448) : tier("long_context", p * 0.168067 + c * 1.680672)`,
 	"qwen-flash":                    `len <= 128000 ? tier("short_context", p * 0.021008 + c * 0.210084) : len <= 256000 ? tier("mid_context", p * 0.084034 + c * 0.840336) : tier("long_context", p * 0.168067 + c * 1.680672)`,
 	"qwen-turbo":                    `tier("base", p * 0.042017 + (rt > 0 ? (c + rt) * 0.420168 : c * 0.084034))`,
@@ -189,6 +197,16 @@ var defaultBillingExpr = map[string]string{
 	"MiniMax/MiniMax-M2.1":   `tier("base", p * 0.294118 + c * 1.176471 + cr * 0.029412 + cc * 0.367647)`,
 	"MiniMax-M2.1-highspeed": `tier("base", p * 0.588235 + c * 2.352941 + cr * 0.029412 + cc * 0.367647)`,
 	"MiniMax-M2":             `tier("base", p * 0.294118 + c * 1.176471 + cr * 0.029412 + cc * 0.367647)`,
+
+	// OpenAI official USD list prices, with long-context pricing applied when input exceeds 272K tokens.
+	"gpt-5.6-sol": `len <= 272000 ? tier("short_context", p * 5 + c * 30 + cr * 0.5 + cc * 6.25) : tier("long_context", p * 10 + c * 45 + cr * 1 + cc * 12.5)`,
+
+	// xAI official USD list prices, with long-context pricing applied when input reaches 200K tokens.
+	"grok-4.20-non-reasoning": `len < 200000 ? tier("standard", p * 1.25 + c * 2.5 + cr * 0.2) : tier("long_context", p * 2.5 + c * 5 + cr * 0.4)`,
+	"grok-4.20-reasoning":     `len < 200000 ? tier("standard", p * 1.25 + c * 2.5 + cr * 0.2) : tier("long_context", p * 2.5 + c * 5 + cr * 0.4)`,
+	"grok-4.3":                `len < 200000 ? tier("standard", p * 1.25 + c * 2.5 + cr * 0.2) : tier("long_context", p * 2.5 + c * 5 + cr * 0.4)`,
+	"grok-4.5":                `len < 200000 ? tier("standard", p * 2 + c * 6 + cr * 0.3) : tier("long_context", p * 4 + c * 12 + cr * 0.6)`,
+	"grok-4.6":                `len < 200000 ? tier("standard", p * 2 + c * 6 + cr * 0.5) : tier("long_context", p * 4 + c * 12 + cr * 1)`,
 }
 
 var billingSetting = BillingSetting{

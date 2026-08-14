@@ -37,7 +37,8 @@ export async function getSystemOptions() {
 }
 
 export async function updateSystemOption(request: UpdateOptionRequest) {
-  const res = await api.put<UpdateOptionResponse>('/api/option/', request)
+  const { silent: _silent, ...payload } = request
+  const res = await api.put<UpdateOptionResponse>('/api/option/', payload)
   return res.data
 }
 

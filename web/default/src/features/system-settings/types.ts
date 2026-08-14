@@ -32,6 +32,7 @@ export type SystemOptionsResponse = {
 export type UpdateOptionRequest = {
   key: string
   value: string | boolean | number
+  silent?: boolean
 }
 
 export type UpdateOptionResponse = {
