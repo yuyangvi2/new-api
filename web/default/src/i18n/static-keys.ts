@@ -186,6 +186,8 @@ export const STATIC_I18N_KEYS = [
   'Professional team providing 24/7 technical support',
   'Video',
   'Seedance 2.5',
+  '480p/720p',
+  '4K',
   'A long-form video generation model for cinematic stories and product shots.',
   'View model',
   'Coming soon',

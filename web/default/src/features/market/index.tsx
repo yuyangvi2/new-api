@@ -57,7 +57,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
@@ -77,6 +76,7 @@ import {
   formatPrice,
   formatRequestPrice,
 } from '../pricing/lib/price'
+import { buildSeedanceOfficialPriceEntries } from '../pricing/lib/seedance-official-pricing'
 import {
   FALLBACK_MODELS,
   inferKind,
@@ -236,151 +236,6 @@ type MarketPriceEntry = {
   unit: 'M' | 'request'
 }
 
-type SeedancePriceTier = {
-  key: string
-  noVideoLabelKey: string
-  videoInputLabelKey: string
-  noVideoPriceCNY: number
-  videoInputPriceCNY: number
-  primary?: boolean
-}
-
-const SEEDANCE_OFFICIAL_PRICE_TIERS: Record<string, SeedancePriceTier[]> = {
-  'doubao-seedance-2.0': [
-    {
-      key: 'base',
-      noVideoLabelKey: '480p/720p no video input',
-      videoInputLabelKey: '480p/720p video input',
-      noVideoPriceCNY: 46,
-      videoInputPriceCNY: 28,
-      primary: true,
-    },
-    {
-      key: '1080p',
-      noVideoLabelKey: '1080p no video input',
-      videoInputLabelKey: '1080p video input',
-      noVideoPriceCNY: 51,
-      videoInputPriceCNY: 31,
-    },
-    {
-      key: '4k',
-      noVideoLabelKey: '4K no video input',
-      videoInputLabelKey: '4K video input',
-      noVideoPriceCNY: 26,
-      videoInputPriceCNY: 16,
-    },
-  ],
-  'doubao-seedance-2-0-fast': [
-    {
-      key: 'base',
-      noVideoLabelKey: 'No video input',
-      videoInputLabelKey: 'Video input',
-      noVideoPriceCNY: 37,
-      videoInputPriceCNY: 22,
-      primary: true,
-    },
-  ],
-  'doubao-seedance-2-0-mini': [
-    {
-      key: 'base',
-      noVideoLabelKey: 'No video input',
-      videoInputLabelKey: 'Video input',
-      noVideoPriceCNY: 23,
-      videoInputPriceCNY: 14,
-      primary: true,
-    },
-  ],
-}
-
-function formatSeedanceOfficialPrice(
-  priceCNY: number,
-  groupRatio: number,
-  usdExchangeRate: number
-): string {
-  const safeExchangeRate =
-    Number.isFinite(usdExchangeRate) && usdExchangeRate > 0
-      ? usdExchangeRate
-      : 7.14
-
-  return formatBillingCurrencyFromUSD(
-    (priceCNY * groupRatio) / safeExchangeRate,
-    {
-      digitsLarge: 4,
-      digitsSmall: 6,
-      abbreviate: false,
-    }
-  )
-}
-
-function buildSeedanceOfficialEntries(
-  model: MarketModel,
-  groupRatio: number,
-  usdExchangeRate: number
-): {
-  primaryEntries: MarketPriceEntry[]
-  extraEntries: MarketPriceEntry[]
-  officialEntries: MarketPriceEntry[]
-} | null {
-  const tiers =
-    SEEDANCE_OFFICIAL_PRICE_TIERS[model.model_name.toLowerCase().trim()]
-  if (!tiers) return null
-
-  const primaryEntries: MarketPriceEntry[] = []
-  const extraEntries: MarketPriceEntry[] = []
-  const officialEntries: MarketPriceEntry[] = []
-
-  for (const tier of tiers) {
-    const targetEntries = tier.primary ? primaryEntries : extraEntries
-    targetEntries.push(
-      {
-        key: `${tier.key}-no-video`,
-        labelKey: tier.noVideoLabelKey,
-        formatted: formatSeedanceOfficialPrice(
-          tier.noVideoPriceCNY,
-          groupRatio,
-          usdExchangeRate
-        ),
-        unit: 'M',
-      },
-      {
-        key: `${tier.key}-video-input`,
-        labelKey: tier.videoInputLabelKey,
-        formatted: formatSeedanceOfficialPrice(
-          tier.videoInputPriceCNY,
-          groupRatio,
-          usdExchangeRate
-        ),
-        unit: 'M',
-      }
-    )
-
-    officialEntries.push(
-      {
-        key: `official-${tier.key}-no-video`,
-        labelKey: tier.noVideoLabelKey,
-        formatted: formatSeedanceOfficialPrice(
-          tier.noVideoPriceCNY,
-          1,
-          usdExchangeRate
-        ),
-        unit: 'M',
-      },
-      {
-        key: `official-${tier.key}-video-input`,
-        labelKey: tier.videoInputLabelKey,
-        formatted: formatSeedanceOfficialPrice(
-          tier.videoInputPriceCNY,
-          1,
-          usdExchangeRate
-        ),
-        unit: 'M',
-      }
-    )
-  }
-
-  return { primaryEntries, extraEntries, officialEntries }
-}
-
 function formatCompactTokenCount(value?: number): string | null {
   const numericValue = Number(value ?? 0)
   if (!Number.isFinite(numericValue) || numericValue <= 0) return null
@@ -457,10 +312,12 @@ function MarketPricePanel(props: {
         groupRatioMultiplier: getDynamicDisplayGroupRatio(model),
       })
     : null
-  const seedanceOfficialEntries = buildSeedanceOfficialEntries(
-    model,
-    displayGroupRatio,
-    props.usdExchangeRate
+  const seedanceOfficialEntries = buildSeedanceOfficialPriceEntries(
+    model.model_name,
+    {
+      groupRatio: displayGroupRatio,
+      usdExchangeRate: props.usdExchangeRate,
+    }
   )
 
   const primaryEntries: MarketPriceEntry[] = []

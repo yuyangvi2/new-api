@@ -74,6 +74,11 @@ import {
   getFixedPriceTypeLabel,
   getFixedPriceUnitLabel,
 } from '../lib/price'
+import {
+  formatSeedanceOfficialPrice,
+  getSeedanceOfficialPriceTiers,
+  type SeedanceOfficialPriceTier,
+} from '../lib/seedance-official-pricing'
 import type {
   ModelCapability,
   PriceType,
@@ -593,6 +598,72 @@ function ModelHeader(props: { model: PricingModel }) {
 // Base price card (used in the Overview tab)
 // ----------------------------------------------------------------------------
 
+function SeedanceOfficialPriceMatrix(props: {
+  tiers: SeedanceOfficialPriceTier[]
+  groupRatio: number
+  priceRate: number
+  usdExchangeRate: number
+  tokenUnitLabel: string
+  showRechargePrice: boolean
+  className?: string
+}) {
+  const { t } = useTranslation()
+  const thClass =
+    'text-muted-foreground py-2 text-[10px] font-medium tracking-wider uppercase'
+
+  const formatTierPrice = (
+    tier: SeedanceOfficialPriceTier,
+    type: 'no-video' | 'video-input'
+  ) =>
+    formatSeedanceOfficialPrice(
+      type === 'no-video' ? tier.noVideoPriceCNY : tier.videoInputPriceCNY,
+      {
+        groupRatio: props.groupRatio,
+        priceRate: props.priceRate,
+        usdExchangeRate: props.usdExchangeRate,
+        showRechargePrice: props.showRechargePrice,
+      }
+    )
+
+  return (
+    <div className={props.className}>
+      <StaticDataTable
+        className='overflow-hidden rounded-lg border'
+        tableClassName='text-sm'
+        headerRowClassName='hover:bg-transparent'
+        data={props.tiers}
+        getRowKey={(tier) => tier.key}
+        columns={[
+          {
+            id: 'resolution',
+            header: t('Resolution'),
+            className: thClass,
+            cellClassName: 'text-muted-foreground py-2.5',
+            cell: (tier) => t(tier.resolutionLabelKey),
+          },
+          {
+            id: 'no-video',
+            header: t('No video input'),
+            className: `${thClass} text-right`,
+            cellClassName: 'py-2.5 text-right font-mono',
+            cell: (tier) => formatTierPrice(tier, 'no-video'),
+          },
+          {
+            id: 'video-input',
+            header: t('Video input'),
+            className: `${thClass} text-right`,
+            cellClassName: 'py-2.5 text-right font-mono',
+            cell: (tier) => formatTierPrice(tier, 'video-input'),
+          },
+        ]}
+      />
+      <p className='text-muted-foreground/40 mt-1.5 text-[10px]'>
+        {t('Prices shown per')} {props.tokenUnitLabel} tokens
+      </p>
+    </div>
+  )
+}
+
 function PriceSection(props: {
   model: PricingModel
   priceRate: number
@@ -605,6 +676,9 @@ function PriceSection(props: {
   const tokenUnitLabel = props.tokenUnit === 'K' ? '1K' : '1M'
   const baseGroupKey = '_base'
   const baseGroupRatioMap = { [baseGroupKey]: 1 }
+  const seedanceOfficialTiers = getSeedanceOfficialPriceTiers(
+    props.model.model_name
+  )
   const dynamicSummary = getDynamicPricingSummary(props.model, {
     tokenUnit: props.tokenUnit,
     showRechargePrice: props.showRechargePrice,
@@ -650,6 +724,22 @@ function PriceSection(props: {
         props.model.audio_completion_ratio != null,
     },
   ]
+
+  if (seedanceOfficialTiers) {
+    return (
+      <section>
+        <SectionTitle>{t('Base Price')}</SectionTitle>
+        <SeedanceOfficialPriceMatrix
+          tiers={seedanceOfficialTiers}
+          groupRatio={1}
+          priceRate={props.priceRate}
+          usdExchangeRate={props.usdExchangeRate}
+          tokenUnitLabel={tokenUnitLabel}
+          showRechargePrice={props.showRechargePrice}
+        />
+      </section>
+    )
+  }
 
   if (dynamicSummary) {
     if (dynamicSummary.isSpecialExpression) {
@@ -936,6 +1026,42 @@ function GroupPricingSection(props: {
 
   const thClass =
     'text-muted-foreground py-2 text-[10px] font-medium tracking-wider uppercase'
+  const seedanceOfficialTiers = getSeedanceOfficialPriceTiers(
+    props.model.model_name
+  )
+
+  if (seedanceOfficialTiers) {
+    return (
+      <section>
+        <SectionTitle>{t('Pricing by Group')}</SectionTitle>
+        <AutoGroupChain model={props.model} autoGroups={props.autoGroups} />
+        <div className='space-y-3'>
+          {availableGroups.map((group) => {
+            const ratio = props.groupRatio[group] || 1
+            return (
+              <div key={group} className='overflow-hidden rounded-lg border'>
+                <div className='bg-muted/20 flex items-center justify-between gap-3 border-b px-3 py-2'>
+                  <GroupBadge group={group} size='sm' />
+                  <span className='text-muted-foreground font-mono text-xs'>
+                    {ratio}x
+                  </span>
+                </div>
+                <SeedanceOfficialPriceMatrix
+                  tiers={seedanceOfficialTiers}
+                  groupRatio={ratio}
+                  priceRate={props.priceRate}
+                  usdExchangeRate={props.usdExchangeRate}
+                  tokenUnitLabel={tokenUnitLabel}
+                  showRechargePrice={showRechargePrice}
+                  className='px-3 pt-2.5 pb-3'
+                />
+              </div>
+            )
+          })}
+        </div>
+      </section>
+    )
+  }
 
   if (isDynamicPricingModel(props.model)) {
     const dynamicTiers = getDynamicPricingTiers(props.model)
