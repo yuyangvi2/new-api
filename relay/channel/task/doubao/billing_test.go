@@ -63,7 +63,7 @@ func TestSeedancePricePerMillionCNYUsesOfficialFastVideoInputPrice(t *testing.T)
 	pricePerMillionCNY, ok := SeedancePricePerMillionCNY("seedance2.0_fast_direct", "720p", true)
 
 	require.True(t, ok)
-	assert.Equal(t, 14.0, pricePerMillionCNY)
+	assert.Equal(t, 22.0, pricePerMillionCNY)
 }
 
 func TestSeedancePricePerMillionCNYSupportsFastAlias(t *testing.T) {
@@ -71,6 +71,37 @@ func TestSeedancePricePerMillionCNYSupportsFastAlias(t *testing.T) {
 
 	require.True(t, ok)
 	assert.Equal(t, 37.0, pricePerMillionCNY)
+}
+
+func TestSeedancePricePerMillionCNYSupportsOfficialStandardAlias(t *testing.T) {
+	pricePerMillionCNY, ok := SeedancePricePerMillionCNY("doubao-seedance-2.0", "1080p", true)
+
+	require.True(t, ok)
+	assert.Equal(t, 31.0, pricePerMillionCNY)
+	assert.True(t, IsSeedanceModel("doubao-seedance-2.0"))
+}
+
+func TestSeedancePricePerMillionCNYSupportsOfficialMiniAndFastAliases(t *testing.T) {
+	tests := []struct {
+		model         string
+		hasVideoInput bool
+		want          float64
+	}{
+		{model: "doubao-seedance-2-0-fast", hasVideoInput: false, want: 37.0},
+		{model: "doubao-seedance-2-0-fast", hasVideoInput: true, want: 22.0},
+		{model: "doubao-seedance-2-0-mini", hasVideoInput: false, want: 23.0},
+		{model: "doubao-seedance-2-0-mini", hasVideoInput: true, want: 14.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.model, func(t *testing.T) {
+			pricePerMillionCNY, ok := SeedancePricePerMillionCNY(tt.model, "720p", tt.hasVideoInput)
+
+			require.True(t, ok)
+			assert.Equal(t, tt.want, pricePerMillionCNY)
+			assert.True(t, IsSeedanceModel(tt.model))
+		})
+	}
 }
 
 func TestEstimateSeedanceQuotaClampsUntrustedDurationAndRatio(t *testing.T) {

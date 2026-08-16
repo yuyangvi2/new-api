@@ -187,7 +187,7 @@ export const CHANNEL_TYPE_CONFIGS: Record<number, ChannelTypeConfig> = {
       baseUrl: 'Default: https://ark.cn-beijing.volces.com',
       key: 'Bearer API key',
       models:
-        'doubao-seedance-2-0-260128, doubao-seedance-2-0-fast-260128',
+        'doubao-seedance-2.0, doubao-seedance-2-0-fast, doubao-seedance-2-0-mini',
     },
   },
 }

@@ -7,8 +7,11 @@ var ModelList = []string{
 	"doubao-seedance-1-0-lite-t2v",
 	"doubao-seedance-1-0-lite-i2v",
 	"doubao-seedance-1-5-pro-251215",
+	"doubao-seedance-2.0",
 	"doubao-seedance-2-0-260128",
+	"doubao-seedance-2-0-fast",
 	"doubao-seedance-2-0-fast-260128",
+	"doubao-seedance-2-0-mini",
 	"seedance2.0_direct",
 	"seedance2.0_vision",
 	"seedance2.0_fast_direct",
@@ -46,7 +49,7 @@ var videoPriceTable = map[string]map[videoPriceKey]float64{
 	},
 	"doubao-seedance-2-0-fast-260128": {
 		{hasVideo: false}: 37.0,
-		{hasVideo: true}:  14.0,
+		{hasVideo: true}:  22.0,
 	},
 	"seedance2.0_direct": {
 		{hasVideo: false}:                46.0,
@@ -70,11 +73,11 @@ var videoPriceTable = map[string]map[videoPriceKey]float64{
 	},
 	"seedance2.0_fast_direct": {
 		{hasVideo: false}: 37.0,
-		{hasVideo: true}:  14.0,
+		{hasVideo: true}:  22.0,
 	},
 	"seedance2.0_fast_vision": {
 		{hasVideo: false}: 37.0,
-		{hasVideo: true}:  14.0,
+		{hasVideo: true}:  22.0,
 	},
 	"Seedance_2.0_mini_lite": {
 		{hasVideo: false}: 23.0,

@@ -280,6 +280,7 @@ var defaultModelRatio = map[string]float64{
 	"MiniMax-M2.1-highspeed":                    4.2 * RMBPerMillion,
 	"MiniMax-M2":                                2.1 * RMBPerMillion,
 	// Doubao Seedance 2.0 video base tier: official 480p/720p, no video input, RMB per 1M tokens.
+	"doubao-seedance-2.0":               46.0 / 14.0,
 	"doubao-seedance-2-0-260128":        46.0 / 14.0,
 	"dreamina-seedance-2-0-260128":      46.0 / 14.0,
 	"seedance-2":                        46.0 / 14.0,
@@ -290,12 +291,14 @@ var defaultModelRatio = map[string]float64{
 	"Seedance_2.0_mini":                 46.0 / 14.0,
 	"seedance2.0_mini":                  46.0 / 14.0,
 	"ark/seedance-2.0":                  37.0 / 14.0,
+	"doubao-seedance-2-0-fast":          37.0 / 14.0,
 	"doubao-seedance-2-0-fast-260128":   37.0 / 14.0,
 	"dreamina-seedance-2-0-fast-260128": 37.0 / 14.0,
 	"seedance-2-fast":                   37.0 / 14.0,
 	"seedance-fast":                     37.0 / 14.0,
 	"seedance2.0_fast_direct":           37.0 / 14.0,
 	"seedance2.0_fast_vision":           37.0 / 14.0,
+	"doubao-seedance-2-0-mini":          23.0 / 14.0,
 	"Seedance_2.0_mini_lite":            37.0 / 14.0,
 	"seedance2.0_fast_mini":             37.0 / 14.0,
 	"text-embedding-v1":                 0.05,   // ￥0.0007 / 1k tokens

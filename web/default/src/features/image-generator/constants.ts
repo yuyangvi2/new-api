@@ -215,6 +215,7 @@ export const VIDEO_MODEL_VARIANT_SETS: VideoModelVariantSet[] = [
 ]
 
 const VIDEO_MODEL_ALIASES: Record<string, string> = {
+  'doubao-seedance-2-0-mini': 'Seedance_2.0_mini',
   'seedance_2.0_mini': 'Seedance_2.0_mini',
   'seedance_2.0_mini_lite': 'Seedance_2.0_mini_lite',
   'seedance2.0_mini': 'Seedance_2.0_mini',
@@ -379,8 +380,11 @@ export function resolveVideoVariantModel(
 }
 
 const IMAGE_OPTIONAL_VIDEO_MODELS = new Set([
+  'doubao-seedance-2.0',
   'doubao-seedance-2-0-260128',
+  'doubao-seedance-2-0-fast',
   'doubao-seedance-2-0-fast-260128',
+  'doubao-seedance-2-0-mini',
   'dreamina-seedance-2-0-260128',
   'dreamina-seedance-2-0-fast-260128',
   'seedance-2',
@@ -461,9 +465,17 @@ export function isToAPIsSeedanceVideoModel(model: string): boolean {
 export function isSeedanceMVideoModel(model: string): boolean {
   const normalizedModel = model.toLowerCase().trim()
   return (
-    normalizedModel === 'doubao-seedance-2.0' ||
     normalizedModel === 'aicc-doubao-seedance-2.0' ||
     normalizedModel === 'aicc-seedance2.0'
+  )
+}
+
+export function isOfficialSeedanceVideoModel(model: string): boolean {
+  const normalizedModel = model.toLowerCase().trim()
+  return (
+    normalizedModel === 'doubao-seedance-2.0' ||
+    normalizedModel === 'doubao-seedance-2-0-fast' ||
+    normalizedModel === 'doubao-seedance-2-0-mini'
   )
 }
 
@@ -472,6 +484,7 @@ export function isSeedanceVideoModel(model: string): boolean {
     isApizSeedanceVideoModel(model) ||
     isVipeakSeedanceVideoModel(model) ||
     isToAPIsSeedanceVideoModel(model) ||
+    isOfficialSeedanceVideoModel(model) ||
     isSeedanceMVideoModel(model)
   )
 }
@@ -493,6 +506,7 @@ export function getSeedanceResolutionOptions(
     normalizedModel === 'seedance_2.0_mini' ||
     normalizedModel === 'seedance_2.0_mini_lite' ||
     normalizedModel === 'ark/seedance-2.0' ||
+    normalizedModel === 'doubao-seedance-2-0-fast' ||
     normalizedModel === 'doubao-seedance-2-0-fast-260128' ||
     normalizedModel === 'dreamina-seedance-2-0-fast-260128' ||
     normalizedModel === 'seedance-fast' ||
@@ -564,6 +578,7 @@ export function getSeedancePricePerMillionCNY({
   const isHighQuality =
     normalizedModelKey === 'seedance_2.0' ||
     normalizedModelKey === 'seedance-2' ||
+    normalizedModelKey === 'doubao-seedance-2.0' ||
     normalizedModelKey === 'doubao-seedance-2-0-260128' ||
     normalizedModelKey === 'dreamina-seedance-2-0-260128' ||
     normalizedModelKey === 'seedance' ||
@@ -579,6 +594,7 @@ export function getSeedancePricePerMillionCNY({
   const isMini =
     normalizedModelKey === 'seedance_2.0_mini' ||
     normalizedModelKey === 'seedance-2-mini' ||
+    normalizedModelKey === 'doubao-seedance-2-0-mini' ||
     normalizedModelKey === 'seedance_2.0_mini_lite'
 
   if (isMini) return hasVideoInput ? 14 : 23
@@ -587,6 +603,7 @@ export function getSeedancePricePerMillionCNY({
     normalizedModelKey === 'seedance_2.0_fast' ||
     normalizedModelKey === 'seedance-2-fast' ||
     normalizedModelKey === 'ark/seedance-2.0' ||
+    normalizedModelKey === 'doubao-seedance-2-0-fast' ||
     normalizedModelKey === 'doubao-seedance-2-0-fast-260128' ||
     normalizedModelKey === 'dreamina-seedance-2-0-fast-260128' ||
     normalizedModelKey === 'seedance-fast' ||
@@ -594,7 +611,7 @@ export function getSeedancePricePerMillionCNY({
     normalizedModelKey === 'seedance2.0_fast_vision' ||
     normalizedModelKey === 'seedance_2.0_mini_lite'
 
-  if (isFast) return hasVideoInput ? 14 : 37
+  if (isFast) return hasVideoInput ? 22 : 37
   return undefined
 }
 

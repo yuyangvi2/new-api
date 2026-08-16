@@ -1,11 +1,17 @@
 package doubao
 
 import (
+	"net/http/httptest"
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/types"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -134,4 +140,38 @@ func TestSeedanceOfficialValidateRequestAllowsAutoDuration(t *testing.T) {
 	}
 
 	assert.NoError(t, validateSeedanceOfficialRequest(req))
+}
+
+func TestSeedanceOfficialEstimateBillingDistinguishesVideoInput(t *testing.T) {
+	originalQuotaPerUnit := common.QuotaPerUnit
+	originalExchangeRate := operation_setting.USDExchangeRate
+	t.Cleanup(func() {
+		common.QuotaPerUnit = originalQuotaPerUnit
+		operation_setting.USDExchangeRate = originalExchangeRate
+	})
+	common.QuotaPerUnit = 1_000_000
+	operation_setting.USDExchangeRate = 1
+
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	duration := dto.IntValue(5)
+	videoReq := requestPayload{
+		Model:      "doubao-seedance-2-0-fast",
+		Content:    []ContentItem{{Type: "text", Text: "make a video"}, {Type: "video_url", VideoURL: &MediaURL{URL: "https://example.com/ref.mp4"}}},
+		Duration:   &duration,
+		Ratio:      "16:9",
+		Resolution: "720p",
+	}
+	ctx.Set(seedanceOfficialTaskContextKey, videoReq)
+
+	ratios := (&SeedanceOfficialTaskAdaptor{}).EstimateBilling(ctx, &relaycommon.RelayInfo{
+		OriginModelName: "doubao-seedance-2-0-fast",
+		PriceData: types.PriceData{
+			Quota:          3_996_000,
+			GroupRatioInfo: types.GroupRatioInfo{GroupRatio: 1},
+		},
+	})
+
+	require.Contains(t, ratios, "seedance_official_estimated_price")
+	assert.InDelta(t, 22.0/37.0, ratios["seedance_official_estimated_price"], 0.000001)
 }

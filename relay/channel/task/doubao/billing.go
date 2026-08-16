@@ -58,7 +58,7 @@ func estimateSeedanceQuota(priceTable map[string]map[videoPriceKey]float64, mode
 	if groupRatio < 0 {
 		groupRatio = 0
 	}
-	quota := int(math.Round(amountCNY * groupRatio * common.QuotaPerUnit / seedanceUSDExchangeRate()))
+	quota := common.QuotaRound(amountCNY * groupRatio * common.QuotaPerUnit / seedanceUSDExchangeRate())
 	return quota, tokens, pricePerMillionCNY, true
 }
 
@@ -125,11 +125,11 @@ func SeedanceOutputSize(ratioValue, resolutionValue string) (int, int) {
 func NormalizeSeedanceModelName(modelName string) string {
 	normalized := strings.ToLower(strings.TrimSpace(modelName))
 	switch normalized {
-	case "seedance_2.0":
+	case "seedance_2.0", "doubao-seedance-2.0":
 		return "seedance2.0_direct"
-	case "seedance_2.0_fast":
+	case "seedance_2.0_fast", "doubao-seedance-2-0-fast":
 		return "seedance2.0_fast_direct"
-	case "seedance_2.0_mini", "seedance2.0_mini":
+	case "seedance_2.0_mini", "seedance2.0_mini", "doubao-seedance-2-0-mini":
 		return "Seedance_2.0_mini"
 	case "seedance_2.0_mini_lite", "seedance2.0_mini_lite", "seedance2.0_fast_mini":
 		return "Seedance_2.0_mini_lite"

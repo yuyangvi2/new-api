@@ -179,6 +179,7 @@ func TestModelPriceHelperPerCallFallsBackToDefaultVipeakSeedanceRatio(t *testing
 		model string
 		ratio float64
 	}{
+		{model: "doubao-seedance-2.0", ratio: 46.0 / 14.0},
 		{model: "dreamina-seedance-2-0-260128", ratio: 46.0 / 14.0},
 		{model: "dreamina-seedance-2-0-fast-260128", ratio: 37.0 / 14.0},
 		{model: "seedance", ratio: 46.0 / 14.0},
