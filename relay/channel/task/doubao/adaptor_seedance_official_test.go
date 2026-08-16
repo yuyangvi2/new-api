@@ -175,7 +175,7 @@ func TestSeedanceOfficialEstimateBillingDistinguishesVideoInput(t *testing.T) {
 	ratios := (&SeedanceOfficialTaskAdaptor{}).EstimateBilling(ctx, info)
 
 	require.Contains(t, ratios, "seedance_official_estimated_price")
-	assert.InDelta(t, 22.0/37.0, ratios["seedance_official_estimated_price"], 0.000001)
+	assert.InDelta(t, 2*22.0/37.0, ratios["seedance_official_estimated_price"], 0.000001)
 	require.NotNil(t, info.TaskRelayInfo.UsageBilling)
 	assert.Equal(t, relaycommon.TaskPricingSourceSeedanceOfficialUsage, info.TaskRelayInfo.UsageBilling.PricingSource)
 	assert.Equal(t, 22.0, info.TaskRelayInfo.UsageBilling.PricePerMillionCNY)

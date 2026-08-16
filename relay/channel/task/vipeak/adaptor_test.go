@@ -176,7 +176,7 @@ func TestEstimateBillingUsesAPIZSeedancePricingForDreaminaFast(t *testing.T) {
 
 	got, ok := ratios["seedance_estimated_price"]
 	require.True(t, ok)
-	assert.InDelta(t, 2_268_000.0/3_996_000.0, got, 0.000001)
+	assert.InDelta(t, 3_564_000.0/3_996_000.0, got, 0.000001)
 }
 
 func TestEnforceCoreRequestFieldsKeepsOfficialSeedanceCanonicalModel(t *testing.T) {

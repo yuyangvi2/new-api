@@ -124,6 +124,9 @@ func estimateSeedanceQuotaForRequest(priceTable map[string]map[videoPriceKey]flo
 		req.Metadata["inputVideoDuration"],
 		req.Metadata["input_duration"],
 	))
+	if hasVideoInput && inputDuration <= 0 {
+		inputDuration = float64(outputDuration)
+	}
 
 	return estimateSeedanceQuota(priceTable, modelName, resolution, ratio, outputDuration, inputDuration, hasVideoInput, groupRatio)
 }

@@ -59,6 +59,24 @@ func TestEstimateSeedanceQuotaForMiniVideoInputUsesVideoPrice(t *testing.T) {
 	assert.Greater(t, quota, 0)
 }
 
+func TestEstimateSeedanceQuotaForVideoInputDefaultsInputDurationToOutputDuration(t *testing.T) {
+	quota, tokens, pricePerMillionCNY, ok := EstimateSeedanceQuotaForRequest(
+		"doubao-seedance-2.0",
+		relaycommon.TaskSubmitReq{
+			Duration: 5,
+			Size:     "16:9",
+			Metadata: map[string]interface{}{"resolution": "720p"},
+		},
+		true,
+		0.98,
+	)
+
+	require.True(t, ok)
+	assert.Equal(t, 216000, tokens)
+	assert.Equal(t, 28.0, pricePerMillionCNY)
+	assert.Greater(t, quota, 0)
+}
+
 func TestSeedancePricePerMillionCNYUsesOfficialFastVideoInputPrice(t *testing.T) {
 	pricePerMillionCNY, ok := SeedancePricePerMillionCNY("seedance2.0_fast_direct", "720p", true)
 
