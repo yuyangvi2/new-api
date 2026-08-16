@@ -164,14 +164,107 @@ func TestSeedanceOfficialEstimateBillingDistinguishesVideoInput(t *testing.T) {
 	}
 	ctx.Set(seedanceOfficialTaskContextKey, videoReq)
 
-	ratios := (&SeedanceOfficialTaskAdaptor{}).EstimateBilling(ctx, &relaycommon.RelayInfo{
+	info := &relaycommon.RelayInfo{
+		TaskRelayInfo:   &relaycommon.TaskRelayInfo{},
 		OriginModelName: "doubao-seedance-2-0-fast",
 		PriceData: types.PriceData{
 			Quota:          3_996_000,
 			GroupRatioInfo: types.GroupRatioInfo{GroupRatio: 1},
 		},
-	})
+	}
+	ratios := (&SeedanceOfficialTaskAdaptor{}).EstimateBilling(ctx, info)
 
 	require.Contains(t, ratios, "seedance_official_estimated_price")
 	assert.InDelta(t, 22.0/37.0, ratios["seedance_official_estimated_price"], 0.000001)
+	require.NotNil(t, info.TaskRelayInfo.UsageBilling)
+	assert.Equal(t, relaycommon.TaskPricingSourceSeedanceOfficialUsage, info.TaskRelayInfo.UsageBilling.PricingSource)
+	assert.Equal(t, 22.0, info.TaskRelayInfo.UsageBilling.PricePerMillionCNY)
+	assert.Equal(t, "720p", info.TaskRelayInfo.UsageBilling.Resolution)
+	require.NotNil(t, info.TaskRelayInfo.UsageBilling.HasVideoInput)
+	assert.True(t, *info.TaskRelayInfo.UsageBilling.HasVideoInput)
+}
+
+func TestSeedanceOfficialAdjustBillingOnCompleteUsesUpstreamUsageTokens(t *testing.T) {
+	originalQuotaPerUnit := common.QuotaPerUnit
+	t.Cleanup(func() {
+		common.QuotaPerUnit = originalQuotaPerUnit
+	})
+	common.QuotaPerUnit = 500000
+
+	hasVideoInput := false
+	task := &model.Task{
+		Quota: 34094,
+		Properties: model.Properties{
+			OriginModelName: "doubao-seedance-2-0-mini",
+		},
+		PrivateData: model.TaskPrivateData{
+			BillingContext: &model.TaskBillingContext{
+				GroupRatio:      0.98,
+				OriginModelName: "doubao-seedance-2-0-mini",
+				UsageBilling: &relaycommon.TaskUsageBillingContext{
+					PricingSource:      relaycommon.TaskPricingSourceSeedanceOfficialUsage,
+					PricePerMillionCNY: 23.0,
+					USDExchangeRate:    7.14,
+					Resolution:         "480p",
+					HasVideoInput:      &hasVideoInput,
+				},
+			},
+		},
+		Data: []byte(`{"resolution":"480p","usage":{"total_tokens":38800}}`),
+	}
+
+	quota, clamp := (&SeedanceOfficialTaskAdaptor{}).AdjustBillingOnCompleteWithClamp(task, &relaycommon.TaskInfo{
+		TotalTokens: 38800,
+	})
+
+	require.Nil(t, clamp)
+	assert.Equal(t, 61243, quota)
+}
+
+func TestSeedanceOfficialAdjustBillingOnCompleteUsesVideoInputPrice(t *testing.T) {
+	originalQuotaPerUnit := common.QuotaPerUnit
+	t.Cleanup(func() {
+		common.QuotaPerUnit = originalQuotaPerUnit
+	})
+	common.QuotaPerUnit = 500000
+
+	hasVideoInput := true
+	task := &model.Task{
+		Properties: model.Properties{
+			OriginModelName: "doubao-seedance-2-0-mini",
+		},
+		PrivateData: model.TaskPrivateData{
+			BillingContext: &model.TaskBillingContext{
+				GroupRatio:      0.98,
+				OriginModelName: "doubao-seedance-2-0-mini",
+				UsageBilling: &relaycommon.TaskUsageBillingContext{
+					PricingSource:      relaycommon.TaskPricingSourceSeedanceOfficialUsage,
+					PricePerMillionCNY: 14.0,
+					USDExchangeRate:    7.14,
+					Resolution:         "480p",
+					HasVideoInput:      &hasVideoInput,
+				},
+			},
+		},
+		Data: []byte(`{"resolution":"480p"}`),
+	}
+
+	quota, clamp := (&SeedanceOfficialTaskAdaptor{}).AdjustBillingOnCompleteWithClamp(task, &relaycommon.TaskInfo{
+		TotalTokens: 58000,
+	})
+
+	require.Nil(t, clamp)
+	assert.Equal(t, 55725, quota)
+}
+
+func TestSeedanceOfficialAdjustBillingOnCompleteFallsBackToPrechargedQuotaWithoutUsageBillingContext(t *testing.T) {
+	task := &model.Task{Quota: 12345}
+
+	quota, clamp := (&SeedanceOfficialTaskAdaptor{}).AdjustBillingOnCompleteWithClamp(task, &relaycommon.TaskInfo{
+		TotalTokens: 38800,
+	})
+
+	require.Nil(t, clamp)
+	assert.Equal(t, 0, quota)
+	assert.Equal(t, task.Quota, (&SeedanceOfficialTaskAdaptor{}).AdjustBillingOnComplete(task, &relaycommon.TaskInfo{}))
 }

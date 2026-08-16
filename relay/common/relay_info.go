@@ -689,7 +689,18 @@ type TaskRelayInfo struct {
 	LockedChannel any
 
 	VideoSuperResolution *TaskVideoSuperResolution
+	UsageBilling         *TaskUsageBillingContext
 }
+
+type TaskUsageBillingContext struct {
+	PricingSource      string  `json:"pricing_source,omitempty"`
+	PricePerMillionCNY float64 `json:"price_per_million_cny,omitempty"`
+	USDExchangeRate    float64 `json:"usd_exchange_rate,omitempty"`
+	Resolution         string  `json:"resolution,omitempty"`
+	HasVideoInput      *bool   `json:"has_video_input,omitempty"`
+}
+
+const TaskPricingSourceSeedanceOfficialUsage = "seedance_official_usage"
 
 type TaskVideoSuperResolution struct {
 	TargetResolution string `json:"target_resolution,omitempty"`

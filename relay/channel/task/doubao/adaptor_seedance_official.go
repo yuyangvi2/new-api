@@ -36,12 +36,28 @@ func (a *SeedanceOfficialTaskAdaptor) EstimateBilling(c *gin.Context, info *rela
 		return nil
 	}
 	billingReq := seedanceOfficialBillingRequest(req)
-	quota, _, _, ok := EstimateSeedanceQuotaForRequest(
-		firstNonEmptyString(info.OriginModelName, req.Model),
+	modelName := firstNonEmptyString(info.OriginModelName, req.Model)
+	hasVideoInput := seedanceOfficialHasVideoInput(req)
+	quota, _, pricePerMillionCNY, ok := EstimateSeedanceQuotaForRequest(
+		modelName,
 		billingReq,
-		seedanceOfficialHasVideoInput(req),
+		hasVideoInput,
 		info.PriceData.GroupRatioInfo.GroupRatio,
 	)
+	if ok && info.TaskRelayInfo != nil {
+		hasVideoInputSnapshot := hasVideoInput
+		resolution := stringFromAny(billingReq.Metadata["resolution"])
+		if resolution == "" {
+			resolution = "720p"
+		}
+		info.TaskRelayInfo.UsageBilling = &relaycommon.TaskUsageBillingContext{
+			PricingSource:      relaycommon.TaskPricingSourceSeedanceOfficialUsage,
+			PricePerMillionCNY: pricePerMillionCNY,
+			USDExchangeRate:    seedanceUSDExchangeRate(),
+			Resolution:         resolution,
+			HasVideoInput:      &hasVideoInputSnapshot,
+		}
+	}
 	if !ok || info.PriceData.Quota <= 0 {
 		return nil
 	}
@@ -57,6 +73,44 @@ func (*SeedanceOfficialTaskAdaptor) AdjustBillingOnComplete(task *model.Task, _ 
 		return 0
 	}
 	return task.Quota
+}
+
+func (*SeedanceOfficialTaskAdaptor) AdjustBillingOnCompleteWithClamp(task *model.Task, taskResult *relaycommon.TaskInfo) (int, *common.QuotaClamp) {
+	if task == nil || taskResult == nil || taskResult.TotalTokens <= 0 {
+		return 0, nil
+	}
+	billingContext := task.PrivateData.BillingContext
+	if billingContext == nil || billingContext.UsageBilling == nil {
+		return 0, nil
+	}
+	usageBilling := billingContext.UsageBilling
+	if usageBilling.PricingSource != relaycommon.TaskPricingSourceSeedanceOfficialUsage || usageBilling.HasVideoInput == nil {
+		return 0, nil
+	}
+
+	resolution := strings.TrimSpace(gjson.GetBytes(task.Data, "resolution").String())
+	if resolution == "" {
+		resolution = usageBilling.Resolution
+	}
+	pricePerMillionCNY := usageBilling.PricePerMillionCNY
+	if resolution != "" && !strings.EqualFold(resolution, usageBilling.Resolution) {
+		if price, ok := SeedancePricePerMillionCNY(TaskModelName(task), resolution, *usageBilling.HasVideoInput); ok {
+			pricePerMillionCNY = price
+		}
+	}
+	actualQuota, clamp, ok := EstimateSeedanceQuotaFromUsageTokens(
+		TaskModelName(task),
+		resolution,
+		taskResult.TotalTokens,
+		*usageBilling.HasVideoInput,
+		billingContext.GroupRatio,
+		pricePerMillionCNY,
+		usageBilling.USDExchangeRate,
+	)
+	if !ok {
+		return 0, nil
+	}
+	return actualQuota, clamp
 }
 
 func (a *SeedanceOfficialTaskAdaptor) GetModelList() []string { return ModelList }
