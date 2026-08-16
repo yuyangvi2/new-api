@@ -135,6 +135,15 @@ func taskBillingOther(task *model.Task) map[string]interface{} {
 				other[k] = v
 			}
 		}
+		if usageBilling := bc.UsageBilling; usageBilling != nil {
+			other["usage_billing_source"] = usageBilling.PricingSource
+			other["usage_price_per_million_cny"] = usageBilling.PricePerMillionCNY
+			other["usage_usd_exchange_rate"] = usageBilling.USDExchangeRate
+			other["usage_resolution"] = usageBilling.Resolution
+			if usageBilling.HasVideoInput != nil {
+				other["usage_has_video_input"] = *usageBilling.HasVideoInput
+			}
+		}
 	}
 	props := task.Properties
 	if props.UpstreamModelName != "" && props.UpstreamModelName != props.OriginModelName {

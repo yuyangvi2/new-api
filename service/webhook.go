@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -30,15 +32,59 @@ func generateSignature(secret string, payload []byte) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// SendWebhookNotify 发送 webhook 通知
-func SendWebhookNotify(webhookURL string, secret string, data dto.Notify) error {
-	// 处理占位符
+func webhookHostMatches(webhookURL, domain string) bool {
+	parsedURL, err := url.Parse(webhookURL)
+	if err != nil {
+		return false
+	}
+	host := parsedURL.Hostname()
+	return strings.EqualFold(host, domain) || strings.HasSuffix(strings.ToLower(host), "."+domain)
+}
+
+// buildWebhookPayload builds raw payload or platform-specific payload (e.g. WeCom / DingTalk / Feishu).
+func buildWebhookPayload(webhookURL string, data dto.Notify) ([]byte, error) {
 	content := data.Content
 	for _, value := range data.Values {
-		content = fmt.Sprintf(content, value)
+		content = strings.Replace(content, dto.ContentValueParam, fmt.Sprintf("%v", value), 1)
 	}
 
-	// 构建 webhook 负载
+	// 适配企业微信群机器人 (qyapi.weixin.qq.com)
+	if webhookHostMatches(webhookURL, "qyapi.weixin.qq.com") {
+		markdownText := fmt.Sprintf("### %s\n\n%s", data.Title, content)
+		payload := map[string]any{
+			"msgtype": "markdown",
+			"markdown": map[string]string{
+				"content": markdownText,
+			},
+		}
+		return common.Marshal(payload)
+	}
+
+	// 适配钉钉群机器人 (oapi.dingtalk.com)
+	if webhookHostMatches(webhookURL, "oapi.dingtalk.com") {
+		markdownText := fmt.Sprintf("### %s\n\n%s", data.Title, content)
+		payload := map[string]any{
+			"msgtype": "markdown",
+			"markdown": map[string]string{
+				"title": data.Title,
+				"text":  markdownText,
+			},
+		}
+		return common.Marshal(payload)
+	}
+
+	// 适配飞书群机器人 (open.feishu.cn)
+	if webhookHostMatches(webhookURL, "open.feishu.cn") {
+		payload := map[string]any{
+			"msg_type": "text",
+			"content": map[string]string{
+				"text": fmt.Sprintf("[%s]\n%s", data.Title, content),
+			},
+		}
+		return common.Marshal(payload)
+	}
+
+	// 默认通用 Webhook 负载
 	payload := WebhookPayload{
 		Type:      data.Type,
 		Title:     data.Title,
@@ -46,9 +92,12 @@ func SendWebhookNotify(webhookURL string, secret string, data dto.Notify) error 
 		Values:    data.Values,
 		Timestamp: time.Now().Unix(),
 	}
+	return common.Marshal(payload)
+}
 
-	// 序列化负载
-	payloadBytes, err := common.Marshal(payload)
+// SendWebhookNotify 发送 webhook 通知
+func SendWebhookNotify(webhookURL string, secret string, data dto.Notify) error {
+	payloadBytes, err := buildWebhookPayload(webhookURL, data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal webhook payload: %v", err)
 	}
@@ -64,7 +113,7 @@ func SendWebhookNotify(webhookURL string, secret string, data dto.Notify) error 
 			Key:    system_setting.WorkerValidKey,
 			Method: http.MethodPost,
 			Headers: map[string]string{
-				"Content-Type": "application/json",
+				"Content-Type": "application/json; charset=utf-8",
 			},
 			Body: payloadBytes,
 		}
@@ -98,7 +147,7 @@ func SendWebhookNotify(webhookURL string, secret string, data dto.Notify) error 
 		}
 
 		// 设置请求头
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
 		// 如果有 secret，生成签名
 		if secret != "" {

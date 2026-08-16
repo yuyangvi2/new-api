@@ -591,8 +591,10 @@ func RelayTask(c *gin.Context) {
 		task.PrivateData.SubscriptionId = relayInfo.SubscriptionId
 		task.PrivateData.TokenId = relayInfo.TokenId
 		task.PrivateData.NodeName = common.NodeName
+		var usageBilling *relaycommon.TaskUsageBillingContext
 		if relayInfo.TaskRelayInfo != nil {
 			task.PrivateData.VideoSuperResolution = relayInfo.TaskRelayInfo.VideoSuperResolution
+			usageBilling = relayInfo.TaskRelayInfo.UsageBilling
 		}
 		task.PrivateData.BillingContext = &model.TaskBillingContext{
 			ModelPrice:      relayInfo.PriceData.ModelPrice,
@@ -602,6 +604,7 @@ func RelayTask(c *gin.Context) {
 			OriginModelName: relayInfo.OriginModelName,
 			PerCallBilling: common.StringsContains(constant.TaskPricePatches, relayInfo.OriginModelName) ||
 				(relayInfo.PriceData.UsePrice && ratio_setting.GetModelPriceUnit(relayInfo.OriginModelName) == "request"),
+			UsageBilling: usageBilling,
 		}
 		task.Quota = result.Quota
 		task.Data = result.TaskData

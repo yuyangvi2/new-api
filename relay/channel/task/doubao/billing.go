@@ -48,6 +48,28 @@ func EstimateSeedanceQuota(modelName, resolution, ratio string, outputDuration i
 	return estimateSeedanceQuota(videoPriceTable, modelName, resolution, ratio, outputDuration, inputDuration, hasVideoInput, groupRatio)
 }
 
+func EstimateSeedanceQuotaFromUsageTokens(modelName, resolution string, totalTokens int, hasVideoInput bool, groupRatio, pricePerMillionCNY, usdExchangeRate float64) (int, *common.QuotaClamp, bool) {
+	if totalTokens <= 0 {
+		return 0, nil, false
+	}
+	if pricePerMillionCNY <= 0 {
+		price, ok := SeedancePricePerMillionCNY(modelName, resolution, hasVideoInput)
+		if !ok {
+			return 0, nil, false
+		}
+		pricePerMillionCNY = price
+	}
+	if groupRatio < 0 {
+		groupRatio = 0
+	}
+	if usdExchangeRate <= 0 {
+		usdExchangeRate = seedanceUSDExchangeRate()
+	}
+	amountCNY := float64(totalTokens) * pricePerMillionCNY / 1_000_000
+	quota, clamp := common.QuotaFromFloatChecked(amountCNY * groupRatio * common.QuotaPerUnit / usdExchangeRate)
+	return quota, clamp, true
+}
+
 func estimateSeedanceQuota(priceTable map[string]map[videoPriceKey]float64, modelName, resolution, ratio string, outputDuration int, inputDuration float64, hasVideoInput bool, groupRatio float64) (int, int, float64, bool) {
 	pricePerMillionCNY, ok := seedancePricePerMillionCNY(priceTable, modelName, resolution, hasVideoInput)
 	if !ok {
