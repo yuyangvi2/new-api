@@ -81,12 +81,7 @@ func GetOptions(c *gin.Context) {
 	common.OptionMapRWMutex.Lock()
 	for k, v := range common.OptionMap {
 		value := common.Interface2String(v)
-		isSensitiveKey := strings.HasSuffix(k, "Token") ||
-			strings.HasSuffix(k, "Secret") ||
-			strings.HasSuffix(k, "Key") ||
-			strings.HasSuffix(k, "secret") ||
-			strings.HasSuffix(k, "api_key")
-		if isSensitiveKey {
+		if isSensitiveOptionKey(k) {
 			continue
 		}
 		options = append(options, &model.Option{
@@ -110,6 +105,35 @@ func GetOptions(c *gin.Context) {
 		"message": "",
 		"data":    options,
 	})
+}
+
+func isSensitiveOptionKey(key string) bool {
+	normalized := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(key), "-", "_"), ".", "_"))
+	if normalized == "" {
+		return false
+	}
+	parts := strings.FieldsFunc(normalized, func(r rune) bool {
+		return r == '_' || r == ':' || r == '/'
+	})
+	for _, part := range parts {
+		switch part {
+		case "key", "secret", "token", "password", "pass", "ak", "sk", "pem", "credential", "cert":
+			return true
+		}
+	}
+	return strings.Contains(normalized, "private_key") ||
+		strings.Contains(normalized, "key") ||
+		strings.Contains(normalized, "secret") ||
+		strings.Contains(normalized, "token") ||
+		strings.Contains(normalized, "pass") ||
+		strings.Contains(normalized, "pem") ||
+		strings.Contains(normalized, "api_key") ||
+		strings.Contains(normalized, "apikey") ||
+		strings.Contains(normalized, "access_token") ||
+		strings.Contains(normalized, "refresh_token") ||
+		strings.Contains(normalized, "client_secret") ||
+		strings.Contains(normalized, "webhook_secret") ||
+		strings.Contains(normalized, "password")
 }
 
 type OptionUpdateRequest struct {

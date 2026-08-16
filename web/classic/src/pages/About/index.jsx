@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import React, { useEffect, useState } from 'react';
 import { API, showError } from '../../helpers';
-import { marked } from 'marked';
+import { renderSafeMarkdown } from '../../helpers/sanitize';
 import { Empty } from '@douyinfe/semi-ui';
 import {
   IllustrationConstruction,
@@ -34,13 +34,18 @@ const About = () => {
   const currentYear = new Date().getFullYear();
 
   const displayAbout = async () => {
-    setAbout(localStorage.getItem('about') || '');
+    const cachedAbout = localStorage.getItem('about') || '';
+    setAbout(
+      cachedAbout && !cachedAbout.startsWith('https://')
+        ? renderSafeMarkdown(cachedAbout)
+        : cachedAbout,
+    );
     const res = await API.get('/api/about');
     const { success, message, data } = res.data;
     if (success) {
       let aboutContent = data;
       if (!data.startsWith('https://')) {
-        aboutContent = marked.parse(data);
+        aboutContent = renderSafeMarkdown(data);
       }
       setAbout(aboutContent);
       localStorage.setItem('about', aboutContent);

@@ -173,6 +173,7 @@ export function PromptInputProvider({
   const [attachements, setAttachements] = useState<
     (FileUIPart & { id: string })[]
   >([])
+  const attachementsRef = useRef<(FileUIPart & { id: string })[]>([])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const openRef = useRef<() => void>(() => {})
 
@@ -211,6 +212,19 @@ export function PromptInputProvider({
   const openFileDialog = useCallback(() => {
     openRef.current?.()
   }, [])
+
+  useEffect(() => {
+    attachementsRef.current = attachements
+  }, [attachements])
+
+  useEffect(
+    () => () => {
+      for (const file of attachementsRef.current) {
+        if (file.url) URL.revokeObjectURL(file.url)
+      }
+    },
+    []
+  )
 
   const attachments = useMemo<AttachmentsContext>(
     () => ({
@@ -488,6 +502,7 @@ export const PromptInput = ({
   // ----- Local attachments (only used when no provider)
   const [items, setItems] = useState<(FileUIPart & { id: string })[]>([])
   const files = usingProvider ? controller.attachments.files : items
+  const localFilesRef = useRef<(FileUIPart & { id: string })[]>([])
 
   const openFileDialogLocal = useCallback(() => {
     inputRef.current?.click()
@@ -669,15 +684,19 @@ export const PromptInput = ({
     }
   }, [add, globalDrop])
 
+  useEffect(() => {
+    if (!usingProvider) {
+      localFilesRef.current = files
+    }
+  }, [usingProvider, files])
+
   useEffect(
     () => () => {
-      if (!usingProvider) {
-        for (const f of files) {
-          if (f.url) URL.revokeObjectURL(f.url)
-        }
+      for (const file of localFilesRef.current) {
+        if (file.url) URL.revokeObjectURL(file.url)
       }
     },
-    [usingProvider, files]
+    []
   )
 
   const handleChange: ChangeEventHandler<HTMLInputElement> = (event) => {

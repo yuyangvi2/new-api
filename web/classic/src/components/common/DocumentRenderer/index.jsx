@@ -27,6 +27,7 @@ import {
 } from '@douyinfe/semi-illustrations';
 import { useTranslation } from 'react-i18next';
 import MarkdownRenderer from '../markdown/MarkdownRenderer';
+import { sanitizeHtml as purifyHtml } from '../../../helpers/sanitize';
 
 // Check whether content is a URL.
 const isUrl = (content) => {
@@ -47,16 +48,16 @@ const isHtmlContent = (content) => {
 };
 
 // Parse HTML content and extract inline styles.
-const sanitizeHtml = (html) => {
+const extractSanitizedHtml = (html) => {
   const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = html;
+  tempDiv.innerHTML = purifyHtml(html);
 
   const styles = Array.from(tempDiv.querySelectorAll('style'))
     .map((style) => style.innerHTML)
     .join('\n');
 
   const bodyContent = tempDiv.querySelector('body');
-  const content = bodyContent ? bodyContent.innerHTML : html;
+  const content = bodyContent ? bodyContent.innerHTML : tempDiv.innerHTML;
 
   return { content, styles };
 };
@@ -106,7 +107,7 @@ const DocumentRenderer = ({ apiEndpoint, title, cacheKey, emptyMessage }) => {
     if (!isHtmlContent(content)) {
       return { content: '', styles: '' };
     }
-    return sanitizeHtml(content);
+    return extractSanitizedHtml(content);
   }, [content]);
 
   useEffect(() => {

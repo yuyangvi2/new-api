@@ -137,7 +137,8 @@ function applyRechargeRate(
   usdExchangeRate: number
 ): number {
   if (!showWithRecharge) return price
-  return (price * priceRate) / usdExchangeRate
+  const rate = Number(usdExchangeRate) > 0 ? Number(usdExchangeRate) : 1
+  return (price * priceRate) / rate
 }
 
 /**

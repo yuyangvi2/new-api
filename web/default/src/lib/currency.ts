@@ -317,17 +317,13 @@ function formatNumberWithSuffix(
   return removeTrailingZeros(value.toFixed(digits))
 }
 
-function adjustForMinimum(
-  value: number,
-  digits: number,
-  minimumNonZero: number
-): number {
+function adjustForMinimum(value: number, minimumNonZero: number): number {
   if (value === 0) return value
+  if (minimumNonZero <= 0) return value
 
-  const threshold = minimumNonZero > 0 ? minimumNonZero : Math.pow(10, -digits)
   const abs = Math.abs(value)
-  if (abs > 0 && abs < threshold) {
-    return value > 0 ? threshold : -threshold
+  if (abs > 0 && abs < minimumNonZero) {
+    return value > 0 ? minimumNonZero : -minimumNonZero
   }
   return value
 }
@@ -354,7 +350,7 @@ function formatCurrencyValue(
 
   const digits =
     Math.abs(value) >= 1 ? options.digitsLarge : options.digitsSmall
-  const adjustedValue = adjustForMinimum(value, digits, options.minimumNonZero)
+  const adjustedValue = adjustForMinimum(value, options.minimumNonZero)
 
   if (meta.kind === 'currency') {
     if (!options.showSymbol) {
