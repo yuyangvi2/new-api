@@ -2,6 +2,7 @@ package openai
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
@@ -24,9 +25,15 @@ func OpenaiRealtimeHandler(c *gin.Context, info *relaycommon.RelayInfo) (*types.
 	info.IsStream = true
 	clientConn := info.ClientWs
 	targetConn := info.TargetWs
+	defer func() {
+		_ = clientConn.Close()
+		_ = targetConn.Close()
+	}()
 
 	clientClosed := make(chan struct{})
 	targetClosed := make(chan struct{})
+	var clientClosedOnce sync.Once
+	var targetClosedOnce sync.Once
 	sendChan := make(chan []byte, 100)
 	receiveChan := make(chan []byte, 100)
 	errChan := make(chan error, 2)
@@ -51,7 +58,8 @@ func OpenaiRealtimeHandler(c *gin.Context, info *relaycommon.RelayInfo) (*types.
 					if !websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 						errChan <- fmt.Errorf("error reading from client: %v", err)
 					}
-					close(clientClosed)
+					_ = targetConn.Close()
+					clientClosedOnce.Do(func() { close(clientClosed) })
 					return
 				}
 
@@ -111,7 +119,8 @@ func OpenaiRealtimeHandler(c *gin.Context, info *relaycommon.RelayInfo) (*types.
 					if !websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 						errChan <- fmt.Errorf("error reading from target: %v", err)
 					}
-					close(targetClosed)
+					_ = clientConn.Close()
+					targetClosedOnce.Do(func() { close(targetClosed) })
 					return
 				}
 				info.SetFirstResponseTime()

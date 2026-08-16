@@ -2,16 +2,15 @@ package zhipu
 
 import (
 	"bufio"
-	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/pkg/cachex"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
@@ -20,6 +19,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/samber/hot"
 )
 
 // https://open.bigmodel.cn/doc/api#chatglm_std
@@ -27,13 +27,24 @@ import (
 // https://open.bigmodel.cn/api/paas/v3/model-api/chatglm_std/invoke
 // https://open.bigmodel.cn/api/paas/v3/model-api/chatglm_std/sse-invoke
 
-var zhipuTokens sync.Map
 var expSeconds int64 = 24 * 3600
 
+var zhipuTokens = cachex.NewHybridCache[zhipuTokenData](cachex.HybridCacheConfig[zhipuTokenData]{
+	Namespace: cachex.Namespace("zhipu_token:v1"),
+	Memory: func() *hot.HotCache[string, zhipuTokenData] {
+		return hot.NewHotCache[string, zhipuTokenData](hot.LRU, 4096).
+			WithTTL(time.Duration(expSeconds) * time.Second).
+			WithJanitor().
+			Build()
+	},
+})
+
 func getZhipuToken(apikey string) string {
-	data, ok := zhipuTokens.Load(apikey)
+	tokenData, ok, err := zhipuTokens.Get(apikey)
+	if err != nil {
+		common.SysLog("failed to get zhipu token cache: " + err.Error())
+	}
 	if ok {
-		tokenData := data.(zhipuTokenData)
 		if time.Now().Before(tokenData.ExpiryTime) {
 			return tokenData.Token
 		}
@@ -69,10 +80,12 @@ func getZhipuToken(apikey string) string {
 		return ""
 	}
 
-	zhipuTokens.Store(apikey, zhipuTokenData{
+	if err := zhipuTokens.SetWithTTL(apikey, zhipuTokenData{
 		Token:      tokenString,
 		ExpiryTime: expiryTime,
-	})
+	}, time.Until(expiryTime)); err != nil {
+		common.SysLog("failed to set zhipu token cache: " + err.Error())
+	}
 
 	return tokenString
 }
@@ -156,13 +169,21 @@ func streamMetaResponseZhipu2OpenAI(zhipuResponse *ZhipuStreamMetaResponse) (*dt
 }
 
 func zhipuStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
+	defer service.CloseResponseBodyGracefully(resp)
+
 	var usage *dto.Usage
 	scanner := helper.NewStreamScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)
-	dataChan := make(chan string)
-	metaChan := make(chan string)
-	stopChan := make(chan bool)
+	dataChan := make(chan string, 10)
+	metaChan := make(chan string, 2)
+	stopChan := make(chan bool, 1)
 	go func() {
+		defer func() {
+			select {
+			case stopChan <- true:
+			default:
+			}
+		}()
 		for scanner.Scan() {
 			data := scanner.Text()
 			lines := strings.Split(data, "\n")
@@ -171,26 +192,40 @@ func zhipuStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 					continue
 				}
 				if line[:5] == "data:" {
-					dataChan <- line[5:]
+					select {
+					case dataChan <- line[5:]:
+					case <-c.Request.Context().Done():
+						service.CloseResponseBodyGracefully(resp)
+						return
+					}
 					if i != len(lines)-1 {
-						dataChan <- "\n"
+						select {
+						case dataChan <- "\n":
+						case <-c.Request.Context().Done():
+							service.CloseResponseBodyGracefully(resp)
+							return
+						}
 					}
 				} else if line[:5] == "meta:" {
-					metaChan <- line[5:]
+					select {
+					case metaChan <- line[5:]:
+					case <-c.Request.Context().Done():
+						service.CloseResponseBodyGracefully(resp)
+						return
+					}
 				}
 			}
 		}
 		if err := scanner.Err(); err != nil {
 			common.SysLog("error reading stream: " + err.Error())
 		}
-		stopChan <- true
 	}()
 	helper.SetEventStreamHeaders(c)
 	c.Stream(func(w io.Writer) bool {
 		select {
 		case data := <-dataChan:
 			response := streamResponseZhipu2OpenAI(data)
-			jsonResponse, err := json.Marshal(response)
+			jsonResponse, err := common.Marshal(response)
 			if err != nil {
 				common.SysLog("error marshalling stream response: " + err.Error())
 				return true
@@ -199,13 +234,13 @@ func zhipuStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 			return true
 		case data := <-metaChan:
 			var zhipuResponse ZhipuStreamMetaResponse
-			err := json.Unmarshal([]byte(data), &zhipuResponse)
+			err := common.Unmarshal([]byte(data), &zhipuResponse)
 			if err != nil {
 				common.SysLog("error unmarshalling stream response: " + err.Error())
 				return true
 			}
 			response, zhipuUsage := streamMetaResponseZhipu2OpenAI(&zhipuResponse)
-			jsonResponse, err := json.Marshal(response)
+			jsonResponse, err := common.Marshal(response)
 			if err != nil {
 				common.SysLog("error marshalling stream response: " + err.Error())
 				return true
@@ -216,9 +251,11 @@ func zhipuStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 		case <-stopChan:
 			c.Render(-1, common.CustomEvent{Data: "data: [DONE]"})
 			return false
+		case <-c.Request.Context().Done():
+			service.CloseResponseBodyGracefully(resp)
+			return false
 		}
 	})
-	service.CloseResponseBodyGracefully(resp)
 	return usage, nil
 }
 
@@ -229,7 +266,7 @@ func zhipuHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respon
 		return nil, types.NewOpenAIError(err, types.ErrorCodeReadResponseBodyFailed, http.StatusInternalServerError)
 	}
 	service.CloseResponseBodyGracefully(resp)
-	err = json.Unmarshal(responseBody, &zhipuResponse)
+	err = common.Unmarshal(responseBody, &zhipuResponse)
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
@@ -240,7 +277,7 @@ func zhipuHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respon
 		}, resp.StatusCode)
 	}
 	fullTextResponse := responseZhipu2OpenAI(&zhipuResponse)
-	jsonResponse, err := json.Marshal(fullTextResponse)
+	jsonResponse, err := common.Marshal(fullTextResponse)
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
 	}

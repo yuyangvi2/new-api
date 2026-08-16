@@ -179,13 +179,15 @@ export const useModelPricingData = () => {
   );
 
   const displayPrice = (usdPrice) => {
+    const safeUsdExchangeRate =
+      Number(usdExchangeRate) > 0 ? Number(usdExchangeRate) : 1;
     let priceInUSD = usdPrice;
     if (showWithRecharge) {
-      priceInUSD = (usdPrice * priceRate) / usdExchangeRate;
+      priceInUSD = (usdPrice * priceRate) / safeUsdExchangeRate;
     }
 
     if (currency === 'CNY') {
-      return `¥${(priceInUSD * usdExchangeRate).toFixed(3)}`;
+      return `¥${(priceInUSD * safeUsdExchangeRate).toFixed(3)}`;
     } else if (currency === 'CUSTOM') {
       return `${customCurrencySymbol}${(priceInUSD * customExchangeRate).toFixed(3)}`;
     }

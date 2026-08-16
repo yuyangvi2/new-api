@@ -407,3 +407,52 @@ func TestRequestOpenAI2ClaudeMessage_ClaudeOpus48ThinkingUsesAdaptiveHighEffort(
 	require.Nil(t, claudeRequest.TopP)
 	require.Nil(t, claudeRequest.TopK)
 }
+
+func TestRequestOpenAI2ClaudeMessageKeepsNoParameterTools(t *testing.T) {
+	got, err := RequestOpenAI2ClaudeMessage(nil, dto.GeneralOpenAIRequest{
+		Model: "claude-test",
+		Tools: []dto.ToolCallRequest{
+			{
+				Type: "function",
+				Function: dto.FunctionRequest{
+					Name:        "get_current_time",
+					Description: "Get time",
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	tools, ok := got.Tools.([]any)
+	require.True(t, ok)
+	require.Len(t, tools, 1)
+	tool, ok := tools[0].(*dto.Tool)
+	require.True(t, ok)
+	assert.Equal(t, "get_current_time", tool.Name)
+	assert.Equal(t, "object", tool.InputSchema["type"])
+}
+
+func TestRequestOpenAI2ClaudeMessageDefaultsNonStringSchemaType(t *testing.T) {
+	got, err := RequestOpenAI2ClaudeMessage(nil, dto.GeneralOpenAIRequest{
+		Model: "claude-test",
+		Tools: []dto.ToolCallRequest{
+			{
+				Type: "function",
+				Function: dto.FunctionRequest{
+					Name: "lookup",
+					Parameters: map[string]any{
+						"type": []any{"string", "null"},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	tools, ok := got.Tools.([]any)
+	require.True(t, ok)
+	require.Len(t, tools, 1)
+	tool, ok := tools[0].(*dto.Tool)
+	require.True(t, ok)
+	assert.Equal(t, "object", tool.InputSchema["type"])
+}

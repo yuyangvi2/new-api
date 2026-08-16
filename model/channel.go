@@ -316,7 +316,7 @@ func (channel *Channel) GetOtherInfo() map[string]interface{} {
 }
 
 func (channel *Channel) SetOtherInfo(otherInfo map[string]interface{}) {
-	otherInfoBytes, err := json.Marshal(otherInfo)
+	otherInfoBytes, err := common.Marshal(otherInfo)
 	if err != nil {
 		common.SysLog(fmt.Sprintf("failed to marshal other info: channel_id=%d, tag=%s, name=%s, error=%v", channel.Id, channel.GetTag(), channel.Name, err))
 		return
@@ -456,22 +456,17 @@ func BatchDeleteChannels(ids []int) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	// 使用事务 分批删除channel表和abilities表
-	tx := DB.Begin()
-	if tx.Error != nil {
-		return tx.Error
-	}
-	for _, chunk := range lo.Chunk(ids, 200) {
-		if err := tx.Where("id in (?)", chunk).Delete(&Channel{}).Error; err != nil {
-			tx.Rollback()
-			return err
+	return DB.Transaction(func(tx *gorm.DB) error {
+		for _, chunk := range lo.Chunk(ids, 200) {
+			if err := tx.Where("id in (?)", chunk).Delete(&Channel{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("channel_id in (?)", chunk).Delete(&Ability{}).Error; err != nil {
+				return err
+			}
 		}
-		if err := tx.Where("channel_id in (?)", chunk).Delete(&Ability{}).Error; err != nil {
-			tx.Rollback()
-			return err
-		}
-	}
-	return tx.Commit().Error
+		return nil
+	})
 }
 
 func (channel *Channel) GetPriority() int64 {
@@ -1038,36 +1033,23 @@ func GetChannelsByIds(ids []int) ([]*Channel, error) {
 }
 
 func BatchSetChannelTag(ids []int, tag *string) error {
-	// 开启事务
-	tx := DB.Begin()
-	if tx.Error != nil {
-		return tx.Error
-	}
-
-	// 更新标签
-	err := tx.Model(&Channel{}).Where("id in (?)", ids).Update("tag", tag).Error
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	// update ability status
-	channels, err := GetChannelsByIds(ids)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	for _, channel := range channels {
-		err = channel.UpdateAbilities(tx)
-		if err != nil {
-			tx.Rollback()
+	return DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&Channel{}).Where("id in (?)", ids).Update("tag", tag).Error; err != nil {
 			return err
 		}
-	}
 
-	// 提交事务
-	return tx.Commit().Error
+		var channels []*Channel
+		if err := tx.Where("id in (?)", ids).Find(&channels).Error; err != nil {
+			return err
+		}
+
+		for _, channel := range channels {
+			if err := channel.UpdateAbilities(tx); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // CountAllChannels returns total channels in DB

@@ -1,13 +1,13 @@
 package coze
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
+	appcommon "github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/relay/channel"
 	"github.com/QuantumNous/new-api/relay/common"
@@ -79,23 +79,33 @@ func (a *Adaptor) DoRequest(c *gin.Context, info *common.RelayInfo, requestBody 
 	if err != nil {
 		return nil, err
 	}
-	err = json.Unmarshal(respBody, &cozeResponse)
+	err = appcommon.Unmarshal(respBody, &cozeResponse)
 	if cozeResponse.Code != 0 {
 		return nil, errors.New(cozeResponse.Msg)
 	}
 	c.Set("coze_conversation_id", cozeResponse.Data.ConversationId)
 	c.Set("coze_chat_id", cozeResponse.Data.Id)
 	// 轮询检查消息是否完成
-	for {
+	const maxPollAttempts = 300
+	isChatComplete := false
+	for attempt := 0; attempt < maxPollAttempts; attempt++ {
 		err, isComplete := checkIfChatComplete(a, c, info)
 		if err != nil {
 			return nil, err
 		} else {
 			if isComplete {
+				isChatComplete = true
 				break
 			}
 		}
-		time.Sleep(time.Second * 1)
+		select {
+		case <-c.Request.Context().Done():
+			return nil, c.Request.Context().Err()
+		case <-time.After(time.Second):
+		}
+	}
+	if !isChatComplete {
+		return nil, errors.New("coze chat polling timed out")
 	}
 	// 发送获取消息请求
 	return getChatDetail(a, c, info)

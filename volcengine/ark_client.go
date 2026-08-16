@@ -191,10 +191,14 @@ func canonicalQuery(query url.Values) string {
 		values := query[key]
 		sort.Strings(values)
 		for _, value := range values {
-			parts = append(parts, fmt.Sprintf("%s=%s", url.QueryEscape(key), url.QueryEscape(value)))
+			parts = append(parts, fmt.Sprintf("%s=%s", canonicalQueryEscape(key), canonicalQueryEscape(value)))
 		}
 	}
 	return strings.Join(parts, "&")
+}
+
+func canonicalQueryEscape(value string) string {
+	return strings.ReplaceAll(url.QueryEscape(value), "+", "%20")
 }
 
 func hmacSHA256(key, data []byte) []byte {

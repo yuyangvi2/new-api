@@ -7,12 +7,12 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/pkg/cachex"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
@@ -20,17 +20,26 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/gin-gonic/gin"
+	"github.com/samber/hot"
 )
 
 // https://cloud.baidu.com/doc/WENXINWORKSHOP/s/flfmc9do2
 
-var baiduTokenStore sync.Map
+var baiduTokenStore = cachex.NewHybridCache[BaiduAccessToken](cachex.HybridCacheConfig[BaiduAccessToken]{
+	Namespace: cachex.Namespace("baidu_token:v1"),
+	Memory: func() *hot.HotCache[string, BaiduAccessToken] {
+		return hot.NewHotCache[string, BaiduAccessToken](hot.LRU, 4096).
+			WithTTL(24 * time.Hour).
+			WithJanitor().
+			Build()
+	},
+})
 
 func requestOpenAI2Baidu(request dto.GeneralOpenAIRequest) *BaiduChatRequest {
 	baiduRequest := BaiduChatRequest{
 		Temperature:    request.Temperature,
-		TopP:           lo.FromPtrOr(request.TopP, 0),
-		PenaltyScore:   lo.FromPtrOr(request.FrequencyPenalty, 0),
+		TopP:           request.TopP,
+		PenaltyScore:   request.FrequencyPenalty,
 		Stream:         lo.FromPtrOr(request.Stream, false),
 		DisableSearch:  false,
 		EnableCitation: false,
@@ -189,17 +198,16 @@ func baiduEmbeddingHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *ht
 }
 
 func getBaiduAccessToken(apiKey string) (string, error) {
-	if val, ok := baiduTokenStore.Load(apiKey); ok {
-		var accessToken BaiduAccessToken
-		if accessToken, ok = val.(BaiduAccessToken); ok {
-			// soon this will expire
-			if time.Now().Add(time.Hour).After(accessToken.ExpiresAt) {
-				go func() {
-					_, _ = getBaiduAccessTokenHelper(apiKey)
-				}()
-			}
-			return accessToken.AccessToken, nil
+	if accessToken, ok, err := baiduTokenStore.Get(apiKey); err == nil && ok {
+		// soon this will expire
+		if time.Now().Add(time.Hour).After(accessToken.ExpiresAt) {
+			go func() {
+				_, _ = getBaiduAccessTokenHelper(apiKey)
+			}()
 		}
+		return accessToken.AccessToken, nil
+	} else if err != nil {
+		common.SysLog("failed to get baidu token cache: " + err.Error())
 	}
 	accessToken, err := getBaiduAccessTokenHelper(apiKey)
 	if err != nil {
@@ -241,6 +249,12 @@ func getBaiduAccessTokenHelper(apiKey string) (*BaiduAccessToken, error) {
 		return nil, errors.New("getBaiduAccessTokenHelper get empty access token")
 	}
 	accessToken.ExpiresAt = time.Now().Add(time.Duration(accessToken.ExpiresIn) * time.Second)
-	baiduTokenStore.Store(apiKey, accessToken)
+	ttl := time.Until(accessToken.ExpiresAt)
+	if ttl <= 0 {
+		ttl = time.Hour
+	}
+	if err := baiduTokenStore.SetWithTTL(apiKey, accessToken, ttl); err != nil {
+		common.SysLog("failed to set baidu token cache: " + err.Error())
+	}
 	return &accessToken, nil
 }

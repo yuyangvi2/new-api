@@ -35,6 +35,13 @@ func streamResponseXAI2OpenAI(xAIResp *dto.ChatCompletionsStreamResponse, usage 
 	return openAIResp
 }
 
+func xAITokenDelta(totalTokens int, promptTokens int) int {
+	if totalTokens < promptTokens {
+		return 0
+	}
+	return totalTokens - promptTokens
+}
+
 func xAIStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
 	usage := &dto.Usage{}
 	var responseTextBuilder strings.Builder
@@ -56,7 +63,7 @@ func xAIStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 			containStreamUsage = true
 			usage.PromptTokens = xAIResp.Usage.PromptTokens
 			usage.TotalTokens = xAIResp.Usage.TotalTokens
-			usage.CompletionTokens = usage.TotalTokens - usage.PromptTokens
+			usage.CompletionTokens = xAITokenDelta(usage.TotalTokens, usage.PromptTokens)
 		}
 
 		openaiResponse := streamResponseXAI2OpenAI(xAIResp, usage)
@@ -90,8 +97,8 @@ func xAIHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
 	}
 	if xaiResponse.Usage != nil {
-		xaiResponse.Usage.CompletionTokens = xaiResponse.Usage.TotalTokens - xaiResponse.Usage.PromptTokens
-		xaiResponse.Usage.CompletionTokenDetails.TextTokens = xaiResponse.Usage.CompletionTokens - xaiResponse.Usage.CompletionTokenDetails.ReasoningTokens
+		xaiResponse.Usage.CompletionTokens = xAITokenDelta(xaiResponse.Usage.TotalTokens, xaiResponse.Usage.PromptTokens)
+		xaiResponse.Usage.CompletionTokenDetails.TextTokens = xAITokenDelta(xaiResponse.Usage.CompletionTokens, xaiResponse.Usage.CompletionTokenDetails.ReasoningTokens)
 	}
 
 	// new body

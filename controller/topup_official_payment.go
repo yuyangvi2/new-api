@@ -479,7 +479,7 @@ func completeOfficialTopUp(c *gin.Context, tradeNo string, provider string, meth
 	if err := topUp.Update(); err != nil {
 		return err
 	}
-	quotaToAdd := int(decimal.NewFromInt(topUp.Amount).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+	quotaToAdd := common.QuotaFromDecimal(decimal.NewFromInt(topUp.Amount).Mul(decimal.NewFromFloat(common.QuotaPerUnit)))
 	if err := model.IncreaseUserQuota(topUp.UserId, quotaToAdd, true); err != nil {
 		return err
 	}

@@ -42,12 +42,33 @@ type ollamaChatStreamChunk struct {
 	EvalDuration       int64  `json:"eval_duration"`
 }
 
-func ollamaToolCallsToOpenAI(toolCalls []OllamaToolCall, startIndex int, includeIndex bool) ([]dto.ToolCallResponse, int) {
+func ollamaToolCallsToOpenAI(toolCalls []OllamaToolCall, startIndex int, includeIndex bool, stableIndexes map[string]int) ([]dto.ToolCallResponse, int) {
 	if len(toolCalls) == 0 {
 		return nil, startIndex
 	}
 	result := make([]dto.ToolCallResponse, 0, len(toolCalls))
+	nameCounts := make(map[string]int, len(toolCalls))
 	for _, tc := range toolCalls {
+		nameCounts[tc.Function.Name]++
+	}
+	nameSeen := make(map[string]int, len(toolCalls))
+	for _, tc := range toolCalls {
+		toolIndex := startIndex
+		if stableIndexes != nil {
+			key := tc.Function.Name
+			if nameCounts[tc.Function.Name] > 1 {
+				nameSeen[tc.Function.Name]++
+				key = fmt.Sprintf("%s#%d", tc.Function.Name, nameSeen[tc.Function.Name])
+			}
+			if existing, ok := stableIndexes[key]; ok {
+				toolIndex = existing
+			} else {
+				stableIndexes[key] = toolIndex
+				startIndex++
+			}
+		} else {
+			startIndex++
+		}
 		var argBytes []byte
 		var err error
 		if tc.Function.Arguments == nil {
@@ -59,7 +80,7 @@ func ollamaToolCallsToOpenAI(toolCalls []OllamaToolCall, startIndex int, include
 			}
 		}
 		tr := dto.ToolCallResponse{
-			ID:   fmt.Sprintf("call_%d", startIndex),
+			ID:   fmt.Sprintf("call_%d", toolIndex),
 			Type: "function",
 			Function: dto.FunctionResponse{
 				Name:      tc.Function.Name,
@@ -67,9 +88,8 @@ func ollamaToolCallsToOpenAI(toolCalls []OllamaToolCall, startIndex int, include
 			},
 		}
 		if includeIndex {
-			tr.SetIndex(startIndex)
+			tr.SetIndex(toolIndex)
 		}
-		startIndex++
 		result = append(result, tr)
 	}
 	return result, startIndex
@@ -104,6 +124,7 @@ func ollamaStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 	var responseId = common.GetUUID()
 	var created = time.Now().Unix()
 	var toolCallIndex int
+	toolCallIndexes := make(map[string]int)
 	start := helper.GenerateStartEmptyResponse(responseId, created, model, nil)
 	if data, err := common.Marshal(start); err == nil {
 		_ = helper.StringData(c, string(data))
@@ -161,7 +182,7 @@ func ollamaStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 			}
 			// tool calls
 			if chunk.Message != nil && len(chunk.Message.ToolCalls) > 0 {
-				delta.Choices[0].Delta.ToolCalls, toolCallIndex = ollamaToolCallsToOpenAI(chunk.Message.ToolCalls, toolCallIndex, true)
+				delta.Choices[0].Delta.ToolCalls, toolCallIndex = ollamaToolCallsToOpenAI(chunk.Message.ToolCalls, toolCallIndex, true, toolCallIndexes)
 			}
 			if data, err := common.Marshal(delta); err == nil {
 				_ = helper.StringData(c, string(data))
@@ -257,7 +278,7 @@ func ollamaChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 		}
 		if ck.Message != nil && len(ck.Message.ToolCalls) > 0 {
 			var converted []dto.ToolCallResponse
-			converted, toolCallIndex = ollamaToolCallsToOpenAI(ck.Message.ToolCalls, toolCallIndex, false)
+			converted, toolCallIndex = ollamaToolCallsToOpenAI(ck.Message.ToolCalls, toolCallIndex, false, nil)
 			toolCalls = append(toolCalls, converted...)
 		}
 	}
@@ -285,7 +306,7 @@ func ollamaChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 			aggContent.WriteString(single.Message.Content)
 			if len(single.Message.ToolCalls) > 0 {
 				var converted []dto.ToolCallResponse
-				converted, toolCallIndex = ollamaToolCallsToOpenAI(single.Message.ToolCalls, toolCallIndex, false)
+				converted, toolCallIndex = ollamaToolCallsToOpenAI(single.Message.ToolCalls, toolCallIndex, false, nil)
 				toolCalls = append(toolCalls, converted...)
 			}
 		} else {

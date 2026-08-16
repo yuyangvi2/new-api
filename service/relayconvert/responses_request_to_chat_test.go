@@ -150,6 +150,25 @@ func TestResponsesRequestToChatCompletionsRequestOnlyFunctionCallCreatesAssistan
 	assert.Equal(t, `{"q":"x"}`, toolCalls[0].Function.Arguments)
 }
 
+func TestResponsesRequestToChatCompletionsRequestFunctionCallOutputFallsBackToID(t *testing.T) {
+	got, err := ResponsesRequestToChatCompletionsRequest(&dto.OpenAIResponsesRequest{
+		Model: "gpt-test",
+		Input: mustRawMessage(t, []map[string]any{
+			{
+				"type":   "function_call_output",
+				"id":     "call_from_id",
+				"output": "tool result",
+			},
+		}),
+	})
+	require.NoError(t, err)
+
+	require.Len(t, got.Messages, 1)
+	assert.Equal(t, "tool", got.Messages[0].Role)
+	assert.Equal(t, "call_from_id", got.Messages[0].ToolCallId)
+	assert.Equal(t, "tool result", got.Messages[0].StringContent())
+}
+
 func TestResponsesRequestToChatCompletionsRequestToolsToolChoiceAndTextFormat(t *testing.T) {
 	got, err := ResponsesRequestToChatCompletionsRequest(&dto.OpenAIResponsesRequest{
 		Model: "gpt-test",
