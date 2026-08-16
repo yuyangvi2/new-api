@@ -429,26 +429,132 @@ function isSeedanceVideoModel(modelName: string): boolean {
   return /seedance|doubao-seedance/i.test(modelName)
 }
 
+function buildSeedanceVideoSample(lang: Lang, ctx: SampleContext): string {
+  const url = `${ctx.baseUrl}${ctx.endpointPath}`
+  const prompt =
+    'Create a cinematic 5 second night city video with a slow push-in camera move and neon lights reflected on wet streets.'
+  const body = {
+    model: ctx.modelName,
+    content: [{ type: 'text', text: prompt }],
+    generate_audio: true,
+    ratio: '16:9',
+    resolution: '720p',
+    duration: 5,
+    watermark: false,
+  }
+  const bodyJson = JSON.stringify(body, null, 2)
+
+  if (lang === 'curl') {
+    return [
+      '# Create a video generation task',
+      `curl ${url} \\`,
+      `  -H "Authorization: Bearer $${ctx.apiKeyEnv}" \\`,
+      `  -H "Content-Type: application/json" \\`,
+      `  -d '${bodyJson.replaceAll('\n', '\n     ')}'`,
+      '',
+      '# Query the task with the id returned above',
+      `curl ${url}/<TASK_ID> \\`,
+      `  -H "Authorization: Bearer $${ctx.apiKeyEnv}"`,
+    ].join('\n')
+  }
+  if (lang === 'python') {
+    return [
+      'import json',
+      'import time',
+      'import requests',
+      '',
+      `url = "${url}"`,
+      `headers = {`,
+      `    "Authorization": "Bearer <YOUR_API_KEY>",`,
+      `    "Content-Type": "application/json",`,
+      `}`,
+      `payload = json.loads('''${bodyJson}''')`,
+      '',
+      `create_response = requests.post(url, headers=headers, json=payload)`,
+      `create_response.raise_for_status()`,
+      `task_id = create_response.json()["id"]`,
+      '',
+      `while True:`,
+      `    task_response = requests.get(f"{url}/{task_id}", headers=headers)`,
+      `    task_response.raise_for_status()`,
+      `    task = task_response.json()`,
+      `    if task.get("status") in {"succeeded", "failed", "expired", "cancelled", "canceled"}:`,
+      `        break`,
+      `    time.sleep(5)`,
+      '',
+      `print(task)`,
+    ].join('\n')
+  }
+  if (lang === 'typescript') {
+    return [
+      `const headers = {`,
+      `  Authorization: \`Bearer \${process.env.${ctx.apiKeyEnv}}\`,`,
+      `  'Content-Type': 'application/json',`,
+      `}`,
+      '',
+      `const createResponse = await fetch('${url}', {`,
+      `  method: 'POST',`,
+      `  headers,`,
+      `  body: JSON.stringify(${bodyJson.replaceAll('\n', '\n    ')}),`,
+      `})`,
+      `if (!createResponse.ok) throw new Error(await createResponse.text())`,
+      '',
+      `const { id } = (await createResponse.json()) as { id: string }`,
+      `let task: { status?: string; content?: { video_url?: string } } | undefined`,
+      '',
+      `for (;;) {`,
+      `  const taskResponse = await fetch(\`${url}/\${id}\`, { headers })`,
+      `  if (!taskResponse.ok) throw new Error(await taskResponse.text())`,
+      `  task = await taskResponse.json()`,
+      `  if (['succeeded', 'failed', 'expired', 'cancelled', 'canceled'].includes(task.status ?? '')) break`,
+      `  await new Promise((resolve) => setTimeout(resolve, 5000))`,
+      `}`,
+      '',
+      `console.log(task)`,
+    ].join('\n')
+  }
+  return [
+    `const headers = {`,
+    `  Authorization: \`Bearer \${process.env.${ctx.apiKeyEnv}}\`,`,
+    `  'Content-Type': 'application/json',`,
+    `}`,
+    '',
+    `const createResponse = await fetch('${url}', {`,
+    `  method: 'POST',`,
+    `  headers,`,
+    `  body: JSON.stringify(${bodyJson.replaceAll('\n', '\n    ')}),`,
+    `})`,
+    `if (!createResponse.ok) throw new Error(await createResponse.text())`,
+    '',
+    `const { id } = await createResponse.json()`,
+    `let task`,
+    '',
+    `for (;;) {`,
+    `  const taskResponse = await fetch(\`${url}/\${id}\`, { headers })`,
+    `  if (!taskResponse.ok) throw new Error(await taskResponse.text())`,
+    `  task = await taskResponse.json()`,
+    `  if (['succeeded', 'failed', 'expired', 'cancelled', 'canceled'].includes(task.status ?? '')) break`,
+    `  await new Promise((resolve) => setTimeout(resolve, 5000))`,
+    `}`,
+    '',
+    `console.log(task)`,
+  ].join('\n')
+}
+
 function buildVideoSample(lang: Lang, ctx: SampleContext): string {
+  if (isSeedanceVideoModel(ctx.modelName)) {
+    return buildSeedanceVideoSample(lang, ctx)
+  }
+
   const url = `${ctx.baseUrl}${ctx.endpointPath}`
   const prompt =
     'Create a 10 second night city video with a slow push-in camera move and neon lights reflected on wet streets.'
-  const body = isSeedanceVideoModel(ctx.modelName)
-    ? {
-        model: ctx.modelName,
-        content: [{ type: 'text', text: prompt }],
-        generate_audio: true,
-        ratio: '16:9',
-        resolution: '720p',
-        duration: 10,
-        watermark: false,
-      }
-    : {
-        model: ctx.modelName,
-        prompt,
-        seconds: '10',
-        size: '1280x720',
-      }
+  const body = {
+    model: ctx.modelName,
+    prompt,
+    seconds: '10',
+    size: '1280x720',
+  }
   const bodyJson = JSON.stringify(body, null, 2)
 
   if (lang === 'curl') {
@@ -726,6 +832,18 @@ function ParamRangeCell(props: { param: SupportedParameter }) {
           <span className='text-muted-foreground font-mono text-sm leading-5'>
             {range}
           </span>
+        )}
+        {enumValues && enumValues.length > 0 && (
+          <div className='flex flex-wrap gap-0.5'>
+            {enumValues.map((v) => (
+              <code
+                key={v}
+                className='bg-muted text-muted-foreground rounded px-1.5 py-0.5 font-mono text-sm'
+              >
+                {v}
+              </code>
+            ))}
+          </div>
         )}
       </div>
     )
