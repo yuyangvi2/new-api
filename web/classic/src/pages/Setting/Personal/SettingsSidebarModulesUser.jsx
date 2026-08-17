@@ -94,6 +94,7 @@ export default function SettingsSidebarModulesUser() {
       defaultConfig.personal = {
         enabled: true,
         topup: isSidebarModuleAllowed('personal', 'topup'),
+        invoice: isSidebarModuleAllowed('personal', 'invoice'),
         personal: isSidebarModuleAllowed('personal', 'personal'),
       };
     }
@@ -107,6 +108,7 @@ export default function SettingsSidebarModulesUser() {
         deployment: isSidebarModuleAllowed('admin', 'deployment'),
         redemption: isSidebarModuleAllowed('admin', 'redemption'),
         user: isSidebarModuleAllowed('admin', 'user'),
+        invoice_admin: isSidebarModuleAllowed('admin', 'invoice_admin'),
         setting: isSidebarModuleAllowed('admin', 'setting'),
       };
     }
@@ -326,6 +328,11 @@ export default function SettingsSidebarModulesUser() {
       modules: [
         { key: 'topup', title: t('钱包管理'), description: t('余额充值管理') },
         {
+          key: 'invoice',
+          title: t('发票中心'),
+          description: t('发票申请和记录'),
+        },
+        {
           key: 'personal',
           title: t('个人设置'),
           description: t('个人信息设置'),
@@ -350,6 +357,11 @@ export default function SettingsSidebarModulesUser() {
           description: t('兑换码生成管理'),
         },
         { key: 'user', title: t('用户管理'), description: t('用户账户管理') },
+        {
+          key: 'invoice_admin',
+          title: t('发票管理'),
+          description: t('发票申请管理'),
+        },
         {
           key: 'setting',
           title: t('系统设置'),

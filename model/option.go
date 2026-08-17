@@ -219,7 +219,26 @@ func SyncOptions(frequency int) {
 	}
 }
 
+func validateOptionValue(key string, value string) error {
+	switch key {
+	case "InvoiceTypes":
+		_, err := ParseInvoiceTypes(value)
+		return err
+	case "InvoiceKinds":
+		_, err := ParseInvoiceKinds(value)
+		return err
+	case "InvoiceFeeRules":
+		_, err := ParseInvoiceFeeRules(value)
+		return err
+	default:
+		return nil
+	}
+}
+
 func UpdateOption(key string, value string) error {
+	if err := validateOptionValue(key, value); err != nil {
+		return err
+	}
 	// Save to database first
 	option := Option{
 		Key: key,
@@ -381,6 +400,8 @@ func updateOptionMap(key string, value string) (err error) {
 			setting.DefaultUseAutoGroup = boolValue
 		case "ExposeRatioEnabled":
 			ratio_setting.SetExposeRatioEnabled(boolValue)
+		case "InvoiceEnabled":
+			InvoiceEnabled = boolValue
 		}
 	}
 	switch key {
@@ -607,6 +628,12 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.StreamCacheQueueLength, _ = strconv.Atoi(value)
 	case "PayMethods":
 		err = operation_setting.UpdatePayMethodsByJsonString(value)
+	case "InvoiceTypes":
+		err = UpdateInvoiceTypesByJSONString(value)
+	case "InvoiceKinds":
+		err = UpdateInvoiceKindsByJSONString(value)
+	case "InvoiceFeeRules":
+		err = UpdateInvoiceFeeRulesByJSONString(value)
 	case "WaffoPayMethods":
 		// WaffoPayMethods is read directly from OptionMap via setting.GetWaffoPayMethods().
 		// The value is already stored in OptionMap at the top of this function (line: common.OptionMap[key] = value).

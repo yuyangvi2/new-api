@@ -32,6 +32,8 @@ import {
   DashboardSpeed02Icon,
   DashboardSquare03Icon,
   FileChartLineIcon,
+  Invoice01Icon,
+  Invoice02Icon,
   Key02Icon,
   LayoutGridIcon,
   LimitationIcon,
@@ -70,6 +72,8 @@ export const SidebarIcons = {
   experienceCenter: createSidebarIcon(
     AiContentGenerator02Icon as IconSvgElement
   ),
+  invoices: createSidebarIcon(Invoice01Icon as IconSvgElement),
+  invoiceManagement: createSidebarIcon(Invoice02Icon as IconSvgElement),
   models: createSidebarIcon(BrainCogIcon as IconSvgElement),
   modelsRouting: createSidebarIcon(Route03Icon as IconSvgElement),
   operations: createSidebarIcon(ToolCaseIcon as IconSvgElement),

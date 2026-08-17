@@ -80,6 +80,7 @@ const NotificationSettings = ({
     personal: {
       enabled: true,
       topup: true,
+      invoice: true,
       personal: true,
     },
     admin: {
@@ -90,6 +91,7 @@ const NotificationSettings = ({
       subscription: true,
       redemption: true,
       user: true,
+      invoice_admin: true,
       setting: true,
     },
   });
@@ -165,7 +167,7 @@ const NotificationSettings = ({
         midjourney: true,
         task: true,
       },
-      personal: { enabled: true, topup: true, personal: true },
+      personal: { enabled: true, topup: true, invoice: true, personal: true },
       admin: {
         enabled: true,
         channel: true,
@@ -174,6 +176,7 @@ const NotificationSettings = ({
         subscription: true,
         redemption: true,
         user: true,
+        invoice_admin: true,
         setting: true,
       },
     };
@@ -280,6 +283,11 @@ const NotificationSettings = ({
       modules: [
         { key: 'topup', title: t('钱包管理'), description: t('余额充值管理') },
         {
+          key: 'invoice',
+          title: t('发票中心'),
+          description: t('发票申请和记录'),
+        },
+        {
           key: 'personal',
           title: t('个人设置'),
           description: t('个人信息设置'),
@@ -310,6 +318,11 @@ const NotificationSettings = ({
           description: t('兑换码生成管理'),
         },
         { key: 'user', title: t('用户管理'), description: t('用户账户管理') },
+        {
+          key: 'invoice_admin',
+          title: t('发票管理'),
+          description: t('发票申请管理'),
+        },
         {
           key: 'setting',
           title: t('系统设置'),
