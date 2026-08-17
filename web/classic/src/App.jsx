@@ -35,10 +35,11 @@ import Channel from './pages/Channel';
 import Token from './pages/Token';
 import Redemption from './pages/Redemption';
 import TopUp from './pages/TopUp';
+import InvoiceCenter from './pages/Invoice';
 import Log from './pages/Log';
 import Chat from './pages/Chat';
 import Chat2Link from './pages/Chat2Link';
-import MjProxy from './pages/Midjourney';
+import Midjourney from './pages/Midjourney';
 import Pricing from './pages/Pricing';
 import Task from './pages/Task';
 import ModelPage from './pages/Model';
@@ -278,6 +279,26 @@ function App() {
           }
         />
         <Route
+          path='/console/invoice'
+          element={
+            <PrivateRoute>
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <InvoiceCenter />
+              </Suspense>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path='/console/invoice-admin'
+          element={
+            <AdminRoute>
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <InvoiceCenter adminOnly />
+              </Suspense>
+            </AdminRoute>
+          }
+        />
+        <Route
           path='/console/log'
           element={
             <PrivateRoute>
@@ -300,7 +321,7 @@ function App() {
           element={
             <PrivateRoute>
               <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                <MjProxy />
+                <Midjourney />
               </Suspense>
             </PrivateRoute>
           }

@@ -83,29 +83,34 @@ func containsConfiguredPaymentMethod(method string) bool {
 	}
 }
 
-func requestOfficialTopUpPay(c *gin.Context, req EpayRequest, userId int, payMoney float64) {
+func requestOfficialTopUpPay(c *gin.Context, req EpayRequest, userId int, payMoney float64, invoiceAmounts *invoicePaymentAmounts) {
 	amount := req.Amount
 	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
 		dAmount := decimal.NewFromInt(amount)
 		dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
 		amount = dAmount.Div(dQuotaPerUnit).IntPart()
 	}
+	totalPayMoney := payMoney
+	if invoiceAmounts != nil && invoiceAmounts.Required {
+		totalPayMoney = invoiceAmounts.TotalPayment
+	}
 	tradeNo := fmt.Sprintf("USR%dNO%s%d", userId, common.GetRandomString(6), time.Now().Unix())
 	order := officialPaymentOrder{
 		tradeNo: tradeNo,
 		name:    "Tokone充值",
-		money:   payMoney,
+		money:   totalPayMoney,
 	}
 	topUp := &model.TopUp{
 		UserId:          userId,
 		Amount:          amount,
-		Money:           payMoney,
+		Money:           totalPayMoney,
 		TradeNo:         tradeNo,
 		PaymentMethod:   req.PaymentMethod,
 		PaymentProvider: officialPaymentProvider(req.PaymentMethod),
 		CreateTime:      time.Now().Unix(),
 		Status:          common.TopUpStatusPending,
 	}
+	applyInvoiceToTopUp(topUp, invoiceAmounts, payMoney, totalPayMoney, true)
 	if err := topUp.Insert(); err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("官方支付 创建充值订单失败 user_id=%d trade_no=%s payment_method=%s amount=%d error=%q", userId, tradeNo, req.PaymentMethod, req.Amount, err.Error()))
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "创建订单失败"})
@@ -467,6 +472,9 @@ func completeOfficialTopUp(c *gin.Context, tradeNo string, provider string, meth
 	if topUp.PaymentProvider != provider {
 		return model.ErrPaymentMethodMismatch
 	}
+	if topUp.Status == common.TopUpStatusSuccess {
+		return model.CreateInvoiceRecordFromTopUp(topUp.TradeNo)
+	}
 	if topUp.Status != common.TopUpStatusPending {
 		return nil
 	}
@@ -481,6 +489,9 @@ func completeOfficialTopUp(c *gin.Context, tradeNo string, provider string, meth
 	}
 	quotaToAdd := common.QuotaFromDecimal(decimal.NewFromInt(topUp.Amount).Mul(decimal.NewFromFloat(common.QuotaPerUnit)))
 	if err := model.IncreaseUserQuota(topUp.UserId, quotaToAdd, true); err != nil {
+		return err
+	}
+	if err := model.CreateInvoiceRecordFromTopUp(topUp.TradeNo); err != nil {
 		return err
 	}
 	model.RecordTopupLog(topUp.UserId, fmt.Sprintf("使用官方支付充值成功，充值金额: %v，支付金额：%.2f", logger.LogQuota(quotaToAdd), topUp.Money), c.ClientIP(), topUp.PaymentMethod, provider)

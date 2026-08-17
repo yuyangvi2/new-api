@@ -98,6 +98,11 @@ export function useSidebarData(): SidebarData {
             icon: SidebarIcons.wallet,
           },
           {
+            title: t('Invoices'),
+            url: '/invoices',
+            icon: SidebarIcons.invoices,
+          },
+          {
             title: t('Profile'),
             url: '/profile',
             icon: SidebarIcons.profile,
@@ -122,6 +127,11 @@ export function useSidebarData(): SidebarData {
             title: t('Users'),
             url: '/users',
             icon: SidebarIcons.users,
+          },
+          {
+            title: t('Invoices'),
+            url: '/invoice-management',
+            icon: SidebarIcons.invoiceManagement,
           },
           {
             title: t('Redemption Codes'),

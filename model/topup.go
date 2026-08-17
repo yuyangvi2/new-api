@@ -12,16 +12,38 @@ import (
 )
 
 type TopUp struct {
-	Id              int     `json:"id"`
-	UserId          int     `json:"user_id" gorm:"index"`
-	Amount          int64   `json:"amount"`
-	Money           float64 `json:"money"`
-	TradeNo         string  `json:"trade_no" gorm:"unique;type:varchar(255);index"`
-	PaymentMethod   string  `json:"payment_method" gorm:"type:varchar(50)"`
-	PaymentProvider string  `json:"payment_provider" gorm:"type:varchar(50);default:''"`
-	CreateTime      int64   `json:"create_time"`
-	CompleteTime    int64   `json:"complete_time"`
-	Status          string  `json:"status"`
+	Id                   int     `json:"id"`
+	UserId               int     `json:"user_id" gorm:"index"`
+	Amount               int64   `json:"amount"`
+	Money                float64 `json:"money"`
+	OriginalMoney        float64 `json:"original_money"`
+	DiscountMoney        float64 `json:"discount_money"`
+	ActualMoney          float64 `json:"actual_money"`
+	PaidAmountCNY        float64 `json:"paid_amount_cny"`
+	PromoCodeId          int     `json:"promo_code_id" gorm:"index"`
+	PromoCode            string  `json:"promo_code" gorm:"type:varchar(64);default:''"`
+	AffiliateSourceQuota int     `json:"affiliate_source_quota"`
+	InvoiceRequired      bool    `json:"invoice_required"`
+	InvoiceType          string  `json:"invoice_type" gorm:"type:varchar(32);default:''"`
+	InvoiceKind          string  `json:"invoice_kind" gorm:"type:varchar(32);default:''"`
+	InvoiceTitle         string  `json:"invoice_title" gorm:"type:varchar(255);default:''"`
+	InvoiceTaxNo         string  `json:"invoice_tax_no" gorm:"type:varchar(128);default:''"`
+	InvoiceEmail         string  `json:"invoice_email" gorm:"type:varchar(255);default:''"`
+	InvoicePhone         string  `json:"invoice_phone" gorm:"type:varchar(64);default:''"`
+	InvoiceRemark        string  `json:"invoice_remark" gorm:"type:text"`
+	InvoiceBaseAmount    float64 `json:"invoice_base_amount"`
+	InvoiceFeeAmount     float64 `json:"invoice_fee_amount"`
+	InvoiceStatus        string  `json:"invoice_status" gorm:"type:varchar(32);default:''"`
+	TradeNo              string  `json:"trade_no" gorm:"unique;type:varchar(255);index"`
+	PaymentMethod        string  `json:"payment_method" gorm:"type:varchar(50)"`
+	PaymentProvider      string  `json:"payment_provider" gorm:"type:varchar(50);default:''"`
+	RequestIP            string  `json:"request_ip" gorm:"type:varchar(64);default:''"`
+	ProviderOrderId      string  `json:"provider_order_id" gorm:"type:varchar(128);default:'';index"`
+	ProviderAmount       string  `json:"provider_amount" gorm:"type:varchar(64);default:''"`
+	ProviderCurrency     string  `json:"provider_currency" gorm:"type:varchar(32);default:''"`
+	CreateTime           int64   `json:"create_time"`
+	CompleteTime         int64   `json:"complete_time"`
+	Status               string  `json:"status"`
 }
 
 const (
@@ -30,6 +52,8 @@ const (
 	PaymentMethodWaffo          = "waffo"
 	PaymentMethodWaffoPancake   = "waffo_pancake"
 	PaymentMethodBalance        = "balance"
+	PaymentMethodBepusdt        = "bepusdt"
+	PaymentMethodOkpay          = "okpay"
 	PaymentMethodOfficialAlipay = "alipay_official"
 	PaymentMethodOfficialWeChat = "wechat_pay"
 )
@@ -40,6 +64,8 @@ const (
 	PaymentProviderCreem          = "creem"
 	PaymentProviderWaffo          = "waffo"
 	PaymentProviderWaffoPancake   = "waffo_pancake"
+	PaymentProviderBepusdt        = "bepusdt"
+	PaymentProviderOkpay          = "okpay"
 	PaymentProviderBalance        = "balance"
 	PaymentProviderOfficialAlipay = "official_alipay"
 	PaymentProviderOfficialWeChat = "official_wechat_pay"
@@ -53,8 +79,31 @@ var (
 
 func (topUp *TopUp) Insert() error {
 	var err error
+	normalizeTopUpMoneySnapshot(topUp)
 	err = DB.Create(topUp).Error
 	return err
+}
+
+func normalizeTopUpMoneySnapshot(topUp *TopUp) {
+	if topUp == nil {
+		return
+	}
+	if topUp.OriginalMoney == 0 {
+		topUp.OriginalMoney = topUp.Money
+	}
+	if topUp.ActualMoney == 0 && topUp.Money > 0 && topUp.PromoCodeId == 0 {
+		topUp.ActualMoney = topUp.Money
+	}
+	if topUp.Money == 0 && topUp.ActualMoney > 0 {
+		topUp.Money = topUp.ActualMoney
+	}
+	if topUp.PaidAmountCNY <= 0 {
+		paidAmount := invoiceOrderPaidAmount(topUp.Money, topUp.ActualMoney, topUp.PromoCodeId)
+		if paidAmount > 0 {
+			provider := invoiceOrderPaymentProvider(topUp.PaymentProvider, topUp.PaymentMethod)
+			topUp.PaidAmountCNY = invoiceOrderAmountCNY(paidAmount, provider)
+		}
+	}
 }
 
 func (topUp *TopUp) Update() error {
@@ -150,7 +199,7 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 			return err
 		}
 
-		return nil
+		return CreateInvoiceRecordFromTopUpTx(tx, topUp)
 	})
 
 	if err != nil {
@@ -345,7 +394,7 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 
 		// 幂等处理：已成功直接返回
 		if topUp.Status == common.TopUpStatusSuccess {
-			return nil
+			return CreateInvoiceRecordFromTopUpTx(tx, topUp)
 		}
 
 		if topUp.Status != common.TopUpStatusPending {
@@ -376,6 +425,10 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 
 		// 增加用户额度（立即写库，保持一致性）
 		if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd)).Error; err != nil {
+			return err
+		}
+
+		if err := CreateInvoiceRecordFromTopUpTx(tx, topUp); err != nil {
 			return err
 		}
 
@@ -455,7 +508,7 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 			return err
 		}
 
-		return nil
+		return CreateInvoiceRecordFromTopUpTx(tx, topUp)
 	})
 
 	if err != nil {
@@ -492,7 +545,7 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 		}
 
 		if topUp.Status == common.TopUpStatusSuccess {
-			return nil // 幂等：已成功直接返回
+			return CreateInvoiceRecordFromTopUpTx(tx, topUp)
 		}
 
 		if topUp.Status != common.TopUpStatusPending {
@@ -516,7 +569,7 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 			return err
 		}
 
-		return nil
+		return CreateInvoiceRecordFromTopUpTx(tx, topUp)
 	})
 
 	if err != nil {
@@ -555,7 +608,7 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 		}
 
 		if topUp.Status == common.TopUpStatusSuccess {
-			return nil
+			return CreateInvoiceRecordFromTopUpTx(tx, topUp)
 		}
 
 		if topUp.Status != common.TopUpStatusPending {
@@ -577,7 +630,7 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 			return err
 		}
 
-		return nil
+		return CreateInvoiceRecordFromTopUpTx(tx, topUp)
 	})
 
 	if err != nil {

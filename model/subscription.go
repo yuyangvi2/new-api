@@ -213,17 +213,39 @@ func (p *SubscriptionPlan) NormalizeDefaults() {
 
 // Subscription order (payment -> webhook -> create UserSubscription)
 type SubscriptionOrder struct {
-	Id     int     `json:"id"`
-	UserId int     `json:"user_id" gorm:"index"`
-	PlanId int     `json:"plan_id" gorm:"index"`
-	Money  float64 `json:"money"`
+	Id                   int     `json:"id"`
+	UserId               int     `json:"user_id" gorm:"index"`
+	PlanId               int     `json:"plan_id" gorm:"index"`
+	Money                float64 `json:"money"`
+	OriginalMoney        float64 `json:"original_money"`
+	DiscountMoney        float64 `json:"discount_money"`
+	ActualMoney          float64 `json:"actual_money"`
+	PaidAmountCNY        float64 `json:"paid_amount_cny"`
+	PromoCodeId          int     `json:"promo_code_id" gorm:"index"`
+	PromoCode            string  `json:"promo_code" gorm:"type:varchar(64);default:''"`
+	AffiliateSourceQuota int     `json:"affiliate_source_quota"`
+	InvoiceRequired      bool    `json:"invoice_required"`
+	InvoiceType          string  `json:"invoice_type" gorm:"type:varchar(32);default:''"`
+	InvoiceKind          string  `json:"invoice_kind" gorm:"type:varchar(32);default:''"`
+	InvoiceTitle         string  `json:"invoice_title" gorm:"type:varchar(255);default:''"`
+	InvoiceTaxNo         string  `json:"invoice_tax_no" gorm:"type:varchar(128);default:''"`
+	InvoiceEmail         string  `json:"invoice_email" gorm:"type:varchar(255);default:''"`
+	InvoicePhone         string  `json:"invoice_phone" gorm:"type:varchar(64);default:''"`
+	InvoiceRemark        string  `json:"invoice_remark" gorm:"type:text"`
+	InvoiceBaseAmount    float64 `json:"invoice_base_amount"`
+	InvoiceFeeAmount     float64 `json:"invoice_fee_amount"`
+	InvoiceStatus        string  `json:"invoice_status" gorm:"type:varchar(32);default:''"`
 
-	TradeNo         string `json:"trade_no" gorm:"unique;type:varchar(255);index"`
-	PaymentMethod   string `json:"payment_method" gorm:"type:varchar(50)"`
-	PaymentProvider string `json:"payment_provider" gorm:"type:varchar(50);default:''"`
-	Status          string `json:"status"`
-	CreateTime      int64  `json:"create_time"`
-	CompleteTime    int64  `json:"complete_time"`
+	TradeNo          string `json:"trade_no" gorm:"unique;type:varchar(255);index"`
+	PaymentMethod    string `json:"payment_method" gorm:"type:varchar(50)"`
+	PaymentProvider  string `json:"payment_provider" gorm:"type:varchar(50);default:''"`
+	RequestIP        string `json:"request_ip" gorm:"type:varchar(64);default:''"`
+	ProviderOrderId  string `json:"provider_order_id" gorm:"type:varchar(128);default:'';index"`
+	ProviderAmount   string `json:"provider_amount" gorm:"type:varchar(64);default:''"`
+	ProviderCurrency string `json:"provider_currency" gorm:"type:varchar(32);default:''"`
+	Status           string `json:"status"`
+	CreateTime       int64  `json:"create_time"`
+	CompleteTime     int64  `json:"complete_time"`
 
 	ProviderPayload string `json:"provider_payload" gorm:"type:text"`
 }
@@ -232,7 +254,30 @@ func (o *SubscriptionOrder) Insert() error {
 	if o.CreateTime == 0 {
 		o.CreateTime = common.GetTimestamp()
 	}
+	normalizeSubscriptionOrderMoneySnapshot(o)
 	return DB.Create(o).Error
+}
+
+func normalizeSubscriptionOrderMoneySnapshot(order *SubscriptionOrder) {
+	if order == nil {
+		return
+	}
+	if order.OriginalMoney == 0 {
+		order.OriginalMoney = order.Money
+	}
+	if order.ActualMoney == 0 && order.Money > 0 && order.PromoCodeId == 0 {
+		order.ActualMoney = order.Money
+	}
+	if order.Money == 0 && order.ActualMoney > 0 {
+		order.Money = order.ActualMoney
+	}
+	if order.PaidAmountCNY <= 0 {
+		paidAmount := invoiceOrderPaidAmount(order.Money, order.ActualMoney, order.PromoCodeId)
+		if paidAmount > 0 {
+			provider := invoiceOrderPaymentProvider(order.PaymentProvider, order.PaymentMethod)
+			order.PaidAmountCNY = invoiceOrderAmountCNY(paidAmount, provider)
+		}
+	}
 }
 
 func (o *SubscriptionOrder) Update() error {
@@ -583,7 +628,7 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 			return ErrPaymentMethodMismatch
 		}
 		if order.Status == common.TopUpStatusSuccess {
-			return nil
+			return CreateInvoiceRecordFromSubscriptionOrderTx(tx, &order)
 		}
 		if order.Status != common.TopUpStatusPending {
 			return ErrSubscriptionOrderStatusInvalid
@@ -614,6 +659,9 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 		if err := tx.Save(&order).Error; err != nil {
 			return err
 		}
+		if err := CreateInvoiceRecordFromSubscriptionOrderTx(tx, &order); err != nil {
+			return err
+		}
 		logUserId = order.UserId
 		logPlanTitle = plan.Title
 		logMoney = order.Money
@@ -642,20 +690,59 @@ func upsertSubscriptionTopUpTx(tx *gorm.DB, order *SubscriptionOrder) error {
 	if err := tx.Where("trade_no = ?", order.TradeNo).First(&topup).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			topup = TopUp{
-				UserId:        order.UserId,
-				Amount:        0,
-				Money:         order.Money,
-				TradeNo:       order.TradeNo,
-				PaymentMethod: order.PaymentMethod,
-				CreateTime:    order.CreateTime,
-				CompleteTime:  now,
-				Status:        common.TopUpStatusSuccess,
+				UserId:               order.UserId,
+				Amount:               0,
+				Money:                order.Money,
+				OriginalMoney:        order.OriginalMoney,
+				DiscountMoney:        order.DiscountMoney,
+				ActualMoney:          order.ActualMoney,
+				PaidAmountCNY:        order.PaidAmountCNY,
+				PromoCodeId:          order.PromoCodeId,
+				PromoCode:            order.PromoCode,
+				AffiliateSourceQuota: order.AffiliateSourceQuota,
+				InvoiceRequired:      order.InvoiceRequired,
+				InvoiceType:          order.InvoiceType,
+				InvoiceKind:          order.InvoiceKind,
+				InvoiceTitle:         order.InvoiceTitle,
+				InvoiceTaxNo:         order.InvoiceTaxNo,
+				InvoiceEmail:         order.InvoiceEmail,
+				InvoicePhone:         order.InvoicePhone,
+				InvoiceRemark:        order.InvoiceRemark,
+				InvoiceBaseAmount:    order.InvoiceBaseAmount,
+				InvoiceFeeAmount:     order.InvoiceFeeAmount,
+				InvoiceStatus:        order.InvoiceStatus,
+				TradeNo:              order.TradeNo,
+				PaymentMethod:        order.PaymentMethod,
+				PaymentProvider:      order.PaymentProvider,
+				RequestIP:            order.RequestIP,
+				CreateTime:           order.CreateTime,
+				CompleteTime:         now,
+				Status:               common.TopUpStatusSuccess,
 			}
 			return tx.Create(&topup).Error
 		}
 		return err
 	}
 	topup.Money = order.Money
+	topup.OriginalMoney = order.OriginalMoney
+	topup.DiscountMoney = order.DiscountMoney
+	topup.ActualMoney = order.ActualMoney
+	topup.PaidAmountCNY = order.PaidAmountCNY
+	topup.PromoCodeId = order.PromoCodeId
+	topup.PromoCode = order.PromoCode
+	topup.AffiliateSourceQuota = order.AffiliateSourceQuota
+	topup.InvoiceRequired = order.InvoiceRequired
+	topup.InvoiceType = order.InvoiceType
+	topup.InvoiceKind = order.InvoiceKind
+	topup.InvoiceTitle = order.InvoiceTitle
+	topup.InvoiceTaxNo = order.InvoiceTaxNo
+	topup.InvoiceEmail = order.InvoiceEmail
+	topup.InvoicePhone = order.InvoicePhone
+	topup.InvoiceRemark = order.InvoiceRemark
+	topup.InvoiceBaseAmount = order.InvoiceBaseAmount
+	topup.InvoiceFeeAmount = order.InvoiceFeeAmount
+	topup.InvoiceStatus = order.InvoiceStatus
+	topup.RequestIP = order.RequestIP
 	if topup.PaymentMethod == "" {
 		topup.PaymentMethod = order.PaymentMethod
 	} else if topup.PaymentMethod != order.PaymentMethod {

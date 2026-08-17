@@ -30,20 +30,27 @@ import RiskAcknowledgementModal from '../common/modals/RiskAcknowledgementModal'
 
 const CURRENT_COMPLIANCE_TERMS_VERSION = 'v1';
 
-const PaymentSetting = () => {
+const PaymentSetting = ({ defaultActiveKey = 'general' } = {}) => {
   const { t } = useTranslation();
   let [inputs, setInputs] = useState({
     ServerAddress: '',
     PayAddress: '',
     EpayId: '',
     EpayKey: '',
-    Price: 7.14,
+    Price: 7.3,
     MinTopUp: 1,
     TopupGroupRatio: '',
     CustomCallbackAddress: '',
     PayMethods: '',
     AmountOptions: '',
     AmountDiscount: '',
+    'payment_setting.balance_subscription_enabled': true,
+    'payment_setting.balance_subscription_promo_enabled': true,
+    InvoiceEnabled: false,
+    InvoiceTypes: '["personal","company"]',
+    InvoiceKinds: '["normal"]',
+    InvoiceFeeRules:
+      '[{"min":0,"max":500,"type":"fixed","value":50},{"min":500.01,"max":2000,"type":"fixed","value":100},{"min":2000.01,"max":5000,"type":"fixed","value":175},{"min":5000.01,"type":"percent","value":5}]',
 
     StripeApiSecret: '',
     StripeWebhookSecret: '',
@@ -51,6 +58,27 @@ const PaymentSetting = () => {
     StripeUnitPrice: 8.0,
     StripeMinTopUp: 1,
     StripePromotionCodesEnabled: false,
+
+    'affiliate_setting.first_level_enabled': false,
+    'affiliate_setting.first_level_ratio': 0,
+    'affiliate_setting.second_level_enabled': false,
+    'affiliate_setting.second_level_ratio': 0,
+    'affiliate_setting.settlement_delay_seconds': 0,
+    'affiliate_setting.min_withdrawal_amount': 10,
+    'affiliate_setting.trigger_topup_enabled': true,
+    'affiliate_setting.trigger_subscription_enabled': false,
+    'affiliate_setting.filter_redemption_topup_enabled': false,
+    'affiliate_setting.payout_methods': 'usdt,alipay,wechat',
+    'affiliate_setting.usdt_chain': 'TRC20',
+    'affiliate_setting.promotion_template': '邀请链接：{invite_link}',
+    'affiliate_setting.review_enabled': false,
+    'affiliate_setting.auto_approve_after_days': 0,
+    'affiliate_setting.agreement_enabled': false,
+    'affiliate_setting.agreement_text': '',
+    'affiliate_setting.inviter_min_account_age_days': 0,
+    'affiliate_setting.inviter_min_recharge_amount': 0,
+    'affiliate_setting.invitee_min_account_age_days': 0,
+    'affiliate_setting.invitee_min_recharge_amount': 0,
 
     'payment_setting.compliance_confirmed': false,
     'payment_setting.compliance_terms_version': '',
@@ -136,17 +164,27 @@ const PaymentSetting = () => {
             }
             break;
           case 'payment_setting.amount_discount':
+          case 'InvoiceTypes':
+          case 'InvoiceKinds':
+          case 'InvoiceFeeRules':
             try {
-              newInputs['AmountDiscount'] = JSON.stringify(
-                JSON.parse(item.value),
-                null,
-                2,
-              );
+              newInputs[
+                item.key === 'payment_setting.amount_discount'
+                  ? 'AmountDiscount'
+                  : item.key
+              ] = JSON.stringify(JSON.parse(item.value), null, 2);
             } catch (error) {
-              newInputs['AmountDiscount'] = item.value;
+              newInputs[
+                item.key === 'payment_setting.amount_discount'
+                  ? 'AmountDiscount'
+                  : item.key
+              ] = item.value;
             }
             break;
           case 'payment_setting.compliance_confirmed':
+          case 'payment_setting.balance_subscription_enabled':
+          case 'payment_setting.balance_subscription_promo_enabled':
+          case 'InvoiceEnabled':
             newInputs[item.key] = toBoolean(item.value);
             break;
           case 'payment_setting.compliance_confirmed_at':
@@ -160,7 +198,31 @@ const PaymentSetting = () => {
           case 'MinTopUp':
           case 'StripeUnitPrice':
           case 'StripeMinTopUp':
+          case 'affiliate_setting.first_level_ratio':
+          case 'affiliate_setting.second_level_ratio':
+          case 'affiliate_setting.settlement_delay_seconds':
+          case 'affiliate_setting.min_withdrawal_amount':
+          case 'affiliate_setting.auto_approve_after_days':
+          case 'affiliate_setting.inviter_min_account_age_days':
+          case 'affiliate_setting.inviter_min_recharge_amount':
+          case 'affiliate_setting.invitee_min_account_age_days':
+          case 'affiliate_setting.invitee_min_recharge_amount':
             newInputs[item.key] = parseFloat(item.value);
+            break;
+          case 'affiliate_setting.first_level_enabled':
+          case 'affiliate_setting.second_level_enabled':
+          case 'affiliate_setting.trigger_topup_enabled':
+          case 'affiliate_setting.trigger_subscription_enabled':
+          case 'affiliate_setting.filter_redemption_topup_enabled':
+          case 'affiliate_setting.review_enabled':
+          case 'affiliate_setting.agreement_enabled':
+            newInputs[item.key] = toBoolean(item.value);
+            break;
+          case 'affiliate_setting.usdt_chain':
+          case 'affiliate_setting.payout_methods':
+          case 'affiliate_setting.promotion_template':
+          case 'affiliate_setting.agreement_text':
+            newInputs[item.key] = item.value;
             break;
           default:
             if (item.key.endsWith('Enabled')) {
@@ -265,7 +327,7 @@ const PaymentSetting = () => {
           >
             <Tabs
               type='card'
-              defaultActiveKey='general'
+              defaultActiveKey={defaultActiveKey}
               contentStyle={{ paddingTop: 24 }}
             >
               <Tabs.TabPane tab={t('通用设置')} itemKey='general'>

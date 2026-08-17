@@ -36,8 +36,10 @@ const routerMap = {
   token: '/console/token',
   redemption: '/console/redemption',
   topup: '/console/topup',
+  invoice: '/console/invoice',
   user: '/console/user',
   subscription: '/console/subscription',
+  invoice_admin: '/console/invoice-admin',
   log: '/console/log',
   midjourney: '/console/midjourney',
   setting: '/console/setting',
@@ -56,7 +58,6 @@ const SiderBar = ({ onNavigate = () => {} }) => {
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   const {
     isModuleVisible,
-    hasSectionVisibleModules,
     loading: sidebarLoading,
   } = useSidebar();
 
@@ -130,6 +131,11 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         to: '/topup',
       },
       {
+        text: t('发票中心'),
+        itemKey: 'invoice',
+        to: '/invoice',
+      },
+      {
         text: t('个人设置'),
         itemKey: 'personal',
         to: '/personal',
@@ -144,6 +150,14 @@ const SiderBar = ({ onNavigate = () => {} }) => {
 
     return filteredItems;
   }, [t, isModuleVisible]);
+
+  const getNavTarget = (itemKey) =>
+    routerMapState[itemKey] || routerMap[itemKey];
+
+  const getSelectedItemKey = (data) => {
+    if (typeof data === 'string') return data;
+    return data?.itemKey || data?.selectedKey || data?.key;
+  };
 
   const adminItems = useMemo(() => {
     const items = [
@@ -172,7 +186,7 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         className: isAdmin() ? '' : 'tableHiddle',
       },
       {
-        text: t('兑换码管理'),
+        text: t('营销福利'),
         itemKey: 'redemption',
         to: '/redemption',
         className: isAdmin() ? '' : 'tableHiddle',
@@ -181,6 +195,12 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         text: t('用户管理'),
         itemKey: 'user',
         to: '/user',
+        className: isAdmin() ? '' : 'tableHiddle',
+      },
+      {
+        text: t('发票管理'),
+        itemKey: 'invoice_admin',
+        to: '/invoice-admin',
         className: isAdmin() ? '' : 'tableHiddle',
       },
       {
@@ -197,13 +217,21 @@ const SiderBar = ({ onNavigate = () => {} }) => {
       return configVisible;
     });
 
-    return filteredItems;
+    const systemSettingsItem = filteredItems.find(
+      (item) => item.itemKey === 'setting',
+    );
+    const orderedItems = [
+      ...filteredItems.filter((item) => item.itemKey !== 'setting'),
+      systemSettingsItem,
+    ];
+
+    return orderedItems.filter(Boolean);
   }, [isAdmin(), isRoot(), t, isModuleVisible]);
 
   const chatMenuItems = useMemo(() => {
     const items = [
       {
-        text: t('模型调试'),
+        text: t('操练场'),
         itemKey: 'playground',
         to: '/playground',
       },
@@ -414,8 +442,7 @@ const SiderBar = ({ onNavigate = () => {} }) => {
           hoverStyle='sidebar-nav-item:hover'
           selectedStyle='sidebar-nav-item-selected'
           renderWrapper={({ itemElement, props }) => {
-            const to =
-              routerMapState[props.itemKey] || routerMap[props.itemKey];
+            const to = getNavTarget(props.itemKey);
 
             // 如果没有路由，直接返回元素
             if (!to) return itemElement;
@@ -424,19 +451,24 @@ const SiderBar = ({ onNavigate = () => {} }) => {
               <Link
                 style={{ textDecoration: 'none' }}
                 to={to}
-                onClick={onNavigate}
+                onClick={() => {
+                  onNavigate();
+                }}
               >
                 {itemElement}
               </Link>
             );
           }}
-          onSelect={(key) => {
+          onSelect={(data) => {
+            const itemKey = getSelectedItemKey(data);
+            if (!itemKey) return;
+
             // 如果点击的是已经展开的子菜单的父项，则收起子菜单
-            if (openedKeys.includes(key.itemKey)) {
-              setOpenedKeys(openedKeys.filter((k) => k !== key.itemKey));
+            if (openedKeys.includes(itemKey)) {
+              setOpenedKeys(openedKeys.filter((k) => k !== itemKey));
             }
 
-            setSelectedKeys([key.itemKey]);
+            setSelectedKeys([itemKey]);
           }}
           openKeys={openedKeys}
           onOpenChange={(data) => {
@@ -444,7 +476,7 @@ const SiderBar = ({ onNavigate = () => {} }) => {
           }}
         >
           {/* 聊天区域 */}
-          {hasSectionVisibleModules('chat') && (
+          {chatMenuItems.length > 0 && (
             <div className='sidebar-section'>
               {!collapsed && (
                 <div className='sidebar-group-label'>{t('聊天')}</div>
@@ -454,7 +486,7 @@ const SiderBar = ({ onNavigate = () => {} }) => {
           )}
 
           {/* 控制台区域 */}
-          {hasSectionVisibleModules('console') && (
+          {isModuleVisible('console') && workspaceItems.length > 0 && (
             <>
               <Divider className='sidebar-divider' />
               <div>
@@ -467,7 +499,7 @@ const SiderBar = ({ onNavigate = () => {} }) => {
           )}
 
           {/* 个人中心区域 */}
-          {hasSectionVisibleModules('personal') && (
+          {financeItems.length > 0 && (
             <>
               <Divider className='sidebar-divider' />
               <div>
@@ -480,17 +512,18 @@ const SiderBar = ({ onNavigate = () => {} }) => {
           )}
 
           {/* 管理员区域 - 只在管理员时显示且配置允许时显示 */}
-          {isAdmin() && hasSectionVisibleModules('admin') && (
+          {isAdmin() && isModuleVisible('admin') && adminItems.length > 0 && (
             <>
               <Divider className='sidebar-divider' />
               <div>
                 {!collapsed && (
                   <div className='sidebar-group-label'>{t('管理员')}</div>
                 )}
-                {adminItems.map((item) => renderNavItem(item))}
+                {adminItems.map((item) => renderSubItem(item))}
               </div>
             </>
           )}
+
         </Nav>
       </SkeletonWrapper>
 
