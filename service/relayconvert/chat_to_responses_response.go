@@ -98,6 +98,13 @@ func UsageFromChatUsage(src *dto.Usage) *dto.Usage {
 	if src == nil {
 		return usage
 	}
+	usage.UsageSemantic = src.UsageSemantic
+	usage.UsageSource = src.UsageSource
+	usage.BillingUsage = dto.CloneBillingUsage(src.BillingUsage)
+	if usage.BillingUsage == nil {
+		usage.BillingUsage = dto.NewOpenAIChatBillingUsage(src)
+	}
+	usage.Cost = src.Cost
 	if src.PromptTokens != 0 {
 		usage.PromptTokens = src.PromptTokens
 		usage.InputTokens = src.PromptTokens
@@ -115,6 +122,7 @@ func UsageFromChatUsage(src *dto.Usage) *dto.Usage {
 		src.PromptTokensDetails.ImageTokens != 0 ||
 		src.PromptTokensDetails.AudioTokens != 0 ||
 		src.PromptTokensDetails.CachedCreationTokens != 0 ||
+		src.PromptTokensDetails.CacheWriteTokens != 0 ||
 		src.PromptTokensDetails.TextTokens != 0 {
 		details := src.PromptTokensDetails
 		usage.InputTokensDetails = &details
@@ -125,6 +133,8 @@ func UsageFromChatUsage(src *dto.Usage) *dto.Usage {
 		src.CompletionTokenDetails.ImageTokens != 0 {
 		usage.CompletionTokenDetails = src.CompletionTokenDetails
 	}
+	usage.ClaudeCacheCreation5mTokens = src.ClaudeCacheCreation5mTokens
+	usage.ClaudeCacheCreation1hTokens = src.ClaudeCacheCreation1hTokens
 	return usage
 }
 

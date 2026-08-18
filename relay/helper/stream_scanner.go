@@ -24,6 +24,7 @@ import (
 const (
 	InitialScannerBufferSize    = 64 << 10  // 64KB (64*1024)
 	DefaultMaxScannerBufferSize = 128 << 20 // 64MB (64*1024*1024) default SSE buffer size
+	DefaultPingTriggerDelay     = 75 * time.Second
 	DefaultPingInterval         = 10 * time.Second
 	// streamWriteTimeout bounds a single blocked write to a slow client so the
 	// unconditional wg.Wait() in cleanup can always finish. Without it, a slow
@@ -72,7 +73,7 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		stopChan    = make(chan bool, 3) // 增加缓冲区避免阻塞
 		scanner     = NewStreamScanner(resp.Body)
 		ticker      = time.NewTicker(streamingTimeout)
-		pingTicker  *time.Ticker
+		pingTimer   *time.Timer
 		writeMutex  sync.Mutex     // Mutex to protect concurrent writes
 		wg          sync.WaitGroup // 用于等待所有 goroutine 退出
 		cleanupOnce sync.Once
@@ -87,20 +88,25 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 
 	generalSettings := operation_setting.GetGeneralSetting()
 	pingEnabled := generalSettings.PingIntervalEnabled && !info.DisablePing
+	pingTriggerDelay := time.Duration(generalSettings.PingTriggerSeconds) * time.Second
+	if pingTriggerDelay <= 0 {
+		pingTriggerDelay = DefaultPingTriggerDelay
+	}
 	pingInterval := time.Duration(generalSettings.PingIntervalSeconds) * time.Second
 	if pingInterval <= 0 {
 		pingInterval = DefaultPingInterval
 	}
 
 	if pingEnabled {
-		pingTicker = time.NewTicker(pingInterval)
+		pingTimer = time.NewTimer(NextPingDelay(c, pingTriggerDelay, pingInterval))
 	}
 
 	logger.LogDebug(c, "relay timeout seconds: %d", common.RelayTimeout)
 	logger.LogDebug(c, "relay max idle conns: %d", common.RelayMaxIdleConns)
 	logger.LogDebug(c, "relay max idle conns per host: %d", common.RelayMaxIdleConnsPerHost)
 	logger.LogDebug(c, "streaming timeout seconds: %d", int64(streamingTimeout.Seconds()))
-	logger.LogDebug(c, "ping interval seconds: %d", int64(pingInterval.Seconds()))
+	logger.LogDebug(c, "ping trigger seconds: %d", int64(pingTriggerDelay.Seconds()))
+	logger.LogDebug(c, "ping active interval seconds: %d", int64(pingInterval.Seconds()))
 
 	cleanup := func() {
 		cleanupOnce.Do(func() {
@@ -111,8 +117,8 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 			}
 
 			ticker.Stop()
-			if pingTicker != nil {
-				pingTicker.Stop()
+			if pingTimer != nil {
+				pingTimer.Stop()
 			}
 
 			wg.Wait()
@@ -127,7 +133,7 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 	ctx = context.WithValue(ctx, "stop_chan", stopChan)
 
 	// Handle ping data sending with improved error handling
-	if pingEnabled && pingTicker != nil {
+	if pingEnabled && pingTimer != nil {
 		wg.Add(1)
 		gopool.Go(func() {
 			defer func() {
@@ -147,7 +153,7 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 
 			for {
 				select {
-				case <-pingTicker.C:
+				case <-pingTimer.C:
 					var err error
 					func() {
 						writeMutex.Lock()
@@ -161,6 +167,7 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 						return
 					}
 					logger.LogDebug(c, "ping data sent")
+					pingTimer.Reset(pingInterval)
 				case <-ctx.Done():
 					return
 				case <-stopChan:
@@ -282,6 +289,18 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 	}
 
 	cleanup()
+	writeMutex.Lock()
+	_ = FlushPendingWriter(c)
+	writeMutex.Unlock()
+	attemptFailedBeforeOutput := !HasSemanticOutput(c) &&
+		info.StreamStatus.EndReason != relaycommon.StreamEndReasonDone &&
+		!(info.StreamStatus.EndReason == relaycommon.StreamEndReasonHandlerStop && info.StreamStatus.EndError == nil)
+	if attemptFailedBeforeOutput {
+		SuppressAttemptSemanticOutput(c)
+	}
+	if info.ReceivedResponseCount == 0 && attemptFailedBeforeOutput && info.StreamStatus.EndError != nil {
+		info.StreamStatus.RecordError(info.StreamStatus.EndError.Error())
+	}
 	if info.StreamStatus.IsNormalEnd() && !info.StreamStatus.HasErrors() {
 		logger.LogInfo(c, fmt.Sprintf("stream ended: %s", info.StreamStatus.Summary()))
 	} else {

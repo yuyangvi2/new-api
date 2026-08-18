@@ -318,6 +318,69 @@ func TestAdaptorConvertsResponsesRequestToOpenAIChatUpstream(t *testing.T) {
 	assert.Equal(t, "/v1/chat/completions", parsedURL.Path)
 }
 
+func TestAdaptorConvertsResponsesRequestToGeminiUpstream(t *testing.T) {
+	adaptor := &Adaptor{}
+	info := advancedCustomRelayInfo(&dto.AdvancedCustomConfig{
+		Routes: []dto.AdvancedCustomRoute{
+			{
+				IncomingPath: "/v1/responses",
+				UpstreamPath: "/v1beta/models/{model}:generateContent",
+				Converter:    dto.AdvancedCustomConverterOpenAIResponsesToGeminiGenerateContent,
+			},
+		},
+	})
+	info.RelayMode = relayconstant.RelayModeResponses
+	info.RequestURLPath = "/v1/responses"
+	info.OriginModelName = "gemini-test"
+	info.UpstreamModelName = "gemini-test"
+	c := advancedCustomGinContext("/v1/responses")
+
+	converted, err := adaptor.ConvertOpenAIResponsesRequest(c, info, dto.OpenAIResponsesRequest{
+		Model:        "gemini-test",
+		Instructions: mustAdvancedCustomRawMessage(t, "system rules"),
+		Input:        mustAdvancedCustomRawMessage(t, "hello"),
+	})
+	require.NoError(t, err)
+
+	geminiReq, ok := converted.(*dto.GeminiChatRequest)
+	require.True(t, ok)
+	require.NotNil(t, geminiReq.SystemInstructions)
+	assert.Equal(t, "system rules", geminiReq.SystemInstructions.Parts[0].Text)
+	require.Len(t, geminiReq.Contents, 1)
+	assert.Equal(t, "hello", geminiReq.Contents[0].Parts[0].Text)
+
+	requestURL, err := adaptor.GetRequestURL(info)
+	require.NoError(t, err)
+	parsedURL, err := url.Parse(requestURL)
+	require.NoError(t, err)
+	assert.Equal(t, "/v1beta/models/gemini-test:generateContent", parsedURL.Path)
+}
+
+func TestAdaptorUsesGeminiStreamURLForResponsesToGemini(t *testing.T) {
+	adaptor := &Adaptor{}
+	info := advancedCustomRelayInfo(&dto.AdvancedCustomConfig{
+		Routes: []dto.AdvancedCustomRoute{
+			{
+				IncomingPath: "/v1/responses",
+				UpstreamPath: "https://upstream.example/v1beta/models/{model}:generateContent",
+				Converter:    dto.AdvancedCustomConverterOpenAIResponsesToGeminiGenerateContent,
+			},
+		},
+	})
+	info.RelayMode = relayconstant.RelayModeResponses
+	info.RequestURLPath = "/v1/responses"
+	info.OriginModelName = "gemini-test"
+	info.UpstreamModelName = "gemini-test"
+	info.IsStream = true
+
+	requestURL, err := adaptor.GetRequestURL(info)
+	require.NoError(t, err)
+	parsedURL, err := url.Parse(requestURL)
+	require.NoError(t, err)
+	assert.Equal(t, "/v1beta/models/gemini-test:streamGenerateContent", parsedURL.Path)
+	assert.Equal(t, "sse", parsedURL.Query().Get("alt"))
+}
+
 func advancedCustomRelayInfo(config *dto.AdvancedCustomConfig) *relaycommon.RelayInfo {
 	return &relaycommon.RelayInfo{
 		RelayFormat:    types.RelayFormatOpenAI,

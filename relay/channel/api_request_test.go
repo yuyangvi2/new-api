@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/gin-gonic/gin"
@@ -190,4 +191,43 @@ func TestProcessHeaderOverride_PassHeadersTemplateSetsRuntimeHeaders(t *testing.
 	require.Equal(t, "Codex CLI", upstreamReq.Header.Get("Originator"))
 	require.Equal(t, "sess-123", upstreamReq.Header.Get("Session_id"))
 	require.Empty(t, upstreamReq.Header.Get("X-Codex-Beta-Features"))
+}
+
+func TestStartPingKeepAliveUsesTriggerDelay(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	stop, done := startPingKeepAlive(ctx, time.Hour, time.Millisecond)
+	select {
+	case <-done:
+		t.Fatal("pinger exited before cancellation")
+	case <-time.After(25 * time.Millisecond):
+	}
+	stop()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("pinger did not stop after cancellation")
+	}
+	require.NotContains(t, recorder.Body.String(), ": PING")
+}
+
+func TestStartPingKeepAlivePingsAfterTrigger(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	stop, done := startPingKeepAlive(ctx, time.Millisecond, time.Millisecond)
+	defer func() {
+		stop()
+		<-done
+	}()
+
+	require.Eventually(t, func() bool {
+		return recorder.Body.String() != ""
+	}, time.Second, 10*time.Millisecond)
+	require.Contains(t, recorder.Body.String(), ": PING")
 }

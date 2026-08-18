@@ -1081,6 +1081,10 @@ func buildUsageFromGeminiMetadata(metadata dto.GeminiUsageMetadata, fallbackProm
 		PromptTokens:     promptTokens,
 		CompletionTokens: metadata.CandidatesTokenCount + metadata.ThoughtsTokenCount,
 		TotalTokens:      metadata.TotalTokenCount,
+		BillingUsage:     dto.CloneBillingUsage(metadata.BillingUsage),
+	}
+	if usage.BillingUsage == nil {
+		usage.BillingUsage = dto.NewGeminiChatBillingUsage(&metadata)
 	}
 	usage.CompletionTokenDetails.ReasoningTokens = metadata.ThoughtsTokenCount
 	usage.PromptTokensDetails.CachedTokens = metadata.CachedContentTokenCount
@@ -1111,7 +1115,11 @@ func buildUsageFromGeminiMetadata(metadata dto.GeminiUsageMetadata, fallbackProm
 	}
 
 	if usage.TotalTokens > 0 && usage.CompletionTokens <= 0 {
-		usage.CompletionTokens = usage.TotalTokens - usage.PromptTokens
+		if usage.TotalTokens > usage.PromptTokens {
+			usage.CompletionTokens = usage.TotalTokens - usage.PromptTokens
+		} else {
+			usage.CompletionTokens = 0
+		}
 	}
 
 	if usage.PromptTokens > 0 && usage.PromptTokensDetails.TextTokens == 0 && usage.PromptTokensDetails.AudioTokens == 0 {

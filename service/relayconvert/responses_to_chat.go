@@ -135,6 +135,13 @@ func UsageFromResponsesUsage(src *dto.Usage) *dto.Usage {
 	if src == nil {
 		return usage
 	}
+	usage.UsageSemantic = src.UsageSemantic
+	usage.UsageSource = src.UsageSource
+	usage.BillingUsage = dto.CloneBillingUsage(src.BillingUsage)
+	if usage.BillingUsage == nil {
+		usage.BillingUsage = dto.NewOpenAIResponsesBillingUsage(src)
+	}
+	usage.Cost = src.Cost
 	if src.InputTokens != 0 {
 		usage.PromptTokens = src.InputTokens
 	}
@@ -148,12 +155,23 @@ func UsageFromResponsesUsage(src *dto.Usage) *dto.Usage {
 	}
 	if src.InputTokensDetails != nil {
 		usage.PromptTokensDetails.CachedTokens = src.InputTokensDetails.CachedTokens
+		usage.PromptTokensDetails.CachedCreationTokens = src.InputTokensDetails.CachedCreationTokens
+		usage.PromptTokensDetails.CacheWriteTokens = src.InputTokensDetails.CacheWriteTokens
+		usage.PromptTokensDetails.TextTokens = src.InputTokensDetails.TextTokens
 		usage.PromptTokensDetails.ImageTokens = src.InputTokensDetails.ImageTokens
 		usage.PromptTokensDetails.AudioTokens = src.InputTokensDetails.AudioTokens
 	}
-	if src.CompletionTokenDetails.ReasoningTokens != 0 {
+	if src.CompletionTokenDetails.ReasoningTokens != 0 ||
+		src.CompletionTokenDetails.TextTokens != 0 ||
+		src.CompletionTokenDetails.AudioTokens != 0 ||
+		src.CompletionTokenDetails.ImageTokens != 0 {
 		usage.CompletionTokenDetails.ReasoningTokens = src.CompletionTokenDetails.ReasoningTokens
+		usage.CompletionTokenDetails.TextTokens = src.CompletionTokenDetails.TextTokens
+		usage.CompletionTokenDetails.AudioTokens = src.CompletionTokenDetails.AudioTokens
+		usage.CompletionTokenDetails.ImageTokens = src.CompletionTokenDetails.ImageTokens
 	}
+	usage.ClaudeCacheCreation5mTokens = src.ClaudeCacheCreation5mTokens
+	usage.ClaudeCacheCreation1hTokens = src.ClaudeCacheCreation1hTokens
 	return usage
 }
 

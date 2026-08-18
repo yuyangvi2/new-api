@@ -51,3 +51,19 @@ func TestComputeTieredQuota_NoClampInRange(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, result.Clamp, "in-range settlement must not report a clamp")
 }
+
+func TestComputeTieredQuota_ClampsNegativeQuotaToZero(t *testing.T) {
+	exprStr := `tier("base", -p)`
+	snap := &billingexpr.BillingSnapshot{
+		BillingMode:  "tiered_expr",
+		ExprString:   exprStr,
+		ExprHash:     billingexpr.ExprHashString(exprStr),
+		GroupRatio:   1.0,
+		QuotaPerUnit: 500_000,
+	}
+
+	result, err := billingexpr.ComputeTieredQuota(snap, billingexpr.TokenParams{P: 1000})
+	require.NoError(t, err)
+	assert.Equal(t, 0, result.ActualQuotaAfterGroup, "tiered billing must never produce a credit")
+	assert.Equal(t, 0.0, result.ActualQuotaBeforeGroup)
+}

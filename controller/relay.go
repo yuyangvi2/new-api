@@ -76,6 +76,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	var (
 		newAPIError *types.NewAPIError
 		ws          *websocket.Conn
+		relayInfo   *relaycommon.RelayInfo
 	)
 
 	if relayFormat == types.RelayFormatOpenAIRealtime {
@@ -92,6 +93,20 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		if newAPIError != nil {
 			logger.LogError(c, fmt.Sprintf("relay error: %s", common.LocalLogPreview(newAPIError.Error())))
 			newAPIError.SetMessage(common.MessageWithRequestId(newAPIError.Error(), requestId))
+			if types.IsClientDisconnectedError(newAPIError) {
+				return
+			}
+			if relayInfo != nil && relayInfo.IsStream {
+				if helper.HasTerminalOutput(c) {
+					return
+				}
+				if helper.HasKeepaliveOnly(c) || helper.HasSemanticOutput(c) {
+					if streamErr := helper.StreamError(c, relayFormat, newAPIError); streamErr != nil {
+						logger.LogError(c, "write final stream error failed: "+streamErr.Error())
+					}
+					return
+				}
+			}
 			switch relayFormat {
 			case types.RelayFormatOpenAIRealtime:
 				helper.WssError(c, ws, newAPIError.ToOpenAIError())
@@ -119,10 +134,13 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		return
 	}
 
-	relayInfo, err := relaycommon.GenRelayInfo(c, relayFormat, request, ws)
+	relayInfo, err = relaycommon.GenRelayInfo(c, relayFormat, request, ws)
 	if err != nil {
 		newAPIError = types.NewError(err, types.ErrorCodeGenRelayInfoFailed)
 		return
+	}
+	if relayInfo.IsStream {
+		helper.InitializeDownstreamStreamState(c)
 	}
 
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
@@ -189,9 +207,18 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	}
 	relayInfo.RetryIndex = 0
 	relayInfo.LastError = nil
+	upstreamAttempted := false
 
 	for ; retryParam.GetRetry() <= common.RetryTimes; retryParam.IncreaseRetry() {
+		if shouldStopRetryForClientDisconnect(c) {
+			newAPIError = types.NewClientDisconnectedError(c.Request.Context().Err())
+			break
+		}
 		relayInfo.RetryIndex = retryParam.GetRetry()
+		if relayInfo.IsStream {
+			relayInfo.ResetStreamAttempt()
+			helper.BeginStreamAttempt(c)
+		}
 		channel, channelErr := getChannel(c, relayInfo, retryParam)
 		if channelErr != nil {
 			logger.LogError(c, channelErr.Error())
@@ -211,6 +238,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			break
 		}
 		c.Request.Body = io.NopCloser(bodyStorage)
+		upstreamAttempted = true
 
 		switch relayFormat {
 		case types.RelayFormatOpenAIRealtime:
@@ -233,8 +261,18 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 		processChannelError(c, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(c, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError)
 
+		if shouldStopRetryForClientDisconnect(c) {
+			newAPIError = types.NewClientDisconnectedError(c.Request.Context().Err())
+			break
+		}
+		if relayInfo.IsStream && helper.HasSemanticOutput(c) {
+			break
+		}
 		if !shouldRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry()) {
 			break
+		}
+		if relayInfo.IsStream && helper.HasKeepaliveOnly(c) {
+			logger.LogWarn(c, fmt.Sprintf("retrying stream after keepalive-only attempt: channel=%d retry_index=%d error_code=%s", channel.Id, relayInfo.RetryIndex, newAPIError.GetErrorCode()))
 		}
 	}
 
@@ -243,7 +281,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		retryLogStr := fmt.Sprintf("重试：%s", strings.Trim(strings.Join(strings.Fields(fmt.Sprint(useChannel)), "->"), "[]"))
 		logger.LogInfo(c, retryLogStr)
 	}
-	if newAPIError != nil {
+	if newAPIError != nil && upstreamAttempted {
 		gopool.Go(func() {
 			perfmetrics.RecordRelaySample(relayInfo, false, 0)
 		})
@@ -324,6 +362,17 @@ func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service
 		return nil, newAPIError
 	}
 	return channel, nil
+}
+
+// shouldStopRetryForClientDisconnect complements stream-level cleanup: it is
+// checked at retry boundaries so a disconnected client never causes another
+// channel selection or upstream request.
+func shouldStopRetryForClientDisconnect(c *gin.Context) bool {
+	if c == nil || c.Request == nil || c.Request.Context().Err() == nil {
+		return false
+	}
+	logger.LogInfo(c, "client disconnected, stop relay retry")
+	return true
 }
 
 func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) bool {
@@ -523,6 +572,14 @@ func RelayTask(c *gin.Context) {
 	}
 
 	for ; retryParam.GetRetry() <= common.RetryTimes; retryParam.IncreaseRetry() {
+		if shouldStopRetryForClientDisconnect(c) {
+			apiErr := types.NewClientDisconnectedError(c.Request.Context().Err())
+			taskErr = service.TaskErrorFromAPIError(apiErr)
+			if taskErr != nil {
+				taskErr.LocalError = true
+			}
+			break
+		}
 		var channel *model.Channel
 
 		if lockedCh, ok := relayInfo.LockedChannel.(*model.Channel); ok && lockedCh != nil {
@@ -567,6 +624,14 @@ func RelayTask(c *gin.Context) {
 				types.NewOpenAIError(taskErr.Error, types.ErrorCodeBadResponseStatusCode, taskErr.StatusCode))
 		}
 
+		if shouldStopRetryForClientDisconnect(c) {
+			apiErr := types.NewClientDisconnectedError(c.Request.Context().Err())
+			taskErr = service.TaskErrorFromAPIError(apiErr)
+			if taskErr != nil {
+				taskErr.LocalError = true
+			}
+			break
+		}
 		if !shouldRetryTaskRelay(c, channel.Id, taskErr, common.RetryTimes-retryParam.GetRetry()) {
 			break
 		}
@@ -576,6 +641,10 @@ func RelayTask(c *gin.Context) {
 	if len(useChannel) > 1 {
 		retryLogStr := fmt.Sprintf("重试：%s", strings.Trim(strings.Join(strings.Fields(fmt.Sprint(useChannel)), "->"), "[]"))
 		logger.LogInfo(c, retryLogStr)
+	}
+
+	if taskErr == nil && result == nil {
+		taskErr = service.TaskErrorWrapperLocal(errors.New("task submit returned empty result"), "empty_task_result", http.StatusInternalServerError)
 	}
 
 	// ── 成功：结算 + 日志 + 插入任务 ──
