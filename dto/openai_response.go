@@ -423,6 +423,7 @@ type ResponsesStreamResponse struct {
 	ContentIndex *int                           `json:"content_index,omitempty"`
 	SummaryIndex *int                           `json:"summary_index,omitempty"`
 	ItemID       string                         `json:"item_id,omitempty"`
+	Arguments    json.RawMessage                `json:"arguments,omitempty"`
 	Part         *ResponsesReasoningSummaryPart `json:"part,omitempty"`
 }
 

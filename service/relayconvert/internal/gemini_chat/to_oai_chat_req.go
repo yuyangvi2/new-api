@@ -24,6 +24,9 @@ func GeminiGenerateContentRequestToOpenAIChat(geminiRequest *dto.GeminiChatReque
 	}
 
 	var messages []dto.Message
+	toolCallSeq := 0
+	toolCallIDsByName := make(map[string][]string)
+	lastToolCallID := ""
 	for _, content := range geminiRequest.Contents {
 		message := dto.Message{
 			Role: convertGeminiRoleToOpenAI(content.Role),
@@ -59,8 +62,10 @@ func GeminiGenerateContentRequestToOpenAIChat(geminiRequest *dto.GeminiChatReque
 				}
 				mediaContents = append(mediaContents, mediaContent)
 			} else if part.FunctionCall != nil {
+				toolCallSeq++
+				toolCallID := fmt.Sprintf("call_%d", toolCallSeq)
 				toolCall := dto.ToolCallRequest{
-					ID:   fmt.Sprintf("call_%d", len(toolCalls)+1),
+					ID:   toolCallID,
 					Type: "function",
 					Function: dto.FunctionRequest{
 						Name:      part.FunctionCall.FunctionName,
@@ -68,10 +73,17 @@ func GeminiGenerateContentRequestToOpenAIChat(geminiRequest *dto.GeminiChatReque
 					},
 				}
 				toolCalls = append(toolCalls, toolCall)
+				toolCallIDsByName[part.FunctionCall.FunctionName] = append(toolCallIDsByName[part.FunctionCall.FunctionName], toolCallID)
+				lastToolCallID = toolCallID
 			} else if part.FunctionResponse != nil {
+				toolCallID := lastToolCallID
+				if ids := toolCallIDsByName[part.FunctionResponse.Name]; len(ids) > 0 {
+					toolCallID = ids[0]
+					toolCallIDsByName[part.FunctionResponse.Name] = ids[1:]
+				}
 				toolMessage := dto.Message{
 					Role:       "tool",
-					ToolCallId: fmt.Sprintf("call_%d", len(toolCalls)),
+					ToolCallId: toolCallID,
 				}
 				toolMessage.SetStringContent(jsonutil.ToJSONString(part.FunctionResponse.Response))
 				messages = append(messages, toolMessage)
@@ -96,13 +108,13 @@ func GeminiGenerateContentRequestToOpenAIChat(geminiRequest *dto.GeminiChatReque
 	if geminiRequest.GenerationConfig.Temperature != nil {
 		openaiRequest.Temperature = geminiRequest.GenerationConfig.Temperature
 	}
-	if geminiRequest.GenerationConfig.TopP != nil && *geminiRequest.GenerationConfig.TopP > 0 {
+	if geminiRequest.GenerationConfig.TopP != nil {
 		openaiRequest.TopP = common.GetPointer(*geminiRequest.GenerationConfig.TopP)
 	}
-	if geminiRequest.GenerationConfig.TopK != nil && *geminiRequest.GenerationConfig.TopK > 0 {
+	if geminiRequest.GenerationConfig.TopK != nil {
 		openaiRequest.TopK = common.GetPointer(int(*geminiRequest.GenerationConfig.TopK))
 	}
-	if geminiRequest.GenerationConfig.MaxOutputTokens != nil && *geminiRequest.GenerationConfig.MaxOutputTokens > 0 {
+	if geminiRequest.GenerationConfig.MaxOutputTokens != nil {
 		openaiRequest.MaxTokens = common.GetPointer(*geminiRequest.GenerationConfig.MaxOutputTokens)
 	}
 	if len(geminiRequest.GenerationConfig.StopSequences) > 0 {
@@ -139,6 +151,9 @@ func GeminiGenerateContentRequestToOpenAIChat(geminiRequest *dto.GeminiChatReque
 			openaiRequest.Tools = tools
 		}
 	}
+	if geminiRequest.ToolConfig != nil && geminiRequest.ToolConfig.FunctionCallingConfig != nil {
+		openaiRequest.ToolChoice = geminiFunctionCallingConfigToOpenAI(geminiRequest.ToolConfig.FunctionCallingConfig)
+	}
 
 	if geminiRequest.SystemInstructions != nil {
 		systemMessage := dto.Message{
@@ -149,6 +164,30 @@ func GeminiGenerateContentRequestToOpenAIChat(geminiRequest *dto.GeminiChatReque
 	}
 
 	return openaiRequest, nil
+}
+
+func geminiFunctionCallingConfigToOpenAI(config *dto.FunctionCallingConfig) any {
+	if config == nil {
+		return nil
+	}
+	switch config.Mode {
+	case "NONE":
+		return "none"
+	case "ANY":
+		if len(config.AllowedFunctionNames) > 0 {
+			return map[string]any{
+				"type": "function",
+				"function": map[string]any{
+					"name": config.AllowedFunctionNames[0],
+				},
+			}
+		}
+		return "required"
+	case "AUTO":
+		return "auto"
+	default:
+		return nil
+	}
 }
 
 func convertGeminiRoleToOpenAI(geminiRole string) string {
