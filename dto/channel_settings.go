@@ -77,6 +77,7 @@ const (
 	AdvancedCustomConverterOpenAIChatCompletionsToAnthropicMessages     = "openai_chat_completions_to_anthropic_messages"
 	AdvancedCustomConverterOpenAIChatCompletionsToOpenAIResponses       = "openai_chat_completions_to_openai_responses"
 	AdvancedCustomConverterOpenAIResponsesToOpenAIChatCompletions       = "openai_responses_to_openai_chat_completions"
+	AdvancedCustomConverterOpenAIResponsesToGeminiGenerateContent       = "openai_responses_to_gemini_generate_content"
 	AdvancedCustomConverterGeminiGenerateContentToOpenAIChatCompletions = "gemini_generate_content_to_openai_chat_completions"
 	AdvancedCustomConverterOpenAIChatCompletionsToGeminiGenerateContent = "openai_chat_completions_to_gemini_generate_content"
 )
@@ -162,6 +163,7 @@ func IsAdvancedCustomConverterAllowed(converter string) bool {
 		AdvancedCustomConverterOpenAIChatCompletionsToAnthropicMessages,
 		AdvancedCustomConverterOpenAIChatCompletionsToOpenAIResponses,
 		AdvancedCustomConverterOpenAIResponsesToOpenAIChatCompletions,
+		AdvancedCustomConverterOpenAIResponsesToGeminiGenerateContent,
 		AdvancedCustomConverterGeminiGenerateContentToOpenAIChatCompletions,
 		AdvancedCustomConverterOpenAIChatCompletionsToGeminiGenerateContent:
 		return true
@@ -255,7 +257,8 @@ func validateAdvancedCustomConverterPath(index int, incomingPath string, convert
 		if incomingPath == "/v1/chat/completions" {
 			return nil
 		}
-	case AdvancedCustomConverterOpenAIResponsesToOpenAIChatCompletions:
+	case AdvancedCustomConverterOpenAIResponsesToOpenAIChatCompletions,
+		AdvancedCustomConverterOpenAIResponsesToGeminiGenerateContent:
 		if incomingPath == "/v1/responses" {
 			return nil
 		}

@@ -9,6 +9,7 @@ import (
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/shopspring/decimal"
+	"github.com/stretchr/testify/require"
 )
 
 // Claude Sonnet-style tiered expression: standard vs long-context
@@ -263,6 +264,34 @@ func TestTryTieredSettle_CacheTokensAffectSettlement(t *testing.T) {
 	if quota2 != 14750 {
 		t.Fatalf("cache quota = %d, want 14750", quota2)
 	}
+}
+
+func TestBuildTieredTokenParamsUsesOpenAICacheWriteTokens(t *testing.T) {
+	usage := &dto.Usage{
+		PromptTokens: 1000,
+		PromptTokensDetails: dto.InputTokenDetails{
+			CacheWriteTokens: 100,
+		},
+	}
+	params := BuildTieredTokenParams(usage, false, billingexpr.UsedVars(`tier("default", p + cc * 2)`))
+
+	require.Equal(t, 900.0, params.P)
+	require.Equal(t, 100.0, params.CC)
+}
+
+func TestBuildTieredTokenParamsUsesClaudeAggregateCacheCreation(t *testing.T) {
+	usage := &dto.Usage{
+		PromptTokens:  50,
+		UsageSemantic: dto.BillingUsageSemanticAnthropic,
+		PromptTokensDetails: dto.InputTokenDetails{
+			CachedCreationTokens: 20,
+		},
+	}
+	params := BuildTieredTokenParams(usage, true, billingexpr.UsedVars(`tier("default", p + cc * 2)`))
+
+	require.Equal(t, 20.0, params.CC)
+	require.Equal(t, 0.0, params.CC1h)
+	require.Equal(t, 70.0, params.Len)
 }
 
 // ---------------------------------------------------------------------------

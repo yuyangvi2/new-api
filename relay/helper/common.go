@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
@@ -13,6 +15,194 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
+
+const (
+	streamFlushStateContextKey = "stream_flush_state"
+	downstreamStreamStateKey   = "downstream_stream_state"
+	streamFlushByteThreshold   = 8 << 10
+	streamFlushTimeThreshold   = 25 * time.Millisecond
+	streamImmediateEventCount  = 3
+)
+
+type downstreamStreamState struct {
+	mu               sync.RWMutex
+	startedAt        time.Time
+	keepaliveWritten bool
+	semanticWritten  bool
+	terminalWritten  bool
+	pingTriggered    bool
+	suppressSemantic bool
+}
+
+func getDownstreamStreamState(c *gin.Context) *downstreamStreamState {
+	if c == nil {
+		return nil
+	}
+	if value, ok := c.Get(downstreamStreamStateKey); ok {
+		if state, ok := value.(*downstreamStreamState); ok {
+			return state
+		}
+	}
+	state := &downstreamStreamState{startedAt: time.Now()}
+	c.Set(downstreamStreamStateKey, state)
+	return state
+}
+
+func InitializeDownstreamStreamState(c *gin.Context) {
+	_ = getDownstreamStreamState(c)
+}
+
+func BeginStreamAttempt(c *gin.Context) {
+	state := getDownstreamStreamState(c)
+	if state == nil {
+		return
+	}
+	state.mu.Lock()
+	state.suppressSemantic = false
+	state.mu.Unlock()
+}
+
+func SuppressAttemptSemanticOutput(c *gin.Context) {
+	state := getDownstreamStreamState(c)
+	if state == nil {
+		return
+	}
+	state.mu.Lock()
+	state.suppressSemantic = true
+	state.mu.Unlock()
+}
+
+func shouldSuppressSemanticOutput(c *gin.Context) bool {
+	state := getDownstreamStreamState(c)
+	if state == nil {
+		return false
+	}
+	state.mu.RLock()
+	defer state.mu.RUnlock()
+	return state.suppressSemantic
+}
+
+func NextPingDelay(c *gin.Context, triggerDelay time.Duration, pingInterval time.Duration) time.Duration {
+	state := getDownstreamStreamState(c)
+	if state == nil {
+		return triggerDelay
+	}
+	state.mu.RLock()
+	defer state.mu.RUnlock()
+	if state.pingTriggered {
+		return pingInterval
+	}
+	remaining := triggerDelay - time.Since(state.startedAt)
+	if remaining <= 0 {
+		return time.Nanosecond
+	}
+	return remaining
+}
+
+func markKeepaliveWritten(c *gin.Context) {
+	state := getDownstreamStreamState(c)
+	if state == nil {
+		return
+	}
+	state.mu.Lock()
+	state.keepaliveWritten = true
+	state.pingTriggered = true
+	state.mu.Unlock()
+}
+
+func markSemanticWritten(c *gin.Context) {
+	state := getDownstreamStreamState(c)
+	if state == nil {
+		return
+	}
+	state.mu.Lock()
+	state.semanticWritten = true
+	state.mu.Unlock()
+}
+
+func markTerminalWritten(c *gin.Context) {
+	state := getDownstreamStreamState(c)
+	if state == nil {
+		return
+	}
+	state.mu.Lock()
+	state.semanticWritten = true
+	state.terminalWritten = true
+	state.mu.Unlock()
+}
+
+func HasKeepaliveOnly(c *gin.Context) bool {
+	state := getDownstreamStreamState(c)
+	if state == nil {
+		return false
+	}
+	state.mu.RLock()
+	defer state.mu.RUnlock()
+	return state.keepaliveWritten && !state.semanticWritten
+}
+
+func HasSemanticOutput(c *gin.Context) bool {
+	state := getDownstreamStreamState(c)
+	if state == nil {
+		return false
+	}
+	state.mu.RLock()
+	defer state.mu.RUnlock()
+	return state.semanticWritten
+}
+
+func HasTerminalOutput(c *gin.Context) bool {
+	state := getDownstreamStreamState(c)
+	if state == nil {
+		return false
+	}
+	state.mu.RLock()
+	defer state.mu.RUnlock()
+	return state.terminalWritten
+}
+
+type streamFlushState struct {
+	pendingBytes int
+	events       int
+	lastFlush    time.Time
+}
+
+func getStreamFlushState(c *gin.Context) *streamFlushState {
+	if c == nil {
+		return nil
+	}
+	if value, ok := c.Get(streamFlushStateContextKey); ok {
+		if state, ok := value.(*streamFlushState); ok {
+			return state
+		}
+	}
+	state := &streamFlushState{lastFlush: time.Now()}
+	c.Set(streamFlushStateContextKey, state)
+	return state
+}
+
+func maybeFlushWriter(c *gin.Context, force bool, wrote int) error {
+	state := getStreamFlushState(c)
+	if state != nil && wrote > 0 {
+		state.pendingBytes += wrote
+		state.events++
+	}
+	if !force && state != nil && state.events > streamImmediateEventCount && state.pendingBytes < streamFlushByteThreshold && time.Since(state.lastFlush) < streamFlushTimeThreshold {
+		return nil
+	}
+	if err := FlushWriter(c); err != nil {
+		return err
+	}
+	if state != nil {
+		state.pendingBytes = 0
+		state.lastFlush = time.Now()
+	}
+	return nil
+}
+
+func FlushPendingWriter(c *gin.Context) error {
+	return maybeFlushWriter(c, true, 0)
+}
 
 func FlushWriter(c *gin.Context) (err error) {
 	defer func() {
@@ -59,42 +249,72 @@ func SetEventStreamHeaders(c *gin.Context) {
 }
 
 func ClaudeData(c *gin.Context, resp dto.ClaudeResponse) error {
+	if shouldSuppressSemanticOutput(c) {
+		return nil
+	}
 	if requestContextDone(c) {
 		return nil
 	}
 
 	jsonData, err := common.Marshal(resp)
+	terminal := resp.Type == "error" || resp.Type == "message_stop"
 	if err != nil {
 		common.SysError("error marshalling stream response: " + err.Error())
 	} else {
+		if terminal {
+			markTerminalWritten(c)
+		} else {
+			markSemanticWritten(c)
+		}
 		c.Render(-1, common.CustomEvent{Data: fmt.Sprintf("event: %s\n", resp.Type)})
 		c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonData)})
 	}
-	_ = FlushWriter(c)
+	_ = maybeFlushWriter(c, terminal, len(resp.Type)+len(jsonData)+16)
 	return nil
 }
 
 func ClaudeChunkData(c *gin.Context, resp dto.ClaudeResponse, data string) {
+	if shouldSuppressSemanticOutput(c) {
+		return
+	}
 	if requestContextDone(c) {
 		return
 	}
 
+	terminal := resp.Type == "error" || resp.Type == "message_stop"
+	if terminal {
+		markTerminalWritten(c)
+	} else {
+		markSemanticWritten(c)
+	}
 	c.Render(-1, common.CustomEvent{Data: fmt.Sprintf("event: %s\n", resp.Type)})
 	c.Render(-1, common.CustomEvent{Data: fmt.Sprintf("data: %s\n", data)})
-	_ = FlushWriter(c)
+	_ = maybeFlushWriter(c, terminal, len(resp.Type)+len(data)+16)
 }
 
 func ResponseChunkData(c *gin.Context, resp dto.ResponsesStreamResponse, data string) error {
+	if shouldSuppressSemanticOutput(c) {
+		return nil
+	}
 	if requestContextDone(c) {
 		return fmt.Errorf("request context done: %w", c.Request.Context().Err())
 	}
 
+	if resp.Type == "response.completed" || resp.Type == "response.done" || resp.Type == "response.incomplete" ||
+		resp.Type == "response.failed" || resp.Type == "response.error" || resp.Type == "error" {
+		markTerminalWritten(c)
+	} else {
+		markSemanticWritten(c)
+	}
 	c.Render(-1, common.CustomEvent{Data: fmt.Sprintf("event: %s\n", resp.Type)})
 	c.Render(-1, common.CustomEvent{Data: fmt.Sprintf("data: %s", data)})
-	return FlushWriter(c)
+	return maybeFlushWriter(c, false, len(resp.Type)+len(data)+16)
 }
 
 func StringData(c *gin.Context, str string) error {
+	if shouldSuppressSemanticOutput(c) {
+		return nil
+	}
 	if c == nil || c.Writer == nil {
 		return errors.New("context or writer is nil")
 	}
@@ -103,8 +323,9 @@ func StringData(c *gin.Context, str string) error {
 		return fmt.Errorf("request context done: %w", c.Request.Context().Err())
 	}
 
+	markSemanticWritten(c)
 	c.Render(-1, common.CustomEvent{Data: "data: " + str})
-	return FlushWriter(c)
+	return maybeFlushWriter(c, false, len(str)+8)
 }
 
 func PingData(c *gin.Context) error {
@@ -119,7 +340,8 @@ func PingData(c *gin.Context) error {
 	if _, err := c.Writer.Write([]byte(": PING\n\n")); err != nil {
 		return fmt.Errorf("write ping data failed: %w", err)
 	}
-	return FlushWriter(c)
+	markKeepaliveWritten(c)
+	return maybeFlushWriter(c, true, len(": PING\n\n"))
 }
 
 func ObjectData(c *gin.Context, object interface{}) error {
@@ -134,7 +356,50 @@ func ObjectData(c *gin.Context, object interface{}) error {
 }
 
 func Done(c *gin.Context) {
-	_ = StringData(c, "[DONE]")
+	if shouldSuppressSemanticOutput(c) {
+		return
+	}
+	if StringData(c, "[DONE]") == nil {
+		markTerminalWritten(c)
+		_ = FlushPendingWriter(c)
+	}
+}
+
+func StreamError(c *gin.Context, relayFormat types.RelayFormat, err *types.NewAPIError) error {
+	if err == nil {
+		return nil
+	}
+	BeginStreamAttempt(c)
+	SetEventStreamHeaders(c)
+	switch relayFormat {
+	case types.RelayFormatClaude:
+		return ClaudeData(c, dto.ClaudeResponse{Type: "error", Error: err.ToClaudeError()})
+	case types.RelayFormatOpenAIResponses, types.RelayFormatOpenAIResponsesCompaction:
+		payload := dto.ResponsesStreamResponse{
+			Type: "response.failed",
+			Response: &dto.OpenAIResponsesResponse{
+				Status: common.StringToByteSlice(`"failed"`),
+				Error:  err.ToOpenAIError(),
+			},
+		}
+		data, marshalErr := common.Marshal(payload)
+		if marshalErr != nil {
+			return marshalErr
+		}
+		markTerminalWritten(c)
+		c.Render(-1, common.CustomEvent{Data: "event: response.failed\n"})
+		c.Render(-1, common.CustomEvent{Data: "data: " + string(data)})
+		return maybeFlushWriter(c, true, len(data)+32)
+	default:
+		payload := struct {
+			Error types.OpenAIError `json:"error"`
+		}{Error: err.ToOpenAIError()}
+		if writeErr := ObjectData(c, payload); writeErr != nil {
+			return writeErr
+		}
+		Done(c)
+		return nil
+	}
 }
 
 func WssString(c *gin.Context, ws *websocket.Conn, str string) error {

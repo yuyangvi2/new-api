@@ -113,6 +113,8 @@ func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommo
 			return nil, err
 		}
 		return a.convertOpenAICompatibleRequest(c, info, chatReq)
+	case dto.AdvancedCustomConverterOpenAIResponsesToGeminiGenerateContent:
+		return a.geminiAdaptor.ConvertOpenAIResponsesRequest(c, info, request)
 	default:
 		return nil, fmt.Errorf("converter %q does not support OpenAI Responses requests", converter)
 	}
@@ -222,7 +224,8 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 		return a.openaiAdaptor.DoResponse(c, resp, info)
 	case dto.AdvancedCustomConverterOpenAIChatCompletionsToAnthropicMessages:
 		return a.claudeAdaptor.DoResponse(c, resp, info)
-	case dto.AdvancedCustomConverterOpenAIChatCompletionsToGeminiGenerateContent:
+	case dto.AdvancedCustomConverterOpenAIChatCompletionsToGeminiGenerateContent,
+		dto.AdvancedCustomConverterOpenAIResponsesToGeminiGenerateContent:
 		return a.geminiAdaptor.DoResponse(c, resp, info)
 	case dto.AdvancedCustomConverterOpenAIChatCompletionsToOpenAIResponses:
 		if info.IsStream {
@@ -316,6 +319,7 @@ func (a *Adaptor) routeURL(info *relaycommon.RelayInfo) (string, error) {
 		return "", err
 	}
 	if shouldUseGeminiStreamURL(a.converter, info) {
+		info.DisablePing = true
 		useGeminiStreamGenerateContentURL(parsedURL)
 	}
 	if info != nil && info.RelayMode == relayconstant.RelayModeRealtime {
@@ -391,7 +395,8 @@ func applyUpstreamPathTemplate(upstreamPath string, info *relaycommon.RelayInfo)
 func shouldUseGeminiStreamURL(converter string, info *relaycommon.RelayInfo) bool {
 	return info != nil &&
 		info.IsStream &&
-		converter == dto.AdvancedCustomConverterOpenAIChatCompletionsToGeminiGenerateContent
+		(converter == dto.AdvancedCustomConverterOpenAIChatCompletionsToGeminiGenerateContent ||
+			converter == dto.AdvancedCustomConverterOpenAIResponsesToGeminiGenerateContent)
 }
 
 func useGeminiStreamGenerateContentURL(parsedURL *url.URL) {

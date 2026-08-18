@@ -39,6 +39,7 @@ type ErrorCode string
 
 const (
 	ErrorCodeInvalidRequest         ErrorCode = "invalid_request"
+	ErrorCodeClientDisconnected     ErrorCode = "client_disconnected"
 	ErrorCodeSensitiveWordsDetected ErrorCode = "sensitive_words_detected"
 	ErrorCodeViolationFeeGrokCSAM   ErrorCode = "violation_fee.grok.csam"
 
@@ -361,6 +362,23 @@ func WithClaudeError(claudeError ClaudeError, statusCode int, ops ...NewAPIError
 		op(e)
 	}
 	return e
+}
+
+func NewClientDisconnectedError(err error) *NewAPIError {
+	if err == nil {
+		err = errors.New("client disconnected")
+	}
+	return NewErrorWithStatusCode(
+		err,
+		ErrorCodeClientDisconnected,
+		499,
+		ErrOptionWithSkipRetry(),
+		ErrOptionWithNoRecordErrorLog(),
+	)
+}
+
+func IsClientDisconnectedError(err *NewAPIError) bool {
+	return err != nil && err.errorCode == ErrorCodeClientDisconnected
 }
 
 func IsChannelError(err *NewAPIError) bool {
