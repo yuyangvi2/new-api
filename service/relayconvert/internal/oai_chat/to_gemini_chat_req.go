@@ -23,13 +23,15 @@ func OpenAIChatRequestToGeminiGenerateContent(c *gin.Context, textRequest dto.Ge
 		},
 	}
 
-	if textRequest.TopP != nil && *textRequest.TopP > 0 {
+	if textRequest.TopP != nil {
 		geminiRequest.GenerationConfig.TopP = common.GetPointer(*textRequest.TopP)
 	}
-	if maxTokens := textRequest.GetMaxTokens(); maxTokens > 0 {
-		geminiRequest.GenerationConfig.MaxOutputTokens = common.GetPointer(maxTokens)
+	if textRequest.MaxCompletionTokens != nil {
+		geminiRequest.GenerationConfig.MaxOutputTokens = common.GetPointer(*textRequest.MaxCompletionTokens)
+	} else if textRequest.MaxTokens != nil {
+		geminiRequest.GenerationConfig.MaxOutputTokens = common.GetPointer(*textRequest.MaxTokens)
 	}
-	if textRequest.Seed != nil && *textRequest.Seed != 0 {
+	if textRequest.Seed != nil {
 		geminiRequest.GenerationConfig.Seed = common.GetPointer(int64(*textRequest.Seed))
 	}
 

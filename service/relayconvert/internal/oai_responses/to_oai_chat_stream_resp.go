@@ -253,6 +253,9 @@ func (s *ResponsesToChatStreamState) flushPendingTool(event *dto.ResponsesStream
 	if tool == nil {
 		return nil
 	}
+	if arguments := dto.ResponsesArgumentsString(event.Arguments); arguments != "" && len(arguments) > len(tool.Arguments) {
+		tool.Arguments = arguments
+	}
 	return s.toolDelta(tool, "")
 }
 

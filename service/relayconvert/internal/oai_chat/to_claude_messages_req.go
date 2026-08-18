@@ -104,8 +104,10 @@ func OpenAIChatRequestToClaudeMessages(c *gin.Context, textRequest dto.GeneralOp
 		Temperature:   textRequest.Temperature,
 		Tools:         claudeTools,
 	}
-	if maxTokens := textRequest.GetMaxTokens(); maxTokens > 0 {
-		claudeRequest.MaxTokens = common.GetPointer(maxTokens)
+	if textRequest.MaxCompletionTokens != nil {
+		claudeRequest.MaxTokens = common.GetPointer(*textRequest.MaxCompletionTokens)
+	} else if textRequest.MaxTokens != nil {
+		claudeRequest.MaxTokens = common.GetPointer(*textRequest.MaxTokens)
 	}
 	if textRequest.TopP != nil {
 		claudeRequest.TopP = common.GetPointer(*textRequest.TopP)
@@ -113,8 +115,8 @@ func OpenAIChatRequestToClaudeMessages(c *gin.Context, textRequest dto.GeneralOp
 	if textRequest.TopK != nil {
 		claudeRequest.TopK = common.GetPointer(*textRequest.TopK)
 	}
-	if textRequest.IsStream(nil) {
-		claudeRequest.Stream = common.GetPointer(true)
+	if textRequest.Stream != nil {
+		claudeRequest.Stream = common.GetPointer(*textRequest.Stream)
 	}
 
 	if textRequest.ToolChoice != nil || textRequest.ParallelTooCalls != nil {
@@ -124,7 +126,7 @@ func OpenAIChatRequestToClaudeMessages(c *gin.Context, textRequest dto.GeneralOp
 		}
 	}
 
-	if claudeRequest.MaxTokens == nil || *claudeRequest.MaxTokens == 0 {
+	if claudeRequest.MaxTokens == nil {
 		defaultMaxTokens := uint(model_setting.GetClaudeSettings().GetDefaultMaxTokens(textRequest.Model))
 		claudeRequest.MaxTokens = &defaultMaxTokens
 	}
@@ -248,7 +250,7 @@ func OpenAIChatRequestToClaudeMessages(c *gin.Context, textRequest dto.GeneralOp
 				formatMessages = formatMessages[:len(formatMessages)-1]
 			}
 		}
-		if fmtMessage.Content == nil || (fmtMessage.IsStringContent() && fmtMessage.StringContent() == "") {
+		if fmtMessage.ToolCalls == nil && (fmtMessage.Content == nil || (fmtMessage.IsStringContent() && fmtMessage.StringContent() == "")) {
 			fmtMessage.SetStringContent("...")
 		}
 		formatMessages = append(formatMessages, fmtMessage)

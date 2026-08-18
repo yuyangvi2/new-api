@@ -847,10 +847,18 @@ func FailTaskInfo(reason string) *TaskInfo {
 // safety_identifier: 安全标识符，用于向 OpenAI 报告违规用户（仅 OpenAI 支持，涉及用户隐私）
 // stream_options.include_obfuscation: 响应流混淆控制字段（仅 OpenAI Responses API 支持）
 func RemoveDisabledFields(jsonData []byte, channelOtherSettings dto.ChannelOtherSettings, channelPassThroughEnabled bool) ([]byte, error) {
+	return removeDisabledFields(jsonData, channelOtherSettings, channelPassThroughEnabled, false)
+}
+
+func RemoveResponsesDisabledFields(jsonData []byte, channelOtherSettings dto.ChannelOtherSettings, channelPassThroughEnabled bool) ([]byte, error) {
+	return removeDisabledFields(jsonData, channelOtherSettings, channelPassThroughEnabled, channelOtherSettings.AllowIncludeObfuscation)
+}
+
+func removeDisabledFields(jsonData []byte, channelOtherSettings dto.ChannelOtherSettings, channelPassThroughEnabled bool, allowIncludeObfuscation bool) ([]byte, error) {
 	if model_setting.GetGlobalSettings().PassThroughRequestEnabled || channelPassThroughEnabled {
 		return jsonData, nil
 	}
-	if !hasRemovableDisabledField(jsonData, channelOtherSettings) {
+	if !hasRemovableDisabledField(jsonData, channelOtherSettings, allowIncludeObfuscation) {
 		return jsonData, nil
 	}
 
@@ -895,8 +903,8 @@ func RemoveDisabledFields(jsonData []byte, channelOtherSettings dto.ChannelOther
 		}
 	}
 
-	// 默认移除 stream_options.include_obfuscation，除非明确允许（避免关闭响应流混淆保护）
-	if !channelOtherSettings.AllowIncludeObfuscation {
+	// 默认移除 stream_options.include_obfuscation，除非 Responses API 明确允许（避免关闭响应流混淆保护）
+	if !allowIncludeObfuscation {
 		if streamOptionsAny, exists := data["stream_options"]; exists {
 			if streamOptions, ok := streamOptionsAny.(map[string]interface{}); ok {
 				if _, includeExists := streamOptions["include_obfuscation"]; includeExists {
@@ -919,7 +927,7 @@ func RemoveDisabledFields(jsonData []byte, channelOtherSettings dto.ChannelOther
 	return jsonDataAfter, nil
 }
 
-func hasRemovableDisabledField(jsonData []byte, channelOtherSettings dto.ChannelOtherSettings) bool {
+func hasRemovableDisabledField(jsonData []byte, channelOtherSettings dto.ChannelOtherSettings, allowIncludeObfuscation bool) bool {
 	values := gjson.GetManyBytes(
 		jsonData,
 		"service_tier",
@@ -935,7 +943,7 @@ func hasRemovableDisabledField(jsonData []byte, channelOtherSettings dto.Channel
 		(!channelOtherSettings.AllowSpeed && values[2].Exists()) ||
 		(channelOtherSettings.DisableStore && values[3].Exists()) ||
 		(!channelOtherSettings.AllowSafetyIdentifier && values[4].Exists()) ||
-		(!channelOtherSettings.AllowIncludeObfuscation && values[5].Exists())
+		(!allowIncludeObfuscation && values[5].Exists())
 }
 
 // RemoveGeminiDisabledFields removes disabled fields from Gemini request JSON data
