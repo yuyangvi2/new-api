@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -281,6 +282,12 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*
 	r := requestPayload{
 		Model:   req.Model,
 		Content: []ContentItem{},
+	}
+
+	if req.InputReference != "" {
+		req.Images = []string{req.InputReference}
+	} else if len(req.Images) == 0 && strings.TrimSpace(req.Image) != "" {
+		req.Images = []string{strings.TrimSpace(req.Image)}
 	}
 
 	// Add images if present

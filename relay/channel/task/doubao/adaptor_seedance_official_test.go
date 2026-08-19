@@ -1,7 +1,9 @@
 package doubao
 
 import (
+	"io"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
@@ -140,6 +142,81 @@ func TestSeedanceOfficialValidateRequestAllowsAutoDuration(t *testing.T) {
 	}
 
 	assert.NoError(t, validateSeedanceOfficialRequest(req))
+}
+
+func TestSeedanceOfficialDirectRequestPreservesDataURIImageURL(t *testing.T) {
+	dataURI := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"
+	body := `{
+		"model":"doubao-seedance-2.0",
+		"content":[
+			{"type":"text","text":"animate this"},
+			{"type":"image_url","image_url":{"url":"` + dataURI + `"}}
+		],
+		"resolution":"480p",
+		"ratio":"1:1"
+	}`
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/v1/video/tasks", strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	req, err := parseSeedanceOfficialRequest(ctx)
+
+	require.NoError(t, err)
+	require.Len(t, req.Content, 2)
+	require.NotNil(t, req.Content[1].ImageURL)
+	assert.Equal(t, dataURI, req.Content[1].ImageURL.URL)
+	assert.NoError(t, validateSeedanceOfficialRequest(req))
+}
+
+func TestSeedanceOfficialGenericSingleImageDataURIBecomesImageURLContent(t *testing.T) {
+	dataURI := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"
+	body := `{
+		"model":"doubao-seedance-2.0",
+		"prompt":"animate this",
+		"image":"` + dataURI + `",
+		"resolution":"480p",
+		"aspect_ratio":"1:1",
+		"duration":5
+	}`
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/v1/video/tasks", strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	req, err := parseSeedanceOfficialRequest(ctx)
+
+	require.NoError(t, err)
+	require.Len(t, req.Content, 2)
+	require.NotNil(t, req.Content[0].ImageURL)
+	assert.Equal(t, dataURI, req.Content[0].ImageURL.URL)
+	assert.Equal(t, "text", req.Content[1].Type)
+}
+
+func TestSeedanceOfficialBuildRequestBodyPreservesDataURIImageURL(t *testing.T) {
+	dataURI := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Set(seedanceOfficialTaskContextKey, requestPayload{
+		Model: "doubao-seedance-2.0",
+		Content: []ContentItem{
+			{Type: "text", Text: "animate this"},
+			{Type: "image_url", ImageURL: &MediaURL{URL: dataURI}},
+		},
+	})
+
+	body, err := (&SeedanceOfficialTaskAdaptor{}).BuildRequestBody(ctx, &relaycommon.RelayInfo{
+		ChannelMeta: &relaycommon.ChannelMeta{},
+	})
+
+	require.NoError(t, err)
+	data, err := io.ReadAll(body)
+	require.NoError(t, err)
+	var req requestPayload
+	require.NoError(t, common.Unmarshal(data, &req))
+	require.Len(t, req.Content, 2)
+	require.NotNil(t, req.Content[1].ImageURL)
+	assert.Equal(t, dataURI, req.Content[1].ImageURL.URL)
 }
 
 func TestSeedanceOfficialEstimateBillingDistinguishesVideoInput(t *testing.T) {
