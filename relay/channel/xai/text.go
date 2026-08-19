@@ -87,27 +87,45 @@ func xAIStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 func xAIHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
 	defer service.CloseResponseBodyGracefully(resp)
 
-	responseBody, err := io.ReadAll(resp.Body)
+	rawResponseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
 	}
 	var xaiResponse ChatCompletionResponse
-	err = common.Unmarshal(responseBody, &xaiResponse)
+	err = common.Unmarshal(rawResponseBody, &xaiResponse)
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
 	}
 	if xaiResponse.Usage != nil {
 		xaiResponse.Usage.CompletionTokens = xAITokenDelta(xaiResponse.Usage.TotalTokens, xaiResponse.Usage.PromptTokens)
 		xaiResponse.Usage.CompletionTokenDetails.TextTokens = xAITokenDelta(xaiResponse.Usage.CompletionTokens, xaiResponse.Usage.CompletionTokenDetails.ReasoningTokens)
+	} else {
+		xaiResponse.Usage = &dto.Usage{}
 	}
 
-	// new body
-	encodeJson, err := common.Marshal(xaiResponse)
+	fullTextResponse := dto.OpenAITextResponse{
+		Id:      xaiResponse.Id,
+		Model:   xaiResponse.Model,
+		Object:  xaiResponse.Object,
+		Created: xaiResponse.Created,
+		Choices: xaiResponse.Choices,
+		Usage:   *xaiResponse.Usage,
+	}
+
+	var responseBody []byte
+	switch info.RelayFormat {
+	case types.RelayFormatClaude:
+		responseBody, err = common.Marshal(service.ResponseOpenAI2Claude(&fullTextResponse, info))
+	case types.RelayFormatGemini:
+		responseBody, err = common.Marshal(service.ResponseOpenAI2Gemini(&fullTextResponse, info))
+	default:
+		responseBody, err = common.Marshal(xaiResponse)
+	}
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
 	}
 
-	service.IOCopyBytesGracefully(c, resp, encodeJson)
+	service.IOCopyBytesGracefully(c, resp, responseBody)
 
 	return xaiResponse.Usage, nil
 }

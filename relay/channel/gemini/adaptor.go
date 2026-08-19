@@ -42,6 +42,26 @@ func (a *Adaptor) ConvertGeminiRequest(c *gin.Context, info *relaycommon.RelayIn
 			}
 		}
 	}
+	if tools := request.GetTools(); len(tools) > 0 {
+		toolsChanged := false
+		for i := range tools {
+			if tools[i].FunctionDeclarations == nil {
+				continue
+			}
+			functions, err := common.Any2Type[[]dto.FunctionRequest](tools[i].FunctionDeclarations)
+			if err != nil {
+				continue
+			}
+			for j := range functions {
+				functions[j].Parameters = cleanFunctionParameters(functions[j].Parameters)
+			}
+			tools[i].FunctionDeclarations = functions
+			toolsChanged = true
+		}
+		if toolsChanged {
+			request.SetTools(tools)
+		}
+	}
 	preferVisibleOutputForSmallGeminiBudget(request, info.UpstreamModelName)
 	return request, nil
 }

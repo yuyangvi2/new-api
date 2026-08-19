@@ -256,10 +256,14 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		switch textRequest.Stop.(type) {
 		case string:
 			claudeRequest.StopSequences = []string{textRequest.Stop.(string)}
+		case []string:
+			claudeRequest.StopSequences = textRequest.Stop.([]string)
 		case []interface{}:
 			stopSequences := make([]string, 0)
 			for _, stop := range textRequest.Stop.([]interface{}) {
-				stopSequences = append(stopSequences, stop.(string))
+				if stopString, ok := stop.(string); ok {
+					stopSequences = append(stopSequences, stopString)
+				}
 			}
 			claudeRequest.StopSequences = stopSequences
 		}
