@@ -24,6 +24,11 @@ func TestGrokImagineModelClassification(t *testing.T) {
 			wantImage: true,
 		},
 		{
+			name:      "image 2.0 routes as image only",
+			model:     "grok-imagine-image-2.0",
+			wantImage: true,
+		},
+		{
 			name:      "video routes as OpenAI video only",
 			model:     "grok-imagine-video-1.5",
 			wantVideo: true,

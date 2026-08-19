@@ -39,6 +39,25 @@ func TestGetModelPriceUnitMarksXaiVideoAsSecond(t *testing.T) {
 	assert.Equal(t, "request", GetModelPriceUnit("suno_music"))
 }
 
+func TestGrokImagineImage20HasDefaultImagePricing(t *testing.T) {
+	originalPrice := ModelPrice2JSONString()
+	originalImageRatio := ImageRatio2JSONString()
+	InitRatioSettings()
+	t.Cleanup(func() {
+		require.NoError(t, UpdateModelPriceByJSONString(originalPrice))
+		require.NoError(t, UpdateImageRatioByJSONString(originalImageRatio))
+	})
+
+	price, ok := GetModelPrice("grok-imagine-image-2.0", false)
+
+	require.True(t, ok)
+	assert.Equal(t, 0.05/0.6, price)
+
+	ratio, ok := GetImageRatio("grok-imagine-image-2.0")
+	require.True(t, ok)
+	assert.Equal(t, 1.0, ratio)
+}
+
 func TestGetModelRatioUsesViduQFamilyFallback(t *testing.T) {
 	original := ModelRatio2JSONString()
 	t.Cleanup(func() {
