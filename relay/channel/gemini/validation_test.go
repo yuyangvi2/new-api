@@ -327,3 +327,40 @@ func TestResponseGeminiChat2OpenAIDoesNotLeakToolFinishReasonAcrossChoices(t *te
 	assert.Equal(t, "tool_calls", openAIResponse.Choices[0].FinishReason)
 	assert.Equal(t, "stop", openAIResponse.Choices[1].FinishReason)
 }
+
+func TestConvertGeminiRequestNormalizesNativeToolSchema(t *testing.T) {
+	info := newGeminiRelayInfo()
+	request := &dto.GeminiChatRequest{
+		Contents: []dto.GeminiChatContent{{
+			Role:  "user",
+			Parts: []dto.GeminiPart{{Text: "weather"}},
+		}},
+	}
+	request.SetTools([]dto.GeminiChatTool{{
+		FunctionDeclarations: []dto.FunctionRequest{{
+			Name: "get_weather",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"city": map[string]any{"type": "string"},
+				},
+				"required": []any{"city"},
+			},
+		}},
+	}})
+
+	got, err := (&Adaptor{}).ConvertGeminiRequest(newGeminiTestContext(t), info, request)
+
+	require.NoError(t, err)
+	converted := got.(*dto.GeminiChatRequest)
+	tools := converted.GetTools()
+	require.Len(t, tools, 1)
+	functions, err := common.Any2Type[[]dto.FunctionRequest](tools[0].FunctionDeclarations)
+	require.NoError(t, err)
+	require.Len(t, functions, 1)
+	params := functions[0].Parameters.(map[string]interface{})
+	assert.Equal(t, "OBJECT", params["type"])
+	props := params["properties"].(map[string]interface{})
+	city := props["city"].(map[string]interface{})
+	assert.Equal(t, "STRING", city["type"])
+}

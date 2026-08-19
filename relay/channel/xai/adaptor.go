@@ -2,6 +2,7 @@ package xai
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/relay/channel"
 	"github.com/QuantumNous/new-api/relay/channel/openai"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/QuantumNous/new-api/relay/constant"
@@ -21,15 +23,20 @@ import (
 type Adaptor struct {
 }
 
-func (a *Adaptor) ConvertGeminiRequest(*gin.Context, *relaycommon.RelayInfo, *dto.GeminiChatRequest) (any, error) {
-	//TODO implement me
-	return nil, errors.New("not implemented")
+func (a *Adaptor) ConvertGeminiRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.GeminiChatRequest) (any, error) {
+	openAIRequest, err := service.GeminiToOpenAIRequest(request, info)
+	if err != nil {
+		return nil, err
+	}
+	return a.ConvertOpenAIRequest(c, info, openAIRequest)
 }
 
-func (a *Adaptor) ConvertClaudeRequest(*gin.Context, *relaycommon.RelayInfo, *dto.ClaudeRequest) (any, error) {
-	//TODO implement me
-	//panic("implement me")
-	return nil, errors.New("not available")
+func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.ClaudeRequest) (any, error) {
+	openAIRequest, err := service.ClaudeToOpenAIRequest(*request, info)
+	if err != nil {
+		return nil, err
+	}
+	return a.ConvertOpenAIRequest(c, info, openAIRequest)
 }
 
 func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.AudioRequest) (io.Reader, error) {
@@ -51,6 +58,14 @@ func (a *Adaptor) Init(info *relaycommon.RelayInfo) {
 }
 
 func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
+	if (info.RelayFormat == types.RelayFormatClaude || info.RelayFormat == types.RelayFormatGemini) &&
+		info.RelayMode != constant.RelayModeResponses {
+		baseURL := strings.TrimRight(info.ChannelBaseUrl, "/")
+		if strings.HasSuffix(baseURL, "/v1") {
+			return fmt.Sprintf("%s/chat/completions", baseURL), nil
+		}
+		return fmt.Sprintf("%s/v1/chat/completions", baseURL), nil
+	}
 	return relaycommon.GetFullRequestURL(info.ChannelBaseUrl, info.RequestURLPath, info.ChannelType), nil
 }
 
@@ -64,6 +79,10 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
+	// xAI rejects stop on some Grok chat models. We cannot guarantee stop
+	// enforcement after stripping it, but preserving the request would fail
+	// before any model response is returned.
+	request.Stop = nil
 	if strings.HasSuffix(info.UpstreamModelName, "-search") {
 		info.UpstreamModelName = strings.TrimSuffix(info.UpstreamModelName, "-search")
 		request.Model = info.UpstreamModelName
@@ -123,7 +142,11 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 		}
 	default:
 		if info.IsStream {
-			usage, err = xAIStreamHandler(c, info, resp)
+			if info.RelayFormat == types.RelayFormatOpenAI {
+				usage, err = xAIStreamHandler(c, info, resp)
+			} else {
+				usage, err = openai.OaiStreamHandler(c, info, resp)
+			}
 		} else {
 			usage, err = xAIHandler(c, info, resp)
 		}
