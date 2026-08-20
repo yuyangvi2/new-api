@@ -29,6 +29,14 @@ func (a *Adaptor) ConvertGeminiRequest(c *gin.Context, info *relaycommon.RelayIn
 }
 
 func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.ClaudeRequest) (any, error) {
+	model := ""
+	if request != nil {
+		model = request.Model
+	}
+	if info != nil && info.ChannelMeta != nil && info.ChannelMeta.UpstreamModelName != "" {
+		model = info.ChannelMeta.UpstreamModelName
+	}
+	omitUnsupportedClaudeSamplingParams(c, model, request)
 	return request, nil
 }
 

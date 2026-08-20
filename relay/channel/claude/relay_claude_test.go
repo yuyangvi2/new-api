@@ -348,13 +348,18 @@ func TestRequestOpenAI2ClaudeMessage_ClaudeOpus48HighUsesAdaptiveThinking(t *tes
 	require.Nil(t, claudeRequest.TopK)
 }
 
-func TestRequestOpenAI2ClaudeMessage_ClaudeOpus47And48OmitSamplingParams(t *testing.T) {
+func TestRequestOpenAI2ClaudeMessage_ClaudeNewModelsOmitSamplingParams(t *testing.T) {
 	tests := []struct {
 		name  string
 		model string
 	}{
+		{name: "opus 4.6", model: "claude-opus-4-6"},
 		{name: "opus 4.7", model: "claude-opus-4-7"},
 		{name: "opus 4.8", model: "claude-opus-4-8"},
+		{name: "opus 5", model: "claude-opus-5"},
+		{name: "sonnet 5", model: "claude-sonnet-5"},
+		{name: "fable 5", model: "claude-fable-5"},
+		{name: "mythos 5", model: "claude-mythos-5"},
 	}
 
 	for _, tt := range tests {
@@ -380,6 +385,33 @@ func TestRequestOpenAI2ClaudeMessage_ClaudeOpus47And48OmitSamplingParams(t *test
 			require.Nil(t, claudeRequest.TopK)
 		})
 	}
+}
+
+func TestConvertClaudeRequestNewModelsOmitSamplingParams(t *testing.T) {
+	temperature := 0.7
+	topP := 0.9
+	topK := 40
+	request := &dto.ClaudeRequest{
+		Model:       "claude-opus-5",
+		Temperature: &temperature,
+		TopP:        &topP,
+		TopK:        &topK,
+		Messages: []dto.ClaudeMessage{
+			{
+				Role:    "user",
+				Content: "hello",
+			},
+		},
+	}
+
+	converted, err := (&Adaptor{}).ConvertClaudeRequest(nil, nil, request)
+	require.NoError(t, err)
+
+	claudeRequest := converted.(*dto.ClaudeRequest)
+	require.Equal(t, "claude-opus-5", claudeRequest.Model)
+	require.Nil(t, claudeRequest.Temperature)
+	require.Nil(t, claudeRequest.TopP)
+	require.Nil(t, claudeRequest.TopK)
 }
 
 func TestRequestOpenAI2ClaudeMessage_ClaudeOpus48ThinkingUsesAdaptiveHighEffort(t *testing.T) {

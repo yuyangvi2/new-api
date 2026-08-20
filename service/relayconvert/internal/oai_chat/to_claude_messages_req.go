@@ -213,6 +213,12 @@ func OpenAIChatRequestToClaudeMessages(c *gin.Context, textRequest dto.GeneralOp
 		}
 	}
 
+	if model_setting.ShouldOmitClaudeSamplingParams(claudeRequest.Model) {
+		claudeRequest.Temperature = nil
+		claudeRequest.TopP = nil
+		claudeRequest.TopK = nil
+	}
+
 	if textRequest.Stop != nil {
 		switch stop := textRequest.Stop.(type) {
 		case string:
