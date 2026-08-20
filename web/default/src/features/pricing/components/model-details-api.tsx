@@ -49,6 +49,11 @@ import {
   type SupportedParameter,
 } from '../lib/mock-stats'
 import { replaceModelInPath } from '../lib/model-helpers'
+import {
+  buildSeedanceGuideSample,
+  getSeedanceGuideFlows,
+  type SeedanceGuideFlowId,
+} from '../lib/seedance-api-guide'
 import type { PricingModel } from '../types'
 
 // ---------------------------------------------------------------------------
@@ -742,6 +747,137 @@ function CodeSamplesSection(props: {
 }
 
 // ---------------------------------------------------------------------------
+// Seedance Official workflow guide
+// ---------------------------------------------------------------------------
+
+function resolveSeedanceVideoEndpoint(
+  model: PricingModel,
+  endpointMap: Record<string, { path?: string; method?: string }>
+): string {
+  const endpointTypes = model.supported_endpoint_types || []
+  const preferredType =
+    endpointTypes.find((type) => type === 'seedance') ??
+    endpointTypes.find((type) => type === 'openai-video') ??
+    endpointTypes[0]
+
+  let path = endpointMap[preferredType || '']?.path || '/v1/videos/generations'
+  if (path.includes('{model}')) {
+    path = replaceModelInPath(path, model.model_name || '')
+  }
+  return path
+}
+
+function isFastOrMiniSeedanceModel(modelName: string): boolean {
+  const normalized = modelName.toLowerCase()
+  return normalized.includes('fast') || normalized.includes('mini')
+}
+
+function SeedanceOfficialGuideSection(props: {
+  model: PricingModel
+  endpointMap: Record<string, { path?: string; method?: string }>
+}) {
+  const { t } = useTranslation()
+  const { status } = useStatus()
+  const modelName = props.model.model_name || ''
+  const [flowId, setFlowId] = useState<SeedanceGuideFlowId>('video')
+  const [lang, setLang] = useState<Lang>('curl')
+
+  const baseUrl = useMemo(() => {
+    return getApiBaseAddress(status, 'https://api.example.com')
+  }, [status])
+
+  const flows = useMemo(() => getSeedanceGuideFlows(), [])
+  const activeFlow = flows.find((flow) => flow.id === flowId) ?? flows[0]
+  const endpointPath = resolveSeedanceVideoEndpoint(
+    props.model,
+    props.endpointMap
+  )
+
+  if (!isSeedanceVideoModel(modelName) || !activeFlow) {
+    return null
+  }
+
+  const code = buildSeedanceGuideSample(activeFlow.id, lang, {
+    baseUrl,
+    apiKeyEnv: 'NEW_API_KEY',
+    modelName,
+    endpointPath,
+  })
+
+  return (
+    <section>
+      <SectionTitle icon={ScrollText}>
+        {t('Seedance Official workflow')}
+      </SectionTitle>
+
+      <div className='border-border/60 bg-muted/15 rounded-lg border p-3'>
+        <div className='flex flex-wrap items-center gap-2'>
+          <Tabs
+            value={flowId}
+            onValueChange={(value) => setFlowId(value as SeedanceGuideFlowId)}
+          >
+            <TabsList className='bg-muted/40 h-8 p-0.5'>
+              {flows.map((flow) => (
+                <TabsTrigger
+                  key={flow.id}
+                  value={flow.id}
+                  className='h-7 px-2.5 text-xs'
+                >
+                  {t(flow.titleKey)}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+
+          <Tabs
+            value={lang}
+            onValueChange={(value) => setLang(value as Lang)}
+            className='ml-auto'
+          >
+            <TabsList className='bg-muted/40 h-8 p-0.5'>
+              {(Object.keys(LANG_LABELS) as Lang[]).map((l) => (
+                <TabsTrigger key={l} value={l} className='h-7 px-2.5 text-xs'>
+                  {LANG_LABELS[l]}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </div>
+
+        <div className='mt-3 space-y-2 text-xs leading-relaxed'>
+          <p className='text-muted-foreground'>
+            {t(activeFlow.descriptionKey)}
+          </p>
+          <p className='text-muted-foreground'>
+            {t(
+              'Asset and real-person routes use the same Bearer token as video generation.'
+            )}{' '}
+            {t(
+              'Generation requests reference media through content[].image_url.url or content[].video_url.url; manage reusable assets separately and use approved media URLs in tasks.'
+            )}
+          </p>
+          <p className='text-muted-foreground'>
+            {isFastOrMiniSeedanceModel(modelName)
+              ? t(
+                  'Fast and Mini variants should use the resolutions shown in the parameter table below, typically 480p or 720p.'
+                )
+              : t(
+                  'Use the resolutions enabled in the parameter table below; standard Seedance models may include higher resolutions when configured.'
+                )}
+          </p>
+        </div>
+
+        <div className='mt-3'>
+          <CodeBlock code={code} language={LANG_HIGHLIGHT[lang]}>
+            <CodeBlockCopyButton />
+          </CodeBlock>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Supported parameters table
 // ---------------------------------------------------------------------------
 
@@ -974,6 +1110,10 @@ export function ModelDetailsApi(props: {
   return (
     <div className='space-y-6'>
       <CodeSamplesSection model={props.model} endpointMap={props.endpointMap} />
+      <SeedanceOfficialGuideSection
+        model={props.model}
+        endpointMap={props.endpointMap}
+      />
       <AuthSection />
       <SupportedParametersSection model={props.model} />
       <RateLimitsSection model={props.model} />

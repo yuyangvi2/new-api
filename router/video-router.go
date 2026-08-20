@@ -23,6 +23,7 @@ func SetVideoRouter(router *gin.Engine) {
 	{
 		videoV1Router.POST("/video/generations", controller.RelayTask)
 		videoV1Router.GET("/video/generations/:task_id", controller.RelayTaskFetch)
+		videoV1Router.POST("/videos/generations", controller.RelayTask)
 		videoV1Router.POST("/videos/:video_id/remix", controller.RelayTask)
 		videoV1Router.GET("/seedance-m/video-tasks", controller.ListSeedanceMVideoTasks)
 		videoV1Router.GET("/seedance-m/video-tasks/:upstream_task_id", controller.GetSeedanceMVideoTask)
@@ -71,13 +72,42 @@ func SetVideoRouter(router *gin.Engine) {
 		seedanceGroup.POST("/", middleware.TokenAuth(), volcengine.HandleAction)
 		seedanceGroup.GET("/visual_validate_callback", volcengine.HandleVisualValidateCallback)
 	}
+	registerSeedanceAPIV3TaskRoutes(seedanceGroup.Group("/api/v3"))
+	registerSeedanceOfficialAssetRoutes(router.Group("/v1/seedance-official"))
+
+	// Drop-in compatibility for clients whose Seedance Official adaptor appends
+	// /api/v3/contents/generations/tasks directly to the configured base URL.
+	registerSeedanceAPIV3TaskRoutes(router.Group("/api/v3"))
+}
+
+func registerSeedanceAPIV3TaskRoutes(seedanceAPIV3Group *gin.RouterGroup) {
+	seedanceAPIV3Group.Use(middleware.RouteTag("relay"))
+	seedanceAPIV3Group.Use(middleware.TokenAuth(), middleware.Distribute())
 	{
-		seedanceAPIV3Group := seedanceGroup.Group("/api/v3")
-		seedanceAPIV3Group.Use(middleware.RouteTag("relay"))
-		seedanceAPIV3Group.Use(middleware.TokenAuth(), middleware.Distribute())
-		{
-			seedanceAPIV3Group.POST("/contents/generations/tasks", controller.RelayTask)
-			seedanceAPIV3Group.GET("/contents/generations/tasks/:task_id", controller.RelayTaskFetch)
-		}
+		seedanceAPIV3Group.POST("/contents/generations/tasks", controller.RelayTask)
+		seedanceAPIV3Group.GET("/contents/generations/tasks/:task_id", controller.RelayTaskFetch)
+	}
+}
+
+func registerSeedanceOfficialAssetRoutes(seedanceOfficialGroup *gin.RouterGroup) {
+	seedanceOfficialGroup.Use(middleware.RouteTag("relay"))
+	seedanceOfficialGroup.Use(middleware.TokenAuth())
+	{
+		seedanceOfficialGroup.POST("/asset-groups", volcengine.HandleRESTAction(volcengine.ActionCreateAssetGroup, "", nil))
+		seedanceOfficialGroup.POST("/asset-groups/query", volcengine.HandleRESTAction(volcengine.ActionListAssetGroups, "", nil))
+		seedanceOfficialGroup.GET("/asset-groups/:group_id", volcengine.HandleRESTAction(volcengine.ActionGetAssetGroup, "group_id", nil))
+		seedanceOfficialGroup.PUT("/asset-groups/:group_id", volcengine.HandleRESTAction(volcengine.ActionUpdateAssetGroup, "group_id", nil))
+		seedanceOfficialGroup.DELETE("/asset-groups/:group_id", volcengine.HandleRESTAction(volcengine.ActionDeleteAssetGroup, "group_id", nil))
+		seedanceOfficialGroup.POST("/assets", volcengine.HandleRESTAction(volcengine.ActionCreateAsset, "", nil))
+		seedanceOfficialGroup.POST("/assets/query", volcengine.HandleRESTAction(volcengine.ActionListAssets, "", nil))
+		seedanceOfficialGroup.GET("/assets/:asset_id", volcengine.HandleRESTAction(volcengine.ActionGetAsset, "asset_id", nil))
+		seedanceOfficialGroup.PUT("/assets/:asset_id", volcengine.HandleRESTAction(volcengine.ActionUpdateAsset, "asset_id", nil))
+		seedanceOfficialGroup.DELETE("/assets/:asset_id", volcengine.HandleRESTAction(volcengine.ActionDeleteAsset, "asset_id", nil))
+		seedanceOfficialGroup.POST("/real-person-auth/sessions", volcengine.HandleRESTAction(volcengine.ActionCreateVisualValidateSession, "", nil))
+		seedanceOfficialGroup.POST("/real-person-auth/asset-group/by-byted-token", volcengine.HandleRESTAction(
+			volcengine.ActionGetVisualValidateResult,
+			"",
+			map[string]string{"byted_token": "BytedToken", "bytedToken": "BytedToken"},
+		))
 	}
 }
