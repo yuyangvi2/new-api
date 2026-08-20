@@ -29,6 +29,7 @@ const (
 	WebSearchMaxUsesLow    = 1
 	WebSearchMaxUsesMedium = 5
 	WebSearchMaxUsesHigh   = 10
+	DroppedParamsHeader    = "X-New-Api-Dropped-Params"
 )
 
 func stopReasonClaude2OpenAI(reason string) string {
@@ -41,6 +42,29 @@ func maybeMarkClaudeRefusal(c *gin.Context, stopReason string) {
 	}
 	if strings.EqualFold(stopReason, "refusal") {
 		common.SetContextKey(c, constant.ContextKeyAdminRejectReason, "claude_stop_reason=refusal")
+	}
+}
+
+func omitUnsupportedClaudeSamplingParams(c *gin.Context, model string, request *dto.ClaudeRequest) {
+	if request == nil || !model_setting.ShouldOmitClaudeSamplingParams(model) {
+		return
+	}
+	dropped := make([]string, 0, 3)
+	if request.Temperature != nil {
+		request.Temperature = nil
+		dropped = append(dropped, "temperature")
+	}
+	if request.TopP != nil {
+		request.TopP = nil
+		dropped = append(dropped, "top_p")
+	}
+	if request.TopK != nil {
+		request.TopK = nil
+		dropped = append(dropped, "top_k")
+	}
+	if c != nil && len(dropped) > 0 {
+		c.Header(DroppedParamsHeader, strings.Join(dropped, ","))
+		logger.LogInfo(c, fmt.Sprintf("dropped unsupported Claude sampling params for model %s: %s", model, strings.Join(dropped, ",")))
 	}
 }
 
@@ -245,11 +269,7 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		}
 	}
 
-	if model_setting.ShouldOmitClaudeSamplingParams(claudeRequest.Model) {
-		claudeRequest.Temperature = nil
-		claudeRequest.TopP = nil
-		claudeRequest.TopK = nil
-	}
+	omitUnsupportedClaudeSamplingParams(c, claudeRequest.Model, &claudeRequest)
 
 	if textRequest.Stop != nil {
 		// stop maybe string/array string, convert to array string

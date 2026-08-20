@@ -62,6 +62,10 @@ func OpenAIResponsesRequestToClaudeMessages(c *gin.Context, req *dto.OpenAIRespo
 		claudeRequest.ToolChoice = sharedclaude.MapOpenAIToolChoice(toolChoice, ParallelToolCalls(req.ParallelToolCalls))
 	}
 	applyResponsesReasoningToClaude(req, claudeRequest)
+	if model_setting.ShouldOmitClaudeSamplingParams(claudeRequest.Model) {
+		claudeRequest.Temperature = nil
+		claudeRequest.TopP = nil
+	}
 
 	systemMessages := make([]dto.ClaudeMediaMessage, 0)
 	if RawJSONPresent(req.Instructions) {

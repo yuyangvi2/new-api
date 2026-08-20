@@ -2,6 +2,8 @@ package dto
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/types"
@@ -43,6 +45,10 @@ func (e GeneralErrorResponse) TryToOpenAIError() *types.OpenAIError {
 	if len(e.Error) > 0 {
 		err := common.Unmarshal(e.Error, &openAIError)
 		if err == nil && openAIError.Message != "" {
+			openAIError.Message = enrichUpstreamErrorMessage(openAIError.Message, e.Error)
+			if len(openAIError.Metadata) == 0 {
+				openAIError.Metadata = upstreamErrorMetadata(e.Error)
+			}
 			return &openAIError
 		}
 	}
@@ -56,7 +62,7 @@ func (e GeneralErrorResponse) ToMessage() string {
 			var openAIError types.OpenAIError
 			err := common.Unmarshal(e.Error, &openAIError)
 			if err == nil && openAIError.Message != "" {
-				return openAIError.Message
+				return enrichUpstreamErrorMessage(openAIError.Message, e.Error)
 			}
 		case "string":
 			var msg string
@@ -90,4 +96,69 @@ func (e GeneralErrorResponse) ToMessage() string {
 		return e.Response.Error.Message
 	}
 	return ""
+}
+
+func enrichUpstreamErrorMessage(message string, rawError json.RawMessage) string {
+	var fields map[string]any
+	if err := common.Unmarshal(rawError, &fields); err != nil {
+		return message
+	}
+
+	details := upstreamErrorDetailStrings(fields)
+	if len(details) == 0 {
+		return message
+	}
+	detailText := strings.Join(details, "; ")
+	if strings.Contains(message, detailText) {
+		return message
+	}
+	return fmt.Sprintf("%s: %s", message, detailText)
+}
+
+func upstreamErrorDetailStrings(fields map[string]any) []string {
+	details := make([]string, 0, 4)
+	for _, key := range []string{"param", "detail", "details", "metadata"} {
+		if value, ok := fields[key]; ok {
+			if text := upstreamErrorDetailString(value); text != "" {
+				details = append(details, fmt.Sprintf("%s=%s", key, text))
+			}
+		}
+	}
+	return details
+}
+
+func upstreamErrorDetailString(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case nil:
+		return ""
+	default:
+		data, err := common.Marshal(v)
+		if err != nil {
+			return fmt.Sprintf("%v", v)
+		}
+		return string(data)
+	}
+}
+
+func upstreamErrorMetadata(rawError json.RawMessage) json.RawMessage {
+	var fields map[string]any
+	if err := common.Unmarshal(rawError, &fields); err != nil {
+		return nil
+	}
+	metadata := map[string]any{}
+	for _, key := range []string{"param", "detail", "details", "metadata"} {
+		if value, ok := fields[key]; ok {
+			metadata[key] = value
+		}
+	}
+	if len(metadata) == 0 {
+		return nil
+	}
+	data, err := common.Marshal(metadata)
+	if err != nil {
+		return nil
+	}
+	return data
 }

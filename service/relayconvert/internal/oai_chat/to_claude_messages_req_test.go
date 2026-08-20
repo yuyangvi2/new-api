@@ -56,3 +56,24 @@ func TestOpenAIChatRequestToClaudeMessagesDefaultsNonStringSchemaType(t *testing
 	assert.Equal(t, "object", tool.InputSchema["type"])
 	assert.Equal(t, map[string]any{}, tool.InputSchema["properties"])
 }
+
+func TestOpenAIChatRequestToClaudeMessagesOmitsNewClaudeSamplingParams(t *testing.T) {
+	temperature := 0.7
+	topP := 0.9
+	topK := 40
+
+	got, err := OpenAIChatRequestToClaudeMessages(nil, dto.GeneralOpenAIRequest{
+		Model:       "claude-opus-5",
+		Temperature: &temperature,
+		TopP:        &topP,
+		TopK:        &topK,
+		Messages: []dto.Message{
+			{Role: "user", Content: "hello"},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Nil(t, got.Temperature)
+	assert.Nil(t, got.TopP)
+	assert.Nil(t, got.TopK)
+}
