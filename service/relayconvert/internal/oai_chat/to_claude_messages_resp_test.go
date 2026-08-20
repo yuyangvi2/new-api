@@ -48,8 +48,35 @@ func TestResponseOpenAI2ClaudeToolUseInputIsObject(t *testing.T) {
 			require.Len(t, resp.Content, 1)
 			assert.Equal(t, "tool_use", resp.Content[0].Type)
 			assert.Equal(t, tt.want, resp.Content[0].Input)
+			assert.Equal(t, "tool_use", resp.StopReason)
 		})
 	}
+}
+
+func TestResponseOpenAI2ClaudeToolUseStopReasonWinsOverStop(t *testing.T) {
+	msg := dto.Message{Role: "assistant"}
+	msg.SetToolCalls([]dto.ToolCallRequest{
+		{
+			ID:   "call_1",
+			Type: "function",
+			Function: dto.FunctionRequest{
+				Name:      "lookup",
+				Arguments: `{"q":"x"}`,
+			},
+		},
+	})
+
+	resp := ResponseOpenAI2Claude(&dto.OpenAITextResponse{
+		Id:    "chatcmpl_1",
+		Model: "gpt-test",
+		Choices: []dto.OpenAITextResponseChoice{
+			{Message: msg, FinishReason: "stop"},
+		},
+	}, nil)
+
+	require.Len(t, resp.Content, 1)
+	assert.Equal(t, "tool_use", resp.Content[0].Type)
+	assert.Equal(t, "tool_use", resp.StopReason)
 }
 
 func TestResponseOpenAI2ClaudeUsageCarriesOpenAIBillingUsage(t *testing.T) {

@@ -1,6 +1,8 @@
 package oaichat
 
 import (
+	"strings"
+
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
@@ -64,6 +66,9 @@ func ResponseOpenAI2Gemini(openAIResponse *dto.OpenAITextResponse, info *relayco
 
 		toolCalls := choice.Message.ParseToolCalls()
 		for _, toolCall := range toolCalls {
+			if strings.TrimSpace(toolCall.Function.Name) == "" {
+				continue
+			}
 			var args map[string]interface{}
 			if toolCall.Function.Arguments != "" {
 				if err := common.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
@@ -95,7 +100,7 @@ func StreamResponseOpenAI2Gemini(openAIResponse *dto.ChatCompletionsStreamRespon
 	hasContent := false
 	hasFinishReason := false
 	for _, choice := range openAIResponse.Choices {
-		if len(choice.Delta.GetContentString()) > 0 || (choice.Delta.ToolCalls != nil && len(choice.Delta.ToolCalls) > 0) {
+		if len(choice.Delta.GetContentString()) > 0 || hasNamedToolCall(choice.Delta.ToolCalls) {
 			hasContent = true
 		}
 		if choice.FinishReason != nil {
@@ -166,6 +171,9 @@ func StreamResponseOpenAI2Gemini(openAIResponse *dto.ChatCompletionsStreamRespon
 		if choice.Delta.ToolCalls != nil {
 			for _, toolCall := range choice.Delta.ToolCalls {
 				// 解析参数
+				if strings.TrimSpace(toolCall.Function.Name) == "" {
+					continue
+				}
 				var args map[string]interface{}
 				if toolCall.Function.Arguments != "" {
 					if err := common.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
@@ -199,6 +207,15 @@ func StreamResponseOpenAI2Gemini(openAIResponse *dto.ChatCompletionsStreamRespon
 	}
 
 	return geminiResponse
+}
+
+func hasNamedToolCall(toolCalls []dto.ToolCallResponse) bool {
+	for _, toolCall := range toolCalls {
+		if strings.TrimSpace(toolCall.Function.Name) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func geminiBillingMetadataFromOpenAIUsage(usage *dto.Usage) (dto.GeminiUsageMetadata, bool) {

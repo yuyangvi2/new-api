@@ -504,6 +504,13 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 	}
 
 	// 转换为 OpenAI 格式响应
+	upstreamTaskID := aliResp.Output.TaskID
+	if isAliOfficialVideoSubmitPath(c.Request.URL.Path) {
+		aliResp.Output.TaskID = publicTaskID(info, upstreamTaskID)
+		c.JSON(http.StatusOK, aliResp)
+		return upstreamTaskID, responseBody, nil
+	}
+
 	openAIResp := dto.NewOpenAIVideo()
 	openAIResp.ID = info.PublicTaskID
 	openAIResp.TaskID = info.PublicTaskID
@@ -517,7 +524,7 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 	// 返回 OpenAI 格式
 	c.JSON(http.StatusOK, openAIResp)
 
-	return aliResp.Output.TaskID, responseBody, nil
+	return upstreamTaskID, responseBody, nil
 }
 
 // FetchTask 查询任务状态
@@ -541,6 +548,17 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 		return nil, fmt.Errorf("new proxy http client failed: %w", err)
 	}
 	return client.Do(req)
+}
+
+func isAliOfficialVideoSubmitPath(path string) bool {
+	return strings.HasPrefix(path, "/api/v1/services/aigc/video-generation/video-synthesis")
+}
+
+func publicTaskID(info *relaycommon.RelayInfo, fallback string) string {
+	if info != nil && info.TaskRelayInfo != nil && strings.TrimSpace(info.PublicTaskID) != "" {
+		return info.PublicTaskID
+	}
+	return fallback
 }
 
 func (a *TaskAdaptor) GetModelList() []string {
@@ -619,6 +637,38 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(task *model.Task) ([]byte, error) {
 	}
 
 	return common.Marshal(openAIResp)
+}
+
+func (a *TaskAdaptor) ConvertToAliVideo(task *model.Task) ([]byte, error) {
+	var aliResp AliVideoResponse
+	if len(task.Data) > 0 {
+		if err := common.Unmarshal(task.Data, &aliResp); err != nil {
+			return nil, errors.Wrap(err, "unmarshal ali response failed")
+		}
+	}
+	aliResp.Output.TaskID = task.TaskID
+	aliResp.Output.TaskStatus = aliOfficialStatus(task.Status)
+	if aliResp.Output.VideoURL == "" {
+		aliResp.Output.VideoURL = task.GetResultURL()
+	}
+	if task.Status == model.TaskStatusFailure {
+		aliResp.Output.Code = firstNonEmpty(aliResp.Output.Code, aliResp.Code, "task_failed")
+		aliResp.Output.Message = firstNonEmpty(aliResp.Output.Message, aliResp.Message, task.FailReason)
+	}
+	return common.Marshal(aliResp)
+}
+
+func aliOfficialStatus(status model.TaskStatus) string {
+	switch status {
+	case model.TaskStatusSuccess:
+		return "SUCCEEDED"
+	case model.TaskStatusFailure:
+		return "FAILED"
+	case model.TaskStatusQueued, model.TaskStatusSubmitted:
+		return "PENDING"
+	default:
+		return "RUNNING"
+	}
 }
 
 func convertAliStatus(aliStatus string) string {

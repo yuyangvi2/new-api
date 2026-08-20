@@ -26,6 +26,27 @@ func TestSeedanceAPIV3RoutesSupportVolcengineAndRootPrefixes(t *testing.T) {
 	assert.True(t, routes[http.MethodGet+" /volcengine/api/v3/contents/generations/tasks/:task_id"])
 	assert.True(t, routes[http.MethodPost+" /api/v3/contents/generations/tasks"])
 	assert.True(t, routes[http.MethodGet+" /api/v3/contents/generations/tasks/:task_id"])
+	assert.True(t, routes[http.MethodPost+" /contents/generations/tasks"])
+	assert.True(t, routes[http.MethodGet+" /contents/generations/tasks/:task_id"])
+}
+
+func TestOfficialVideoProviderRoutesAreRegistered(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+
+	require.NotPanics(t, func() {
+		SetVideoRouter(engine)
+	})
+
+	routes := map[string]bool{}
+	for _, route := range engine.Routes() {
+		routes[route.Method+" "+route.Path] = true
+	}
+
+	assert.True(t, routes[http.MethodPost+" /v1/video_generation"])
+	assert.True(t, routes[http.MethodGet+" /v1/query/video_generation"])
+	assert.True(t, routes[http.MethodPost+" /api/v1/services/aigc/video-generation/video-synthesis"])
+	assert.True(t, routes[http.MethodGet+" /api/v1/tasks/:task_id"])
 }
 
 func TestSeedanceOfficialAssetRoutes(t *testing.T) {

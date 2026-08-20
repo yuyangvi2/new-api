@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
@@ -105,23 +106,31 @@ func getChannelQuery(group string, model string, retry int) (*gorm.DB, error) {
 	return channelQuery, nil
 }
 
-func GetChannel(group string, model string, retry int, requestPath string) (*Channel, error) {
+func GetChannel(group string, model string, retry int, requestPath string, requiredChannelType int) (*Channel, error) {
 	var abilities []Ability
 
 	var err error = nil
-	channelQuery, err := getChannelQuery(group, model, retry)
-	if err != nil {
-		return nil, err
-	}
-	if common.UsingMainDatabase(common.DatabaseTypeSQLite) || common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {
-		err = channelQuery.Order("weight DESC").Find(&abilities).Error
+	if requiredChannelType > 0 {
+		err = DB.Where(commonGroupCol+" = ? and model = ? and enabled = ?", group, model, true).Find(&abilities).Error
 	} else {
-		err = channelQuery.Order("weight DESC").Find(&abilities).Error
+		channelQuery, queryErr := getChannelQuery(group, model, retry)
+		if queryErr != nil {
+			return nil, queryErr
+		}
+		if common.UsingMainDatabase(common.DatabaseTypeSQLite) || common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {
+			err = channelQuery.Order("weight DESC").Find(&abilities).Error
+		} else {
+			err = channelQuery.Order("weight DESC").Find(&abilities).Error
+		}
 	}
 	if err != nil {
 		return nil, err
 	}
+	abilities = filterAbilitiesByRequiredChannelType(abilities, requiredChannelType)
 	abilities = filterAbilitiesByRequestPath(abilities, requestPath)
+	if requiredChannelType > 0 {
+		abilities = filterAbilitiesByRetryPriority(abilities, retry)
+	}
 	channel := Channel{}
 	if len(abilities) > 0 {
 		// Randomly choose one
@@ -144,6 +153,76 @@ func GetChannel(group string, model string, retry int, requestPath string) (*Cha
 	}
 	err = DB.First(&channel, "id = ?", channel.Id).Error
 	return &channel, err
+}
+
+func filterAbilitiesByRequiredChannelType(abilities []Ability, requiredChannelType int) []Ability {
+	if requiredChannelType <= 0 || len(abilities) == 0 {
+		return abilities
+	}
+
+	channelIds := make([]int, 0, len(abilities))
+	seen := make(map[int]struct{}, len(abilities))
+	for _, ability := range abilities {
+		if _, ok := seen[ability.ChannelId]; ok {
+			continue
+		}
+		seen[ability.ChannelId] = struct{}{}
+		channelIds = append(channelIds, ability.ChannelId)
+	}
+
+	var channels []*Channel
+	if err := DB.Where("id IN ? AND type = ?", channelIds, requiredChannelType).Find(&channels).Error; err != nil {
+		return nil
+	}
+	matchedChannels := make(map[int]struct{}, len(channels))
+	for _, channel := range channels {
+		matchedChannels[channel.Id] = struct{}{}
+	}
+
+	filtered := make([]Ability, 0, len(abilities))
+	for _, ability := range abilities {
+		if _, ok := matchedChannels[ability.ChannelId]; ok {
+			filtered = append(filtered, ability)
+		}
+	}
+	return filtered
+}
+
+func filterAbilitiesByRetryPriority(abilities []Ability, retry int) []Ability {
+	if len(abilities) == 0 {
+		return abilities
+	}
+
+	prioritySet := make(map[int64]struct{})
+	for _, ability := range abilities {
+		prioritySet[abilityPriority(ability)] = struct{}{}
+	}
+	priorities := make([]int64, 0, len(prioritySet))
+	for priority := range prioritySet {
+		priorities = append(priorities, priority)
+	}
+	sort.Slice(priorities, func(i, j int) bool {
+		return priorities[i] > priorities[j]
+	})
+	if retry >= len(priorities) {
+		retry = len(priorities) - 1
+	}
+	targetPriority := priorities[retry]
+
+	filtered := make([]Ability, 0, len(abilities))
+	for _, ability := range abilities {
+		if abilityPriority(ability) == targetPriority {
+			filtered = append(filtered, ability)
+		}
+	}
+	return filtered
+}
+
+func abilityPriority(ability Ability) int64 {
+	if ability.Priority == nil {
+		return 0
+	}
+	return *ability.Priority
 }
 
 // filterAbilitiesByRequestPath restricts candidates by request path for the DB

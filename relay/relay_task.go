@@ -15,7 +15,10 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relay/channel"
+	taskali "github.com/QuantumNous/new-api/relay/channel/task/ali"
 	"github.com/QuantumNous/new-api/relay/channel/task/doubao"
+	"github.com/QuantumNous/new-api/relay/channel/task/hailuo"
+	"github.com/QuantumNous/new-api/relay/channel/task/seedancem"
 	"github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
@@ -415,7 +418,19 @@ func videoFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *d
 		return
 	}
 
-	if strings.HasPrefix(c.Request.RequestURI, "/volcengine/api/v3/contents/generations/tasks") {
+	if strings.HasPrefix(c.Request.RequestURI, "/volcengine/api/v3/contents/generations/tasks") ||
+		strings.HasPrefix(c.Request.RequestURI, "/api/v3/contents/generations/tasks") {
+		if strings.HasPrefix(c.Request.RequestURI, "/api/v3/contents/generations/tasks") &&
+			originTask.Platform == constant.TaskPlatform(strconv.Itoa(constant.ChannelTypeSeedanceM)) {
+			adaptor := seedancem.TaskAdaptor{}
+			data, err := adaptor.ConvertToSeedanceMVideo(originTask)
+			if err != nil {
+				taskResp = service.TaskErrorWrapper(err, "convert_to_seedance_m_video_failed", http.StatusInternalServerError)
+				return
+			}
+			respBody = data
+			return
+		}
 		adaptor := doubao.SeedanceOfficialTaskAdaptor{}
 		data, err := adaptor.ConvertToSeedanceVideo(originTask)
 		if err != nil {
@@ -427,6 +442,39 @@ func videoFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *d
 	}
 
 	// 通用格式：体验中心(/pg/)返回精简轮询 DTO，其他返回用户 DTO
+	if strings.HasPrefix(c.Request.RequestURI, "/contents/generations/tasks") {
+		adaptor := seedancem.TaskAdaptor{}
+		data, err := adaptor.ConvertToSeedanceMVideo(originTask)
+		if err != nil {
+			taskResp = service.TaskErrorWrapper(err, "convert_to_seedance_m_video_failed", http.StatusInternalServerError)
+			return
+		}
+		respBody = data
+		return
+	}
+
+	if strings.HasPrefix(c.Request.RequestURI, "/v1/query/video_generation") {
+		adaptor := hailuo.TaskAdaptor{}
+		data, err := adaptor.ConvertToHailuoVideo(originTask)
+		if err != nil {
+			taskResp = service.TaskErrorWrapper(err, "convert_to_hailuo_video_failed", http.StatusInternalServerError)
+			return
+		}
+		respBody = data
+		return
+	}
+
+	if strings.HasPrefix(c.Request.RequestURI, "/api/v1/tasks/") {
+		adaptor := taskali.TaskAdaptor{}
+		data, err := adaptor.ConvertToAliVideo(originTask)
+		if err != nil {
+			taskResp = service.TaskErrorWrapper(err, "convert_to_ali_video_failed", http.StatusInternalServerError)
+			return
+		}
+		respBody = data
+		return
+	}
+
 	isPlayground := strings.HasPrefix(c.Request.RequestURI, "/pg/")
 	var data any
 	if isPlayground {

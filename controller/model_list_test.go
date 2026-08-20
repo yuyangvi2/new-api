@@ -15,6 +15,7 @@ import (
 	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -137,6 +138,16 @@ func withSelfUseModeDisabled(t *testing.T) {
 
 	original := operation_setting.SelfUseModeEnabled
 	operation_setting.SelfUseModeEnabled = false
+	t.Cleanup(func() {
+		operation_setting.SelfUseModeEnabled = original
+	})
+}
+
+func withSelfUseModeEnabled(t *testing.T) {
+	t.Helper()
+
+	original := operation_setting.SelfUseModeEnabled
+	operation_setting.SelfUseModeEnabled = true
 	t.Cleanup(func() {
 		operation_setting.SelfUseModeEnabled = original
 	})
@@ -343,6 +354,138 @@ func TestListModelsTokenLimitIncludesTieredBillingModel(t *testing.T) {
 	require.NotContains(t, ids, "zz-token-tiered-empty-expr-model")
 	require.NotContains(t, ids, "zz-token-tiered-missing-expr-model")
 	require.NotContains(t, ids, "zz-token-unpriced-model")
+}
+
+func TestRetrieveModelFindsUserVisibleDynamicAnthropicModel(t *testing.T) {
+	withSelfUseModeEnabled(t)
+	db := setupModelListControllerTestDB(t)
+	require.NoError(t, db.Create(&model.User{
+		Id:       1004,
+		Username: "model-retrieve-user",
+		Password: "password",
+		Group:    "default",
+		Status:   common.UserStatusEnabled,
+	}).Error)
+	require.NoError(t, db.Create(&model.Ability{
+		Group:     "default",
+		Model:     "zz-dynamic-claude-model",
+		ChannelId: 1,
+		Enabled:   true,
+	}).Error)
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/v1/models/zz-dynamic-claude-model", nil)
+	ctx.Params = gin.Params{{Key: "model", Value: "zz-dynamic-claude-model"}}
+	ctx.Set("id", 1004)
+
+	RetrieveModel(ctx, constant.ChannelTypeAnthropic)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var payload dto.AnthropicModel
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &payload))
+	assert.Equal(t, "zz-dynamic-claude-model", payload.ID)
+	assert.Equal(t, "model", payload.Type)
+}
+
+func TestListModelsInfersDeepSeekOwnerForOpenAICompatibleDeepSeekModel(t *testing.T) {
+	withSelfUseModeEnabled(t)
+	db := setupModelListControllerTestDB(t)
+	require.NoError(t, db.Create(&model.User{
+		Id:       1005,
+		Username: "deepseek-owner-user",
+		Password: "password",
+		Group:    "default",
+		Status:   common.UserStatusEnabled,
+	}).Error)
+	require.NoError(t, db.Create(&model.Channel{
+		Id:     501,
+		Type:   constant.ChannelTypeOpenAI,
+		Key:    "sk-test",
+		Name:   "openai-compatible-deepseek",
+		Status: common.ChannelStatusEnabled,
+		Models: "deepseek-chat",
+		Group:  "default",
+	}).Error)
+	require.NoError(t, db.Create(&model.Ability{
+		Group:     "default",
+		Model:     "deepseek-chat",
+		ChannelId: 501,
+		Enabled:   true,
+	}).Error)
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	ctx.Set("id", 1005)
+
+	ListModels(ctx, constant.ChannelTypeOpenAI)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var payload listModelsResponse
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &payload))
+	require.Len(t, payload.Data, 1)
+	assert.Equal(t, "deepseek-chat", payload.Data[0].Id)
+	assert.Equal(t, "deepseek", payload.Data[0].OwnedBy)
+}
+
+func TestListModelsIgnoresInvalidTokenModelLimitContext(t *testing.T) {
+	withSelfUseModeEnabled(t)
+	setupModelListControllerTestDB(t)
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	common.SetContextKey(ctx, constant.ContextKeyUserGroup, "default")
+	common.SetContextKey(ctx, constant.ContextKeyTokenModelLimitEnabled, true)
+	common.SetContextKey(ctx, constant.ContextKeyTokenModelLimit, "invalid")
+
+	require.NotPanics(t, func() {
+		ListModels(ctx, constant.ChannelTypeOpenAI)
+	})
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var payload listModelsResponse
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &payload))
+	assert.True(t, payload.Success)
+	assert.Empty(t, payload.Data)
+}
+
+func TestRenderModelEndpointErrorUsesClaudeEnvelope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+
+	renderModelEndpointError(ctx, constant.ChannelTypeAnthropic, http.StatusInternalServerError, "get user group failed", "server_error", "", types.ErrorCodeQueryDataError)
+
+	require.Equal(t, http.StatusInternalServerError, recorder.Code)
+	var payload struct {
+		Type  string            `json:"type"`
+		Error types.ClaudeError `json:"error"`
+	}
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &payload))
+	assert.Equal(t, "error", payload.Type)
+	assert.Equal(t, "api_error", payload.Error.Type)
+	assert.Equal(t, "get user group failed", payload.Error.Message)
+}
+
+func TestRenderModelEndpointErrorUsesGeminiEnvelope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+
+	renderModelEndpointError(ctx, constant.ChannelTypeGemini, http.StatusInternalServerError, "get user group failed", "server_error", "", types.ErrorCodeQueryDataError)
+
+	require.Equal(t, http.StatusInternalServerError, recorder.Code)
+	var payload struct {
+		Error types.GeminiError `json:"error"`
+	}
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &payload))
+	assert.Equal(t, http.StatusInternalServerError, payload.Error.Code)
+	assert.Equal(t, "INTERNAL", payload.Error.Status)
+	assert.Equal(t, "get user group failed", payload.Error.Message)
 }
 
 func TestCheckUpdatePasswordRequiresCurrentPassword(t *testing.T) {

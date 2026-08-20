@@ -1,11 +1,16 @@
 package ali
 
 import (
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -169,4 +174,32 @@ func TestConvertToAliRequestWan25I2VKeepsLegacyImgURL(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(body), `"img_url"`)
 	require.NotContains(t, string(body), `"media"`)
+}
+
+func TestDoResponseUsesOfficialSubmitFormatForOfficialPath(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/services/aigc/video-generation/video-synthesis", nil)
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body: io.NopCloser(strings.NewReader(`{
+			"output":{"task_id":"upstream-task","task_status":"PENDING"},
+			"request_id":"req-1"
+		}`)),
+	}
+	taskID, _, taskErr := (&TaskAdaptor{}).DoResponse(ctx, resp, &relaycommon.RelayInfo{
+		OriginModelName: "wan2.7-i2v",
+		TaskRelayInfo:   &relaycommon.TaskRelayInfo{PublicTaskID: "public-task"},
+	})
+
+	require.Nil(t, taskErr)
+	assert.Equal(t, "upstream-task", taskID)
+
+	var body AliVideoResponse
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &body))
+	assert.Equal(t, "public-task", body.Output.TaskID)
+	assert.Equal(t, "PENDING", body.Output.TaskStatus)
+	assert.Equal(t, "req-1", body.RequestID)
 }

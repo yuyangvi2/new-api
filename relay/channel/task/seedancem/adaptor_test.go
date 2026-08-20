@@ -2,6 +2,7 @@ package seedancem
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -381,4 +382,27 @@ func TestParseTaskResultUnknownStatusFails(t *testing.T) {
 	assert.Equal(t, model.TaskStatusFailure, info.Status)
 	assert.Equal(t, "100%", info.Progress)
 	assert.Equal(t, "unknown status: paused", info.Reason)
+}
+
+func TestDoResponseUsesOfficialSubmitFormatForOfficialPath(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/contents/generations/tasks", nil)
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"id":"upstream-task"}`)),
+	}
+	taskID, _, taskErr := (&TaskAdaptor{}).DoResponse(ctx, resp, &relaycommon.RelayInfo{
+		OriginModelName: "doubao-seedance-2.0",
+		TaskRelayInfo:   &relaycommon.TaskRelayInfo{PublicTaskID: "public-task"},
+	})
+
+	require.Nil(t, taskErr)
+	assert.Equal(t, "upstream-task", taskID)
+
+	var body map[string]any
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &body))
+	assert.Equal(t, map[string]any{"id": "public-task"}, body)
 }
