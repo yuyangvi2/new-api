@@ -70,6 +70,74 @@ func setupDistributorTestDB(t *testing.T) {
 	})
 }
 
+func TestDistributeRequiredChannelTypeFiltersCandidates(t *testing.T) {
+	setupDistributorTestDB(t)
+
+	highPriority := int64(10)
+	lowPriority := int64(1)
+	weight := uint(100)
+	channels := []model.Channel{
+		{
+			Id:       1,
+			Type:     constant.ChannelTypeKling,
+			Key:      "wrong-key",
+			Name:     "wrong type",
+			Status:   common.ChannelStatusEnabled,
+			Models:   "shared-video-model",
+			Group:    "default",
+			Priority: &highPriority,
+			Weight:   &weight,
+		},
+		{
+			Id:       2,
+			Type:     constant.ChannelTypeMiniMax,
+			Key:      "right-key",
+			Name:     "right type",
+			Status:   common.ChannelStatusEnabled,
+			Models:   "shared-video-model",
+			Group:    "default",
+			Priority: &lowPriority,
+			Weight:   &weight,
+		},
+	}
+	require.NoError(t, model.DB.Create(&channels).Error)
+	require.NoError(t, model.DB.Create(&[]model.Ability{
+		{Group: "default", Model: "shared-video-model", ChannelId: 1, Enabled: true, Priority: &highPriority, Weight: weight},
+		{Group: "default", Model: "shared-video-model", ChannelId: 2, Enabled: true, Priority: &lowPriority, Weight: weight},
+	}).Error)
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("id", 7)
+		common.SetContextKey(c, constant.ContextKeyUsingGroup, "default")
+	})
+	router.POST("/v1/video_generation", RequireChannelType(constant.ChannelTypeMiniMax), Distribute(), func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"channel_id":   common.GetContextKeyInt(c, constant.ContextKeyChannelId),
+			"channel_type": common.GetContextKeyInt(c, constant.ContextKeyChannelType),
+		})
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/video_generation",
+		strings.NewReader(`{"model":"shared-video-model","prompt":"test"}`),
+	)
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, request)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+
+	var body struct {
+		ChannelID   int `json:"channel_id"`
+		ChannelType int `json:"channel_type"`
+	}
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &body))
+	assert.Equal(t, 2, body.ChannelID)
+	assert.Equal(t, constant.ChannelTypeMiniMax, body.ChannelType)
+}
+
 func TestDistributeNoAvailableChannelReturnsSanitizedModelNotFound(t *testing.T) {
 	setupDistributorTestDB(t)
 	require.NoError(t, i18n.Init())

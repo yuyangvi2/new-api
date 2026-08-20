@@ -107,6 +107,71 @@ func TestStreamResponseOpenAI2GeminiMapsToolCallFinishReasonAndUsage(t *testing.
 	assert.Equal(t, map[string]interface{}{"q": "x"}, resp.Candidates[0].Content.Parts[0].FunctionCall.Arguments)
 }
 
+func TestResponseOpenAI2GeminiSkipsToolCallsWithEmptyName(t *testing.T) {
+	msg := dto.Message{Role: "assistant"}
+	msg.SetToolCalls([]dto.ToolCallRequest{
+		{
+			ID:   "call_empty",
+			Type: "function",
+			Function: dto.FunctionRequest{
+				Arguments: `{"q":"ignored"}`,
+			},
+		},
+		{
+			ID:   "call_1",
+			Type: "function",
+			Function: dto.FunctionRequest{
+				Name:      "lookup",
+				Arguments: `{"q":"x"}`,
+			},
+		},
+	})
+
+	resp := ResponseOpenAI2Gemini(&dto.OpenAITextResponse{
+		Model: "gpt-test",
+		Choices: []dto.OpenAITextResponseChoice{
+			{Message: msg, FinishReason: "tool_calls"},
+		},
+	}, nil)
+
+	require.Len(t, resp.Candidates, 1)
+	require.Len(t, resp.Candidates[0].Content.Parts, 1)
+	require.NotNil(t, resp.Candidates[0].Content.Parts[0].FunctionCall)
+	assert.Equal(t, "lookup", resp.Candidates[0].Content.Parts[0].FunctionCall.FunctionName)
+}
+
+func TestStreamResponseOpenAI2GeminiSkipsToolCallsWithEmptyName(t *testing.T) {
+	resp := StreamResponseOpenAI2Gemini(&dto.ChatCompletionsStreamResponse{
+		Choices: []dto.ChatCompletionsStreamResponseChoice{
+			{
+				Delta: dto.ChatCompletionsStreamResponseChoiceDelta{
+					ToolCalls: []dto.ToolCallResponse{
+						{
+							Type: "function",
+							Function: dto.FunctionResponse{
+								Arguments: `{"q":"ignored"}`,
+							},
+						},
+						{
+							Type: "function",
+							Function: dto.FunctionResponse{
+								Name:      "lookup",
+								Arguments: `{"q":"x"}`,
+							},
+						},
+					},
+				},
+			},
+		},
+	}, &relaycommon.RelayInfo{})
+
+	require.NotNil(t, resp)
+	require.Len(t, resp.Candidates, 1)
+	require.Len(t, resp.Candidates[0].Content.Parts, 1)
+	require.NotNil(t, resp.Candidates[0].Content.Parts[0].FunctionCall)
+	assert.Equal(t, "lookup", resp.Candidates[0].Content.Parts[0].FunctionCall.FunctionName)
+}
+
 func geminiRespPtr[T any](value T) *T {
 	return &value
 }

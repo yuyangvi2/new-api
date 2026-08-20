@@ -101,6 +101,13 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 		return
 	}
 
+	upstreamTaskID := hResp.TaskID
+	if isHailuoOfficialSubmitPath(c.Request.URL.Path) {
+		hResp.TaskID = publicTaskID(info, upstreamTaskID)
+		c.JSON(http.StatusOK, hResp)
+		return upstreamTaskID, responseBody, nil
+	}
+
 	ov := dto.NewOpenAIVideo()
 	ov.ID = info.PublicTaskID
 	ov.TaskID = info.PublicTaskID
@@ -109,6 +116,17 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 
 	c.JSON(http.StatusOK, ov)
 	return hResp.TaskID, responseBody, nil
+}
+
+func isHailuoOfficialSubmitPath(path string) bool {
+	return strings.HasPrefix(path, TextToVideoEndpoint)
+}
+
+func publicTaskID(info *relaycommon.RelayInfo, fallback string) string {
+	if info != nil && info.TaskRelayInfo != nil && strings.TrimSpace(info.PublicTaskID) != "" {
+		return info.PublicTaskID
+	}
+	return fallback
 }
 
 func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy string) (*http.Response, error) {
@@ -243,6 +261,47 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(originTask *model.Task) ([]byte, erro
 	}
 
 	return jsonData, nil
+}
+
+func (a *TaskAdaptor) ConvertToHailuoVideo(originTask *model.Task) ([]byte, error) {
+	var hailuoResp QueryTaskResponse
+	if len(originTask.Data) > 0 {
+		if err := common.Unmarshal(originTask.Data, &hailuoResp); err != nil {
+			return nil, errors.Wrap(err, "unmarshal hailuo task data failed")
+		}
+	}
+	hailuoResp.TaskID = originTask.TaskID
+	hailuoResp.Status = hailuoOfficialStatus(originTask.Status)
+	if hailuoResp.BaseResp.StatusMsg == "" {
+		hailuoResp.BaseResp.StatusMsg = "success"
+	}
+	if originTask.Status == model.TaskStatusFailure {
+		hailuoResp.BaseResp.StatusCode = 1
+		hailuoResp.BaseResp.StatusMsg = firstNonEmpty(originTask.FailReason, hailuoResp.BaseResp.StatusMsg)
+	}
+	return common.Marshal(hailuoResp)
+}
+
+func hailuoOfficialStatus(status model.TaskStatus) string {
+	switch status {
+	case model.TaskStatusSuccess:
+		return TaskStatusSuccess
+	case model.TaskStatusFailure:
+		return TaskStatusFailed
+	case model.TaskStatusQueued, model.TaskStatusSubmitted:
+		return TaskStatusQueueing
+	default:
+		return TaskStatusProcessing
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func (a *TaskAdaptor) buildVideoURL(_, fileID string) string {

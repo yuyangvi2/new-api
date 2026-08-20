@@ -30,9 +30,18 @@ type ModelRequest struct {
 	Group string `json:"group,omitempty"`
 }
 
+func RequireChannelType(channelType int) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		common.SetContextKey(c, constant.ContextKeyRequiredChannelType, channelType)
+		c.Set("platform", strconv.Itoa(channelType))
+		c.Next()
+	}
+}
+
 func Distribute() func(c *gin.Context) {
 	return func(c *gin.Context) {
 		var channel *model.Channel
+		requiredChannelType := common.GetContextKeyInt(c, constant.ContextKeyRequiredChannelType)
 		channelId, ok := common.GetContextKey(c, constant.ContextKeyTokenSpecificChannelId)
 		modelRequest, shouldSelectChannel, err := getModelRequest(c)
 		if err != nil {
@@ -52,6 +61,10 @@ func Distribute() func(c *gin.Context) {
 			}
 			if channel.Status != common.ChannelStatusEnabled {
 				abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorChannelDisabled))
+				return
+			}
+			if requiredChannelType > 0 && channel.Type != requiredChannelType {
+				abortWithOpenAiMessage(c, http.StatusNotFound, i18n.T(c, i18n.MsgDistributorModelNotAvailable), types.ErrorCodeModelNotFound)
 				return
 			}
 		} else {
@@ -118,7 +131,8 @@ func Distribute() func(c *gin.Context) {
 					affinityUsable := false
 					preferred, err := model.CacheGetChannel(preferredChannelID)
 					if err == nil && preferred != nil && preferred.Status == common.ChannelStatusEnabled &&
-						channelSupportsRequestPath(preferred, c.Request.URL.Path) {
+						channelSupportsRequestPath(preferred, c.Request.URL.Path) &&
+						channelSupportsRequiredType(preferred, requiredChannelType) {
 						if usingGroup == "auto" {
 							userGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup)
 							autoGroups := service.GetUserAutoGroup(userGroup)
@@ -146,11 +160,12 @@ func Distribute() func(c *gin.Context) {
 
 				if channel == nil {
 					channel, selectGroup, err = service.CacheGetRandomSatisfiedChannel(&service.RetryParam{
-						Ctx:         c,
-						ModelName:   modelRequest.Model,
-						TokenGroup:  usingGroup,
-						RequestPath: c.Request.URL.Path,
-						Retry:       common.GetPointer(0),
+						Ctx:                 c,
+						ModelName:           modelRequest.Model,
+						TokenGroup:          usingGroup,
+						RequestPath:         c.Request.URL.Path,
+						RequiredChannelType: requiredChannelType,
+						Retry:               common.GetPointer(0),
 					})
 					if err != nil {
 						showGroup := usingGroup
@@ -232,6 +247,10 @@ func channelSupportsRequestPath(channel *model.Channel, requestPath string) bool
 	}
 	config := channel.GetOtherSettings().AdvancedCustom
 	return config != nil && config.SupportsPath(requestPath)
+}
+
+func channelSupportsRequiredType(channel *model.Channel, requiredChannelType int) bool {
+	return requiredChannelType <= 0 || (channel != nil && channel.Type == requiredChannelType)
 }
 
 // getModelFromRequest 从请求中读取模型信息
@@ -362,12 +381,21 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 		} else if c.Request.Method == http.MethodGet {
 			relayMode = relayconstant.RelayModeVideoFetchByID
 			shouldSelectChannel = false
+			if c.Param("task_id") == "" && strings.HasPrefix(c.Request.URL.Path, "/v1/query/video_generation") {
+				c.Set("task_id", c.Query("task_id"))
+			}
 			modelRequest.Model = getTaskOriginModelName(c)
 		}
 		c.Set("relay_mode", relayMode)
 	} else if strings.Contains(c.Request.URL.Path, "/v1/video/generations") ||
+		strings.HasPrefix(c.Request.URL.Path, "/contents/generations/tasks") ||
+		strings.HasPrefix(c.Request.URL.Path, "/v1/video_generation") ||
+		strings.HasPrefix(c.Request.URL.Path, "/v1/query/video_generation") ||
+		strings.HasPrefix(c.Request.URL.Path, "/api/v1/services/aigc/video-generation/video-synthesis") ||
+		strings.HasPrefix(c.Request.URL.Path, "/api/v1/tasks/") ||
 		strings.Contains(c.Request.URL.Path, "/pg/video/generations") ||
-		strings.Contains(c.Request.URL.Path, "/volcengine") {
+		strings.Contains(c.Request.URL.Path, "/volcengine") ||
+		strings.HasPrefix(c.Request.URL.Path, "/api/v3/contents/generations/tasks") {
 		relayMode := relayconstant.RelayModeUnknown
 		if c.Request.Method == http.MethodPost {
 			req, err := getModelFromRequest(c)

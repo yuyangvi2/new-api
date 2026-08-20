@@ -82,6 +82,26 @@ func TestSeedanceOfficialParseTaskResultUnknownStatusFails(t *testing.T) {
 	assert.Equal(t, "unknown status: paused", result.Reason)
 }
 
+func TestSeedanceOfficialRequestURL(t *testing.T) {
+	adaptor := &SeedanceOfficialTaskAdaptor{}
+
+	assert.Equal(
+		t,
+		"https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks",
+		adaptor.requestURL("https://ark.cn-beijing.volces.com"),
+	)
+	assert.Equal(
+		t,
+		"https://gateway.example.com/volcengine/api/v3/contents/generations/tasks",
+		adaptor.requestURL("https://gateway.example.com/volcengine"),
+	)
+	assert.Equal(
+		t,
+		"https://gateway.example.com/api/v3/contents/generations/tasks",
+		adaptor.requestURL("https://gateway.example.com/api/v3/contents/generations/tasks"),
+	)
+}
+
 func TestSeedanceOfficialValidateRequestBounds(t *testing.T) {
 	hugeDuration := dto.IntValue(3601)
 	hugeFrames := dto.IntValue(86401)

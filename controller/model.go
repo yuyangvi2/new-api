@@ -165,8 +165,22 @@ func buildOpenAIModel(modelName string, ownerByModel map[string]string) dto.Open
 	if owner, ok := ownerByModel[modelName]; ok && owner != "" {
 		oaiModel.OwnedBy = owner
 	}
+	if inferredOwner := inferModelOwner(modelName, oaiModel.OwnedBy); inferredOwner != "" {
+		oaiModel.OwnedBy = inferredOwner
+	}
 	oaiModel.SupportedEndpointTypes = model.GetModelSupportEndpointTypes(modelName)
 	return oaiModel
+}
+
+func inferModelOwner(modelName string, currentOwner string) string {
+	if currentOwner != "" && currentOwner != "openai" && currentOwner != "custom" {
+		return ""
+	}
+	normalized := strings.ToLower(strings.TrimSpace(modelName))
+	if strings.HasPrefix(normalized, "deepseek") {
+		return "deepseek"
+	}
+	return ""
 }
 
 type modelListGroups struct {
@@ -205,7 +219,7 @@ func getModelListGroups(c *gin.Context) (modelListGroups, error) {
 	}, nil
 }
 
-func ListModels(c *gin.Context, modelType int) {
+func getVisibleOpenAIModels(c *gin.Context) ([]dto.OpenAIModels, error) {
 	acceptUnsetRatioModel := operation_setting.SelfUseModeEnabled
 	if !acceptUnsetRatioModel {
 		userId := c.GetInt("id")
@@ -220,11 +234,7 @@ func ListModels(c *gin.Context, modelType int) {
 	userModelNames := make([]string, 0)
 	groups, err := getModelListGroups(c)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"message": "get user group failed",
-		})
-		return
+		return nil, err
 	}
 	ownerGroups := groups.ownerGroups
 	modelLimitEnable := common.GetContextKeyBool(c, constant.ContextKeyTokenModelLimitEnabled)
@@ -232,7 +242,10 @@ func ListModels(c *gin.Context, modelType int) {
 		s, ok := common.GetContextKey(c, constant.ContextKeyTokenModelLimit)
 		var tokenModelLimit map[string]bool
 		if ok {
-			tokenModelLimit = s.(map[string]bool)
+			tokenModelLimit, ok = s.(map[string]bool)
+			if !ok {
+				tokenModelLimit = map[string]bool{}
+			}
 		} else {
 			tokenModelLimit = map[string]bool{}
 		}
@@ -276,6 +289,15 @@ func ListModels(c *gin.Context, modelType int) {
 	for _, modelName := range userModelNames {
 		userOpenAiModels = append(userOpenAiModels, buildOpenAIModel(modelName, ownerByModel))
 	}
+	return userOpenAiModels, nil
+}
+
+func ListModels(c *gin.Context, modelType int) {
+	userOpenAiModels, err := getVisibleOpenAIModels(c)
+	if err != nil {
+		renderModelEndpointError(c, modelType, http.StatusInternalServerError, "get user group failed", "server_error", "", types.ErrorCodeQueryDataError)
+		return
+	}
 
 	switch modelType {
 	case constant.ChannelTypeAnthropic:
@@ -288,11 +310,17 @@ func ListModels(c *gin.Context, modelType int) {
 				Type:        "model",
 			}
 		}
+		firstID := ""
+		lastID := ""
+		if len(useranthropicModels) > 0 {
+			firstID = useranthropicModels[0].ID
+			lastID = useranthropicModels[len(useranthropicModels)-1].ID
+		}
 		c.JSON(200, gin.H{
 			"data":     useranthropicModels,
-			"first_id": useranthropicModels[0].ID,
+			"first_id": firstID,
 			"has_more": false,
-			"last_id":  useranthropicModels[len(useranthropicModels)-1].ID,
+			"last_id":  lastID,
 		})
 	case constant.ChannelTypeGemini:
 		userGeminiModels := make([]dto.GeminiModel, len(userOpenAiModels))
@@ -338,7 +366,15 @@ func EnabledListModels(c *gin.Context) {
 
 func RetrieveModel(c *gin.Context, modelType int) {
 	modelId := c.Param("model")
-	if aiModel, ok := openAIModelsMap[modelId]; ok {
+	userOpenAiModels, err := getVisibleOpenAIModels(c)
+	if err != nil {
+		renderModelEndpointError(c, modelType, http.StatusInternalServerError, "get user group failed", "server_error", "", types.ErrorCodeQueryDataError)
+		return
+	}
+	aiModel, ok := lo.Find(userOpenAiModels, func(item dto.OpenAIModels) bool {
+		return item.Id == modelId
+	})
+	if ok {
 		switch modelType {
 		case constant.ChannelTypeAnthropic:
 			c.JSON(200, dto.AnthropicModel{
@@ -347,17 +383,40 @@ func RetrieveModel(c *gin.Context, modelType int) {
 				DisplayName: aiModel.Id,
 				Type:        "model",
 			})
+		case constant.ChannelTypeGemini:
+			c.JSON(200, dto.GeminiModel{
+				Name:        aiModel.Id,
+				DisplayName: aiModel.Id,
+			})
 		default:
 			c.JSON(200, aiModel)
 		}
 	} else {
-		openAIError := types.OpenAIError{
-			Message: fmt.Sprintf("The model '%s' does not exist", modelId),
-			Type:    "invalid_request_error",
-			Param:   "model",
-			Code:    "model_not_found",
-		}
-		c.JSON(200, gin.H{
+		message := fmt.Sprintf("The model '%s' does not exist", modelId)
+		renderModelEndpointError(c, modelType, http.StatusNotFound, message, "invalid_request_error", "model", types.ErrorCodeModelNotFound)
+	}
+}
+
+func renderModelEndpointError(c *gin.Context, modelType int, statusCode int, message string, errorType string, param string, code types.ErrorCode) {
+	openAIError := types.OpenAIError{
+		Message: message,
+		Type:    errorType,
+		Param:   param,
+		Code:    code,
+	}
+	newAPIError := types.WithOpenAIError(openAIError, statusCode, types.ErrOptionWithSkipRetry())
+	switch modelType {
+	case constant.ChannelTypeAnthropic:
+		c.JSON(statusCode, gin.H{
+			"type":  "error",
+			"error": newAPIError.ToClaudeError(),
+		})
+	case constant.ChannelTypeGemini:
+		c.JSON(statusCode, gin.H{
+			"error": newAPIError.ToGeminiError(),
+		})
+	default:
+		c.JSON(statusCode, gin.H{
 			"error": openAIError,
 		})
 	}

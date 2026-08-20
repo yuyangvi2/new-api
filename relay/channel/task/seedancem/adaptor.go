@@ -259,6 +259,11 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 		return "", nil, service.TaskErrorWrapperLocal(fmt.Errorf("task_id is empty"), "invalid_response", http.StatusInternalServerError)
 	}
 
+	if isSeedanceMOfficialTaskPath(c.Request.URL.Path) {
+		c.JSON(http.StatusOK, gin.H{"id": publicTaskID(info, r.ID)})
+		return r.ID, responseBody, nil
+	}
+
 	ov := dto.NewOpenAIVideo()
 	ov.ID = info.PublicTaskID
 	ov.TaskID = info.PublicTaskID
@@ -266,6 +271,18 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 	ov.Model = info.OriginModelName
 	c.JSON(http.StatusOK, ov)
 	return r.ID, responseBody, nil
+}
+
+func isSeedanceMOfficialTaskPath(path string) bool {
+	return strings.HasPrefix(path, "/contents/generations/tasks") ||
+		strings.HasPrefix(path, "/api/v3/contents/generations/tasks")
+}
+
+func publicTaskID(info *relaycommon.RelayInfo, fallback string) string {
+	if info != nil && info.TaskRelayInfo != nil && strings.TrimSpace(info.PublicTaskID) != "" {
+		return info.PublicTaskID
+	}
+	return fallback
 }
 
 func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy string) (*http.Response, error) {
@@ -376,6 +393,41 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(originTask *model.Task) ([]byte, erro
 		}
 	}
 	return common.Marshal(ov)
+}
+
+func (a *TaskAdaptor) ConvertToSeedanceMVideo(originTask *model.Task) ([]byte, error) {
+	var r responseTask
+	if len(originTask.Data) > 0 {
+		if err := common.Unmarshal(originTask.Data, &r); err != nil {
+			return nil, errors.Wrap(err, "unmarshal seedance-m task data failed")
+		}
+	}
+	r.ID = originTask.TaskID
+	r.Model = firstNonEmpty(originTask.Properties.OriginModelName, r.Model)
+	r.Status = seedanceMOfficialStatus(originTask.Status)
+	r.CreatedAt = originTask.CreatedAt
+	r.UpdatedAt = originTask.UpdatedAt
+	if r.Content.VideoURL == "" {
+		r.Content.VideoURL = originTask.GetResultURL()
+	}
+	if originTask.Status == model.TaskStatusFailure {
+		r.Error.Code = firstNonEmpty(r.Error.Code, "task_failed")
+		r.Error.Message = firstNonEmpty(r.Error.Message, originTask.FailReason)
+	}
+	return common.Marshal(r)
+}
+
+func seedanceMOfficialStatus(status model.TaskStatus) string {
+	switch status {
+	case model.TaskStatusSuccess:
+		return "succeeded"
+	case model.TaskStatusFailure:
+		return "failed"
+	case model.TaskStatusQueued, model.TaskStatusSubmitted:
+		return "queued"
+	default:
+		return "running"
+	}
 }
 
 func (a *TaskAdaptor) GetModelList() []string {

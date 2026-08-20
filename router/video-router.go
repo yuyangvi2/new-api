@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/volcengine"
@@ -78,6 +79,9 @@ func SetVideoRouter(router *gin.Engine) {
 	// Drop-in compatibility for clients whose Seedance Official adaptor appends
 	// /api/v3/contents/generations/tasks directly to the configured base URL.
 	registerSeedanceAPIV3TaskRoutes(router.Group("/api/v3"))
+	registerSeedanceMOfficialTaskRoutes(router.Group(""))
+	registerHailuoOfficialTaskRoutes(router.Group("/v1"))
+	registerAliOfficialTaskRoutes(router.Group("/api/v1"))
 }
 
 func registerSeedanceAPIV3TaskRoutes(seedanceAPIV3Group *gin.RouterGroup) {
@@ -86,6 +90,33 @@ func registerSeedanceAPIV3TaskRoutes(seedanceAPIV3Group *gin.RouterGroup) {
 	{
 		seedanceAPIV3Group.POST("/contents/generations/tasks", controller.RelayTask)
 		seedanceAPIV3Group.GET("/contents/generations/tasks/:task_id", controller.RelayTaskFetch)
+	}
+}
+
+func registerSeedanceMOfficialTaskRoutes(seedanceMGroup *gin.RouterGroup) {
+	seedanceMGroup.Use(middleware.RouteTag("relay"))
+	seedanceMGroup.Use(middleware.TokenAuth(), middleware.RequireChannelType(constant.ChannelTypeSeedanceM), middleware.Distribute())
+	{
+		seedanceMGroup.POST("/contents/generations/tasks", controller.RelayTask)
+		seedanceMGroup.GET("/contents/generations/tasks/:task_id", controller.RelayTaskFetch)
+	}
+}
+
+func registerHailuoOfficialTaskRoutes(hailuoGroup *gin.RouterGroup) {
+	hailuoGroup.Use(middleware.RouteTag("relay"))
+	hailuoGroup.Use(middleware.TokenAuth(), middleware.RequireChannelType(constant.ChannelTypeMiniMax), middleware.Distribute())
+	{
+		hailuoGroup.POST("/video_generation", controller.RelayTask)
+		hailuoGroup.GET("/query/video_generation", controller.RelayTaskFetch)
+	}
+}
+
+func registerAliOfficialTaskRoutes(aliGroup *gin.RouterGroup) {
+	aliGroup.Use(middleware.RouteTag("relay"))
+	aliGroup.Use(middleware.TokenAuth(), middleware.RequireChannelType(constant.ChannelTypeAli), middleware.Distribute())
+	{
+		aliGroup.POST("/services/aigc/video-generation/video-synthesis", controller.RelayTask)
+		aliGroup.GET("/tasks/:task_id", controller.RelayTaskFetch)
 	}
 }
 

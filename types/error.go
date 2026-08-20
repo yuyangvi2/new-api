@@ -23,6 +23,12 @@ type ClaudeError struct {
 	Message string `json:"message,omitempty"`
 }
 
+type GeminiError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Status  string `json:"status"`
+}
+
 type ErrorType string
 
 const (
@@ -218,7 +224,10 @@ func (e *NewAPIError) ToClaudeError() ClaudeError {
 		if openAIError, ok := e.RelayError.(OpenAIError); ok {
 			result = ClaudeError{
 				Message: e.Error(),
-				Type:    fmt.Sprintf("%v", openAIError.Code),
+				Type:    ClaudeErrorTypeForStatus(e.StatusCode, e.errorCode),
+			}
+			if result.Type == "" {
+				result.Type = fmt.Sprintf("%v", openAIError.Code)
 			}
 		}
 	case ErrorTypeClaudeError:
@@ -228,7 +237,7 @@ func (e *NewAPIError) ToClaudeError() ClaudeError {
 	default:
 		result = ClaudeError{
 			Message: e.Error(),
-			Type:    string(e.errorType),
+			Type:    ClaudeErrorTypeForStatus(e.StatusCode, e.errorCode),
 		}
 	}
 	if e.errorCode != ErrorCodeCountTokenFailed {
@@ -237,7 +246,86 @@ func (e *NewAPIError) ToClaudeError() ClaudeError {
 	if result.Message == "" {
 		result.Message = string(e.errorType)
 	}
+	if result.Type == "" {
+		result.Type = "api_error"
+	}
 	return result
+}
+
+func (e *NewAPIError) ToGeminiError() GeminiError {
+	statusCode := e.StatusCode
+	if statusCode == 0 {
+		statusCode = http.StatusInternalServerError
+	}
+	message := e.Error()
+	if e.errorCode != ErrorCodeCountTokenFailed {
+		message = common.MaskSensitiveInfo(message)
+	}
+	if message == "" {
+		message = string(e.errorType)
+	}
+	return GeminiError{
+		Code:    statusCode,
+		Message: message,
+		Status:  GeminiStatusForHTTPStatus(statusCode),
+	}
+}
+
+func ClaudeErrorTypeForStatus(statusCode int, errorCode ErrorCode) string {
+	switch statusCode {
+	case http.StatusUnauthorized:
+		return "authentication_error"
+	case http.StatusForbidden:
+		return "permission_error"
+	case http.StatusNotFound:
+		return "not_found_error"
+	case http.StatusTooManyRequests:
+		return "rate_limit_error"
+	case http.StatusServiceUnavailable:
+		return "overloaded_error"
+	}
+	if statusCode >= http.StatusBadRequest && statusCode < http.StatusInternalServerError {
+		return "invalid_request_error"
+	}
+	if statusCode >= http.StatusInternalServerError {
+		return "api_error"
+	}
+	if errorCode != "" {
+		return string(errorCode)
+	}
+	return "api_error"
+}
+
+func GeminiStatusForHTTPStatus(statusCode int) string {
+	switch statusCode {
+	case http.StatusBadRequest:
+		return "INVALID_ARGUMENT"
+	case http.StatusUnauthorized:
+		return "UNAUTHENTICATED"
+	case http.StatusForbidden:
+		return "PERMISSION_DENIED"
+	case http.StatusNotFound:
+		return "NOT_FOUND"
+	case http.StatusConflict:
+		return "ABORTED"
+	case http.StatusTooManyRequests:
+		return "RESOURCE_EXHAUSTED"
+	case 499:
+		return "CANCELLED"
+	case http.StatusInternalServerError:
+		return "INTERNAL"
+	case http.StatusNotImplemented:
+		return "UNIMPLEMENTED"
+	case http.StatusServiceUnavailable:
+		return "UNAVAILABLE"
+	case http.StatusGatewayTimeout:
+		return "DEADLINE_EXCEEDED"
+	default:
+		if statusCode >= http.StatusBadRequest && statusCode < http.StatusInternalServerError {
+			return "INVALID_ARGUMENT"
+		}
+		return "INTERNAL"
+	}
 }
 
 type NewAPIErrorOptions func(*NewAPIError)

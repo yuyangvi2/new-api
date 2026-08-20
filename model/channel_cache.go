@@ -105,22 +105,22 @@ func SyncChannelCache(frequency int) {
 	}
 }
 
-func GetRandomSatisfiedChannel(group string, model string, retry int, requestPath string) (*Channel, error) {
+func GetRandomSatisfiedChannel(group string, model string, retry int, requestPath string, requiredChannelType int) (*Channel, error) {
 	// if memory cache is disabled, get channel directly from database
 	if !common.MemoryCacheEnabled {
-		return GetChannel(group, model, retry, requestPath)
+		return GetChannel(group, model, retry, requestPath, requiredChannelType)
 	}
 
 	channelSyncLock.RLock()
 	defer channelSyncLock.RUnlock()
 
 	// First, try to find channels with the exact model name.
-	channels := filterChannelsByRequestPath(group2model2channels[group][model], requestPath)
+	channels := filterChannelsByRequest(group2model2channels[group][model], requestPath, requiredChannelType)
 
 	// If no channels found, try to find channels with the normalized model name.
 	if len(channels) == 0 {
 		normalizedModel := ratio_setting.FormatMatchingModelName(model)
-		channels = filterChannelsByRequestPath(group2model2channels[group][normalizedModel], requestPath)
+		channels = filterChannelsByRequest(group2model2channels[group][normalizedModel], requestPath, requiredChannelType)
 	}
 
 	if len(channels) == 0 {
@@ -207,8 +207,8 @@ func GetRandomSatisfiedChannel(group string, model string, retry int, requestPat
 // configured routes matches requestPath. All other channel types always pass.
 // When requestPath is empty (non-relay callers) filtering is skipped.
 // Caller must hold channelSyncLock (read lock). The cached slice is never mutated.
-func filterChannelsByRequestPath(channels []int, requestPath string) []int {
-	if requestPath == "" || len(channels) == 0 {
+func filterChannelsByRequest(channels []int, requestPath string, requiredChannelType int) []int {
+	if (requestPath == "" && requiredChannelType <= 0) || len(channels) == 0 {
 		return channels
 	}
 	filtered := make([]int, 0, len(channels))
@@ -217,6 +217,9 @@ func filterChannelsByRequestPath(channels []int, requestPath string) []int {
 		if !ok {
 			// keep it so the downstream consistency error is raised as before
 			filtered = append(filtered, channelId)
+			continue
+		}
+		if requiredChannelType > 0 && channel.Type != requiredChannelType {
 			continue
 		}
 		if channel.Type != constant.ChannelTypeAdvancedCustom {
