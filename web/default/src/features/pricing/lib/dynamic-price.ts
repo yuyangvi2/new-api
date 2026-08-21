@@ -22,6 +22,8 @@ import { TOKEN_UNIT_DIVISORS } from '../constants'
 import type { PricingModel, TokenUnit } from '../types'
 import {
   BILLING_PRICING_VARS,
+  applyMultiplierRangeToTier,
+  getRequestRuleMultiplierRange,
   parseTiersFromExpr,
   splitBillingExprAndRequestRules,
   tryParseRequestRuleExpr,
@@ -44,6 +46,7 @@ export type DynamicPriceEntry = {
   label: string
   shortLabel: string
   value: number
+  maxValue?: number
   formatted: string
   variable: BillingVar
 }
@@ -108,12 +111,34 @@ export function formatDynamicUnitPrice(
   })
 }
 
+function formatDynamicUnitPriceRange(
+  minValuePerMillionTokens: number,
+  maxValuePerMillionTokens: number | undefined,
+  options: DynamicPriceOptions
+): string {
+  if (
+    maxValuePerMillionTokens == null ||
+    !Number.isFinite(maxValuePerMillionTokens) ||
+    maxValuePerMillionTokens <= minValuePerMillionTokens
+  ) {
+    return formatDynamicUnitPrice(minValuePerMillionTokens, options)
+  }
+
+  return `${formatDynamicUnitPrice(
+    minValuePerMillionTokens,
+    options
+  )} ~ ${formatDynamicUnitPrice(maxValuePerMillionTokens, options)}`
+}
+
 export function getDynamicPricingTiers(model: PricingModel): ParsedTier[] {
   if (!isDynamicPricingModel(model)) return []
-  const { billingExpr } = splitBillingExprAndRequestRules(
+  const { billingExpr, requestRuleExpr } = splitBillingExprAndRequestRules(
     model.billing_expr || ''
   )
-  return parseTiersFromExpr(billingExpr)
+  const tiers = parseTiersFromExpr(billingExpr)
+  const multiplierRange = getRequestRuleMultiplierRange(requestRuleExpr)
+  if (!multiplierRange) return tiers
+  return tiers.map((tier) => applyMultiplierRangeToTier(tier, multiplierRange))
 }
 
 export function hasDynamicRequestRules(model: PricingModel): boolean {
@@ -134,6 +159,9 @@ export function getDynamicPriceEntries(
     if (!variable.field) return []
     const value = Number(tier[variable.field])
     if (!Number.isFinite(value) || value <= 0) return []
+    const maxValue = Number(tier[`${variable.field}Max`])
+    const effectiveMaxValue =
+      Number.isFinite(maxValue) && maxValue > value ? maxValue : undefined
 
     return [
       {
@@ -142,7 +170,12 @@ export function getDynamicPriceEntries(
         label: variable.label,
         shortLabel: variable.shortLabel,
         value,
-        formatted: formatDynamicUnitPrice(value, options),
+        maxValue: effectiveMaxValue,
+        formatted: formatDynamicUnitPriceRange(
+          value,
+          effectiveMaxValue,
+          options
+        ),
         variable,
       },
     ]

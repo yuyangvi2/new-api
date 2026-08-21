@@ -237,6 +237,8 @@ export type TierCondition = {
 export type ParsedTier = {
   label: string
   conditions: TierCondition[]
+  multiplierMin?: number
+  multiplierMax?: number
   [field: string]: unknown
 }
 
@@ -265,10 +267,226 @@ function parseTierBody(bodyStr: string): Record<string, number> {
   return tier
 }
 
+function findTopLevelTernary(expr: string): {
+  questionIndex: number
+  colonIndex: number
+} | null {
+  let depth = 0
+  let questionIndex = -1
+  for (let index = 0; index < expr.length; index += 1) {
+    const char = expr[index]
+    if (char === '(') depth += 1
+    if (char === ')') depth -= 1
+    if (depth !== 0) continue
+    if (char === '?' && questionIndex < 0) {
+      questionIndex = index
+      continue
+    }
+    if (char === ':' && questionIndex >= 0) {
+      return { questionIndex, colonIndex: index }
+    }
+  }
+  return null
+}
+
+function parsePositiveNumericLiteral(expr: string): number | null {
+  const body = unwrapOuterParens(expr)
+  if (!NUMERIC_LITERAL_REGEX.test(body)) return null
+  const value = Number(body)
+  if (!Number.isFinite(value) || value <= 0) return null
+  return value
+}
+
+function parseMultiplierValues(expr: string): number[] | null {
+  const body = unwrapOuterParens(expr)
+  const directValue = parsePositiveNumericLiteral(body)
+  if (directValue !== null) return [directValue]
+
+  const ternary = findTopLevelTernary(body)
+  if (!ternary) return null
+
+  const whenTrue = parsePositiveNumericLiteral(
+    body.slice(ternary.questionIndex + 1, ternary.colonIndex)
+  )
+  const whenFalse = parsePositiveNumericLiteral(
+    body.slice(ternary.colonIndex + 1)
+  )
+  if (whenTrue === null || whenFalse === null) return null
+  return [whenTrue, whenFalse]
+}
+
+function parseTopLevelMultiplierRange(expr: string): {
+  min: number
+  max: number
+} | null {
+  const parts = splitTopLevelMultiply(expr)
+  if (parts.length < 2 || !unwrapOuterParens(parts[0]).startsWith('tier(')) {
+    return null
+  }
+
+  let min = 1
+  let max = 1
+  for (const part of parts.slice(1)) {
+    const values = parseMultiplierValues(part)
+    if (!values) return null
+    min *= Math.min(...values)
+    max *= Math.max(...values)
+  }
+
+  return { min, max }
+}
+
+export function getRequestRuleMultiplierRange(expr: string): {
+  min: number
+  max: number
+} | null {
+  const groups = tryParseRequestRuleExpr(expr)
+  if (!groups || groups.length === 0) return null
+
+  const exclusiveMultipliers = getExclusiveTimeRangeMultipliers(groups)
+  if (exclusiveMultipliers) {
+    return {
+      min: Math.min(1, ...exclusiveMultipliers),
+      max: Math.max(1, ...exclusiveMultipliers),
+    }
+  }
+
+  let min = 1
+  let max = 1
+  for (const group of groups) {
+    const multiplier = Number(group.multiplier)
+    if (!Number.isFinite(multiplier) || multiplier <= 0) return null
+    min *= Math.min(multiplier, 1)
+    max *= Math.max(multiplier, 1)
+  }
+
+  return { min, max }
+}
+
+function getTimeRangeDomain(timeFunc: TimeFunc): { min: number; max: number } {
+  switch (timeFunc) {
+    case 'hour':
+      return { min: 0, max: 24 }
+    case 'minute':
+      return { min: 0, max: 60 }
+    case 'weekday':
+      return { min: 0, max: 7 }
+    case 'month':
+      return { min: 1, max: 13 }
+    case 'day':
+      return { min: 1, max: 32 }
+    default:
+      return { min: 0, max: 24 }
+  }
+}
+
+function getTimeRangeSegments(
+  condition: TimeCondition
+): Array<{ start: number; end: number }> | null {
+  if (condition.mode !== MATCH_RANGE) return null
+  const start = Number(condition.rangeStart)
+  const end = Number(condition.rangeEnd)
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start === end) {
+    return null
+  }
+
+  const domain = getTimeRangeDomain(condition.timeFunc)
+  if (
+    start < domain.min ||
+    start >= domain.max ||
+    end < domain.min ||
+    end >= domain.max
+  ) {
+    return null
+  }
+
+  if (start < end) return [{ start, end }]
+  return [
+    { start, end: domain.max },
+    { start: domain.min, end },
+  ]
+}
+
+function timeSegmentsOverlap(
+  left: { start: number; end: number },
+  right: { start: number; end: number }
+): boolean {
+  return left.start < right.end && right.start < left.end
+}
+
+function getExclusiveTimeRangeMultipliers(
+  groups: RequestRuleGroup[]
+): number[] | null {
+  const timeRanges: Array<{
+    condition: TimeCondition
+    multiplier: number
+    segments: Array<{ start: number; end: number }>
+  }> = []
+
+  for (const group of groups) {
+    if (!isSingleTimeRangeGroup(group)) return null
+    const condition = group.conditions[0] as TimeCondition
+    const multiplier = Number(group.multiplier)
+    const segments = getTimeRangeSegments(condition)
+    if (!Number.isFinite(multiplier) || multiplier <= 0 || !segments) {
+      return null
+    }
+    timeRanges.push({ condition, multiplier, segments })
+  }
+
+  for (let i = 0; i < timeRanges.length; i += 1) {
+    for (let j = i + 1; j < timeRanges.length; j += 1) {
+      const left = timeRanges[i]
+      const right = timeRanges[j]
+      if (
+        left.condition.timeFunc !== right.condition.timeFunc ||
+        left.condition.timezone !== right.condition.timezone
+      ) {
+        return null
+      }
+      if (
+        left.segments.some((leftSegment) =>
+          right.segments.some((rightSegment) =>
+            timeSegmentsOverlap(leftSegment, rightSegment)
+          )
+        )
+      ) {
+        return null
+      }
+    }
+  }
+
+  return timeRanges.map((range) => range.multiplier)
+}
+
+export function applyMultiplierRangeToTier(
+  tier: ParsedTier,
+  range: { min: number; max: number } | null
+): ParsedTier {
+  if (!range) return tier
+
+  const nextTier: ParsedTier = {
+    ...tier,
+    multiplierMin: range.min,
+    multiplierMax: range.max,
+  }
+
+  for (const variable of BILLING_PRICING_VARS) {
+    if (!variable.field) continue
+    const value = Number(nextTier[variable.field])
+    if (!Number.isFinite(value)) continue
+    nextTier[variable.field] = value * range.min
+    nextTier[`${variable.field}Max`] = value * range.max
+  }
+
+  return nextTier
+}
+
 export function parseTiersFromExpr(exprStr: string): ParsedTier[] {
   if (!exprStr) return []
   try {
     const { body } = stripExprVersion(exprStr)
+    const multiplierRange = parseTopLevelMultiplierRange(body.trim())
     const condGroup =
       `((?:(?:p|c|len)\\s*(?:<|<=|>|>=)\\s*[\\d.eE+]+)` +
       `(?:\\s*&&\\s*(?:p|c|len)\\s*(?:<|<=|>|>=)\\s*[\\d.eE+]+)*)`
@@ -296,7 +514,7 @@ export function parseTiersFromExpr(exprStr: string): ParsedTier[] {
       const tier = parseTierBody(m[3]) as ParsedTier
       tier.label = m[2]
       tier.conditions = conditions
-      tiers.push(tier)
+      tiers.push(applyMultiplierRangeToTier(tier, multiplierRange))
     }
     return tiers
   } catch {
@@ -307,9 +525,9 @@ export function parseTiersFromExpr(exprStr: string): ParsedTier[] {
 export function normalizeTierLabel(label: string | undefined): string {
   if (!label) return ''
   return label
-    .replace(/<[=＝]?|≤|＜[=＝]?/g, '<')
-    .replace(/>[=＝]?|≥|＞[=＝]?/g, '>')
-    .replace(/\s+/g, '')
+    .replaceAll(/<[=＝]?|≤|＜[=＝]?/g, '<')
+    .replaceAll(/>[=＝]?|≥|＞[=＝]?/g, '>')
+    .replaceAll(/\s+/g, '')
     .toLowerCase()
 }
 
@@ -353,6 +571,24 @@ function splitTopLevelAnd(expr: string): string[] {
   return parts.filter(Boolean)
 }
 
+function splitTopLevelOr(expr: string): string[] {
+  const parts: string[] = []
+  let start = 0
+  let depth = 0
+  for (let i = 0; i < expr.length; i += 1) {
+    const c = expr[i]
+    if (c === '(') depth += 1
+    if (c === ')') depth -= 1
+    if (depth === 0 && expr.slice(i, i + 4) === ' || ') {
+      parts.push(expr.slice(start, i).trim())
+      start = i + 4
+      i += 3
+    }
+  }
+  parts.push(expr.slice(start).trim())
+  return parts.filter(Boolean)
+}
+
 function parseExprLiteral(raw: string): string | null {
   const text = raw.trim()
   if (text === 'true' || text === 'false') return text
@@ -364,36 +600,72 @@ function parseExprLiteral(raw: string): string | null {
   }
 }
 
+function tryParseMinuteOfDayRangeCondition(
+  expr: string
+): RequestCondition | null {
+  const m = unwrapOuterParens(expr).match(
+    /^\(hour\("([^"]+)"\) \* 60 \+ minute\("\1"\)\) >= (\d+) (&&|\|\|) \(hour\("\1"\) \* 60 \+ minute\("\1"\)\) < (\d+)$/
+  )
+  if (!m) return null
+
+  const start = Number(m[2])
+  const end = Number(m[4])
+  if (
+    !Number.isInteger(start) ||
+    !Number.isInteger(end) ||
+    start < 0 ||
+    start >= 1440 ||
+    end < 0 ||
+    end >= 1440 ||
+    start === end ||
+    start % 60 !== 0 ||
+    end % 60 !== 0
+  ) {
+    return null
+  }
+
+  const isCrossMidnight = start > end
+  if ((m[3] === '||') !== isCrossMidnight) return null
+
+  return {
+    source: 'time',
+    timeFunc: 'hour',
+    timezone: m[1],
+    mode: MATCH_RANGE,
+    value: '',
+    rangeStart: String(start / 60),
+    rangeEnd: String(end / 60),
+  }
+}
+
 function tryParseTimeCondition(expr: string): RequestCondition | null {
-  let m = expr.match(
-    /^(hour|minute|weekday|month|day)\("([^"]+)"\) >= ([\d.eE+-]+) \|\| \1\("\2"\) < ([\d.eE+-]+)$/
+  const body = unwrapOuterParens(expr)
+  const minuteRange = tryParseMinuteOfDayRangeCondition(body)
+  if (minuteRange) return minuteRange
+
+  let m = body.match(
+    /^(hour|minute|weekday|month|day)\("([^"]+)"\) >= ([\d.eE+-]+) (&&|\|\|) \1\("\2"\) < ([\d.eE+-]+)$/
   )
   if (m) {
+    const start = Number(m[3])
+    const end = Number(m[5])
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start === end) {
+      return null
+    }
+    const isCrossRange = start > end
+    if ((m[4] === '||') !== isCrossRange) return null
+
     return {
       source: 'time',
       timeFunc: m[1] as TimeFunc,
       timezone: m[2],
       mode: MATCH_RANGE,
       value: '',
-      rangeStart: m[3],
-      rangeEnd: m[4],
+      rangeStart: String(start),
+      rangeEnd: String(end),
     }
   }
-  m = expr.match(
-    /^\((hour|minute|weekday|month|day)\("([^"]+)"\) >= ([\d.eE+-]+) \|\| \1\("\2"\) < ([\d.eE+-]+)\)$/
-  )
-  if (m) {
-    return {
-      source: 'time',
-      timeFunc: m[1] as TimeFunc,
-      timezone: m[2],
-      mode: MATCH_RANGE,
-      value: '',
-      rangeStart: m[3],
-      rangeEnd: m[4],
-    }
-  }
-  m = expr.match(
+  m = body.match(
     /^(hour|minute|weekday|month|day)\("([^"]+)"\) (==|>=|<) ([\d.eE+-]+)$/
   )
   if (m) {
@@ -426,24 +698,26 @@ function tryParseRequestCondition(expr: string): RequestCondition | null {
   if (m) return { source: 'param', path: m[1], mode: MATCH_EXISTS, value: '' }
 
   m = expr.match(/^has\(header\("([^"]+)"\), ((?:"(?:[^"\\]|\\.)*"))\)$/)
-  if (m)
+  if (m) {
     return {
       source: 'header',
       path: m[1],
       mode: MATCH_CONTAINS,
       value: JSON.parse(m[2]) as string,
     }
+  }
 
   m = expr.match(
     /^param\("([^"]+)"\) != nil && has\(param\("([^"]+)"\), ((?:"(?:[^"\\]|\\.)*"))\)$/
   )
-  if (m && m[1] === m[2])
+  if (m && m[1] === m[2]) {
     return {
       source: 'param',
       path: m[1],
       mode: MATCH_CONTAINS,
       value: JSON.parse(m[3]) as string,
     }
+  }
 
   m = expr.match(
     /^param\("([^"]+)"\) != nil && param\("([^"]+)"\) (>|>=|<|<=) ([\d.eE+-]+)$/
@@ -473,14 +747,19 @@ function tryParseRequestCondition(expr: string): RequestCondition | null {
   return null
 }
 
-function tryParseRuleGroupFactor(part: string): RequestRuleGroup | null {
-  const m = part.match(/^\((.+) \? ([\d.eE+-]+) : 1\)$/s)
-  if (!m) return null
+function isSingleTimeRangeGroup(group: RequestRuleGroup): boolean {
+  return (
+    group.conditions.length === 1 &&
+    group.conditions[0]?.source === SOURCE_TIME &&
+    group.conditions[0]?.mode === MATCH_RANGE
+  )
+}
 
-  const conditionStr = m[1]
-  const multiplier = m[2]
+function tryParseRuleGroupConditions(expr: string): RequestCondition[] | null {
+  const directCondition = tryParseRequestCondition(expr)
+  if (directCondition) return [directCondition]
 
-  const andParts = splitTopLevelAnd(conditionStr)
+  const andParts = splitTopLevelAnd(unwrapOuterParens(expr))
   const conditions: RequestCondition[] = []
   for (const ap of andParts) {
     const cond = tryParseRequestCondition(ap.trim())
@@ -488,7 +767,26 @@ function tryParseRuleGroupFactor(part: string): RequestRuleGroup | null {
     conditions.push(cond)
   }
   if (conditions.length === 0) return null
-  return { conditions, multiplier }
+  return conditions
+}
+
+function tryParseRuleGroupFactors(part: string): RequestRuleGroup[] | null {
+  const m = part.match(/^\((.+)\s*\?\s*([\d.eE+-]+)\s*:\s*1\)$/s)
+  if (!m) return null
+
+  const conditionStr = unwrapOuterParens(m[1])
+  const multiplier = m[2]
+
+  const groups: RequestRuleGroup[] = []
+  const orParts = splitTopLevelOr(conditionStr)
+  for (const part of orParts) {
+    const conditions = tryParseRuleGroupConditions(part)
+    if (!conditions) return null
+    groups.push({ conditions, multiplier })
+  }
+
+  if (groups.length <= 1) return groups
+  return groups.every(isSingleTimeRangeGroup) ? groups : null
 }
 
 export function tryParseRequestRuleExpr(
@@ -500,9 +798,9 @@ export function tryParseRequestRuleExpr(
   const parts = splitTopLevelMultiply(trimmed)
   const groups: RequestRuleGroup[] = []
   for (const part of parts) {
-    const group = tryParseRuleGroupFactor(part)
-    if (!group) return null
-    groups.push(group)
+    const nextGroups = tryParseRuleGroupFactors(part)
+    if (!nextGroups) return null
+    groups.push(...nextGroups)
   }
   return groups
 }
@@ -613,7 +911,7 @@ export function getRequestRuleMatchOptions(source: string): MatchOption[] {
       { value: MATCH_EQ, labelKey: 'Equals' },
       { value: MATCH_GTE, labelKey: 'Greater than or equal' },
       { value: MATCH_LT, labelKey: 'Less than' },
-      { value: MATCH_RANGE, labelKey: 'Overnight range' },
+      { value: MATCH_RANGE, labelKey: 'Time range' },
     ]
   }
   const base: MatchOption[] = [
@@ -642,12 +940,12 @@ function isTimeFunc(value: unknown): value is TimeFunc {
 export function normalizeCondition(
   cond: Partial<RequestCondition> | null | undefined
 ): RequestCondition {
-  const source =
-    cond?.source === 'time'
-      ? 'time'
-      : cond?.source === 'header'
-        ? 'header'
-        : 'param'
+  let source: RequestCondition['source'] = 'param'
+  if (cond?.source === 'time') {
+    source = 'time'
+  } else if (cond?.source === 'header') {
+    source = 'header'
+  }
 
   if (source === 'time') {
     const timeCond = cond as Partial<TimeCondition> | null | undefined
@@ -707,7 +1005,9 @@ function buildTimeConditionExpr(cond: TimeCondition): string {
     if (!NUMERIC_LITERAL_REGEX.test(s) || !NUMERIC_LITERAL_REGEX.test(e)) {
       return ''
     }
-    return `${fn} >= ${s} || ${fn} < ${e}`
+    return Number(s) < Number(e)
+      ? `${fn} >= ${s} && ${fn} < ${e}`
+      : `${fn} >= ${s} || ${fn} < ${e}`
   }
   const v = normalized.value.trim()
   if (!NUMERIC_LITERAL_REGEX.test(v)) return ''

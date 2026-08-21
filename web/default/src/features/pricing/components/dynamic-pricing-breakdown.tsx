@@ -34,6 +34,8 @@ import {
   MATCH_LT,
   MATCH_RANGE,
   SOURCE_TIME,
+  applyMultiplierRangeToTier,
+  getRequestRuleMultiplierRange,
   normalizeTierLabel,
   parseTiersFromExpr,
   splitBillingExprAndRequestRules,
@@ -153,6 +155,24 @@ function describeGroup(
     .join(' && ')
 }
 
+function formatTierPriceValue(
+  tier: ParsedTier,
+  field: string,
+  symbol: string,
+  rate: number
+): string {
+  const value = Number(tier[field])
+  if (!Number.isFinite(value) || value <= 0) return '-'
+
+  const maxValue = Number(tier[`${field}Max`])
+  const formattedValue = `${symbol}${(value * rate).toFixed(4)}`
+  if (!Number.isFinite(maxValue) || maxValue <= value) {
+    return formattedValue
+  }
+
+  return `${formattedValue} ~ ${symbol}${(maxValue * rate).toFixed(4)}`
+}
+
 export function DynamicPricingBreakdown({
   billingExpr,
   matchedTierLabel,
@@ -178,7 +198,12 @@ export function DynamicPricingBreakdown({
 
   const { tiers, ruleGroups } = useMemo(() => {
     const split = splitBillingExprAndRequestRules(expr)
-    const parsedTiers = parseTiersFromExpr(split.billingExpr)
+    const multiplierRange = getRequestRuleMultiplierRange(
+      split.requestRuleExpr || ''
+    )
+    const parsedTiers = parseTiersFromExpr(split.billingExpr).map((tier) =>
+      applyMultiplierRangeToTier(tier, multiplierRange)
+    )
     const parsedRules = tryParseRequestRuleExpr(split.requestRuleExpr || '')
     return {
       tiers: parsedTiers,
@@ -260,15 +285,16 @@ export function DynamicPricingBreakdown({
             {t('Tiered price table')}
           </div>
           <div className='space-y-1.5 sm:hidden'>
-            {tiers.map((tier, i) => {
+            {tiers.map((tier) => {
               const condSummary = formatConditionSummary(tier.conditions, t)
+              const tierKey = `tier-mobile-${tier.label}-${condSummary}`
               const isMatched =
                 matchedTierLabel != null &&
                 matchedTierLabel !== '' &&
                 tier.label === matchedTierLabel
               return (
                 <div
-                  key={`tier-mobile-${i}`}
+                  key={tierKey}
                   className={cn(
                     'rounded-md border p-2',
                     isMatched && 'border-emerald-500/40 bg-emerald-500/10'
@@ -297,8 +323,11 @@ export function DynamicPricingBreakdown({
                   )}
                   <div className='grid grid-cols-2 gap-x-3 gap-y-1.5'>
                     {visiblePriceFields.map((v) => {
-                      const value = Number(
-                        tier[v.field as string as keyof ParsedTier] || 0
+                      const priceText = formatTierPriceValue(
+                        tier,
+                        v.field as string,
+                        symbol,
+                        rate
                       )
                       return (
                         <div key={v.field} className='min-w-0'>
@@ -311,9 +340,7 @@ export function DynamicPricingBreakdown({
                               compact ? 'text-xs' : 'text-sm font-semibold'
                             )}
                           >
-                            {value > 0
-                              ? `${symbol}${(value * rate).toFixed(4)}`
-                              : '-'}
+                            {priceText}
                           </div>
                         </div>
                       )
@@ -396,12 +423,15 @@ export function DynamicPricingBreakdown({
                   compact ? 'py-2' : 'py-2.5'
                 ),
                 cell: (tier: ParsedTier) => {
-                  const value = Number(
-                    tier[v.field as string as keyof ParsedTier] || 0
+                  const priceText = formatTierPriceValue(
+                    tier,
+                    v.field as string,
+                    symbol,
+                    rate
                   )
-                  return value > 0 ? (
+                  return priceText !== '-' ? (
                     <span className={cn(!compact && 'font-semibold')}>
-                      {`${symbol}${(value * rate).toFixed(4)}`}
+                      {priceText}
                     </span>
                   ) : (
                     '-'
@@ -425,9 +455,9 @@ export function DynamicPricingBreakdown({
             {t('Conditional multipliers')}
           </div>
           <ul className='space-y-1.5'>
-            {ruleGroups.map((group, gi) => (
+            {ruleGroups.map((group) => (
               <li
-                key={`group-${gi}`}
+                key={`${group.multiplier}-${describeGroup(group, t)}`}
                 className='bg-muted/50 flex items-center justify-between gap-3 rounded-md px-3 py-2'
               >
                 <span
