@@ -2,6 +2,7 @@ package vclm
 
 import (
 	"io"
+	"math"
 	"net/http/httptest"
 	"testing"
 
@@ -118,4 +119,19 @@ func TestAdjustBillingOnCompleteUsesFloatingFinalUnitDeduction(t *testing.T) {
 	}, result)
 
 	assert.Equal(t, common.QuotaFromFloat(1.5*0.14*common.QuotaPerUnit), actualQuota)
+}
+
+func TestAdjustBillingOnCompleteRejectsInvalidBillingUnits(t *testing.T) {
+	originalModelRatio := ratio_setting.ModelRatio2JSONString()
+	t.Cleanup(func() { require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(originalModelRatio)) })
+	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{"kling-v2-6":0.14}`))
+	task := &model.Task{Properties: model.Properties{OriginModelName: "kling-v2-6"}}
+	adaptor := &TaskAdaptor{}
+
+	for _, units := range []float64{relaycommon.MaxTaskBillingUnits + 1, math.Inf(1), math.NaN()} {
+		quota, clamp := adaptor.AdjustBillingOnCompleteWithClamp(task, &relaycommon.TaskInfo{BillingUnits: units})
+		assert.Zero(t, quota)
+		assert.Nil(t, clamp)
+		assert.Zero(t, adaptor.AdjustBillingOnComplete(task, &relaycommon.TaskInfo{BillingUnits: units}))
+	}
 }

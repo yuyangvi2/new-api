@@ -21,7 +21,7 @@ type SFImageRequest struct {
 	Prompt            string  `json:"prompt"`
 	NegativePrompt    string  `json:"negative_prompt,omitempty"`
 	ImageSize         string  `json:"image_size,omitempty"`
-	BatchSize         uint    `json:"batch_size,omitempty"`
+	BatchSize         *uint   `json:"batch_size,omitempty"`
 	Seed              uint64  `json:"seed,omitempty"`
 	NumInferenceSteps uint    `json:"num_inference_steps,omitempty"`
 	GuidanceScale     float64 `json:"guidance_scale,omitempty"`

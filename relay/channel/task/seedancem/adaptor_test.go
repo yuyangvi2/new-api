@@ -311,24 +311,60 @@ func TestEstimateBillingUsesVolcengineBasePriceForUserCharge(t *testing.T) {
 		Metadata: map[string]any{"resolution": "720p"},
 	})
 
-	ratios := (&TaskAdaptor{}).EstimateBilling(ctx, &relaycommon.RelayInfo{
+	info := &relaycommon.RelayInfo{
 		OriginModelName: "doubao-seedance-2.0",
 		ChannelMeta:     &relaycommon.ChannelMeta{},
+		TaskRelayInfo:   &relaycommon.TaskRelayInfo{},
 		PriceData: types.PriceData{
 			Quota:          4_968_000,
 			GroupRatioInfo: types.GroupRatioInfo{GroupRatio: 1},
 		},
-	})
+	}
+	ratios := (&TaskAdaptor{}).EstimateBilling(ctx, info)
 
 	assert.Empty(t, ratios)
+	require.NotNil(t, info.TaskRelayInfo.UsageBilling)
+	assert.Equal(t, relaycommon.TaskPricingSourceSeedanceMUsage, info.TaskRelayInfo.UsageBilling.PricingSource)
+	assert.Equal(t, "720p", info.TaskRelayInfo.UsageBilling.Resolution)
 }
 
-func TestAdjustBillingOnCompleteKeepsPrechargedQuota(t *testing.T) {
-	quota := (&TaskAdaptor{}).AdjustBillingOnComplete(&model.Task{Quota: 123649}, &relaycommon.TaskInfo{
+func TestAdjustBillingOnCompleteUsesUpstreamUsageTokens(t *testing.T) {
+	originalQuotaPerUnit := common.QuotaPerUnit
+	t.Cleanup(func() { common.QuotaPerUnit = originalQuotaPerUnit })
+	common.QuotaPerUnit = 1_000_000
+	hasVideo := false
+	task := &model.Task{
+		Quota: 123649,
+		Properties: model.Properties{
+			OriginModelName: "doubao-seedance-2.0",
+		},
+		PrivateData: model.TaskPrivateData{
+			BillingContext: &model.TaskBillingContext{
+				GroupRatio: 1,
+				UsageBilling: &relaycommon.TaskUsageBillingContext{
+					PricingSource:      relaycommon.TaskPricingSourceSeedanceMUsage,
+					PricePerMillionCNY: 22,
+					USDExchangeRate:    1,
+					Resolution:         "720p",
+					HasVideoInput:      &hasVideo,
+				},
+			},
+		},
+	}
+	quota, clamp := (&TaskAdaptor{}).AdjustBillingOnCompleteWithClamp(task, &relaycommon.TaskInfo{
 		TotalTokens: 40594,
 	})
 
-	assert.Equal(t, 123649, quota)
+	assert.Nil(t, clamp)
+	assert.Equal(t, common.QuotaFromFloat(40594*22), quota)
+}
+
+func TestAdjustBillingOnCompleteFallsBackWithoutUsageContext(t *testing.T) {
+	task := &model.Task{Quota: 123649}
+	quota, clamp := (&TaskAdaptor{}).AdjustBillingOnCompleteWithClamp(task, &relaycommon.TaskInfo{TotalTokens: 40594})
+	assert.Zero(t, quota)
+	assert.Nil(t, clamp)
+	assert.Equal(t, task.Quota, (&TaskAdaptor{}).AdjustBillingOnComplete(task, nil))
 }
 
 func TestParseTaskResultMapsStatusesAndLastFrame(t *testing.T) {

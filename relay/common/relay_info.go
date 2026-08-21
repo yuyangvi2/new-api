@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -721,7 +722,10 @@ type TaskUsageBillingContext struct {
 	HasVideoInput      *bool   `json:"has_video_input,omitempty"`
 }
 
-const TaskPricingSourceSeedanceOfficialUsage = "seedance_official_usage"
+const (
+	TaskPricingSourceSeedanceOfficialUsage = "seedance_official_usage"
+	TaskPricingSourceSeedanceMUsage        = "seedance_m_usage"
+)
 
 type TaskVideoSuperResolution struct {
 	TargetResolution string `json:"target_resolution,omitempty"`
@@ -830,6 +834,13 @@ type TaskInfo struct {
 	CompletionTokens int     `json:"completion_tokens,omitempty"` // 用于按倍率计费
 	TotalTokens      int     `json:"total_tokens,omitempty"`      // 用于按倍率计费
 	BillingUnits     float64 `json:"-"`                           // 上游返回的浮点计费单元，内部结算使用
+}
+
+// MaxTaskBillingUnits bounds a single task's untrusted upstream deduction.
+const MaxTaskBillingUnits = 10_000
+
+func ValidTaskBillingUnits(units float64) bool {
+	return units > 0 && units <= MaxTaskBillingUnits && !math.IsNaN(units) && !math.IsInf(units, 0)
 }
 
 func FailTaskInfo(reason string) *TaskInfo {

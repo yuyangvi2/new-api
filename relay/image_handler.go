@@ -122,6 +122,15 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 	if request.N != nil {
 		imageN = *request.N
 	}
+	if info.ChannelType == constant.ChannelTypeSiliconFlow {
+		if rawBatchSize, ok := request.Extra["batch_size"]; ok {
+			var batchSize uint
+			if err := common.Unmarshal(rawBatchSize, &batchSize); err == nil {
+				imageN = batchSize
+			}
+		}
+		info.PriceData.AddOtherRatio("n", float64(imageN))
+	}
 
 	// n is handled via OtherRatio so it is applied exactly once in quota
 	// calculation (both price-based and ratio-based paths).

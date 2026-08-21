@@ -20,15 +20,19 @@ func SetVideoRouter(router *gin.Engine) {
 
 	videoV1Router := router.Group("/v1")
 	videoV1Router.Use(middleware.RouteTag("relay"))
+	seedanceMTaskRouter := videoV1Router.Group("/seedance-m/video-tasks")
+	seedanceMTaskRouter.Use(middleware.TokenAuth())
+	{
+		seedanceMTaskRouter.GET("", controller.ListSeedanceMVideoTasks)
+		seedanceMTaskRouter.GET("/:task_id", controller.GetSeedanceMVideoTask)
+		seedanceMTaskRouter.DELETE("/:task_id", controller.DeleteSeedanceMVideoTask)
+	}
 	videoV1Router.Use(middleware.TokenAuth(), middleware.Distribute())
 	{
 		videoV1Router.POST("/video/generations", controller.RelayTask)
 		videoV1Router.GET("/video/generations/:task_id", controller.RelayTaskFetch)
 		videoV1Router.POST("/videos/generations", controller.RelayTask)
 		videoV1Router.POST("/videos/:video_id/remix", controller.RelayTask)
-		videoV1Router.GET("/seedance-m/video-tasks", controller.ListSeedanceMVideoTasks)
-		videoV1Router.GET("/seedance-m/video-tasks/:upstream_task_id", controller.GetSeedanceMVideoTask)
-		videoV1Router.DELETE("/seedance-m/video-tasks/:upstream_task_id", controller.DeleteSeedanceMVideoTask)
 		videoV1Router.POST("/seedance-m/asset-groups", controller.CreateSeedanceMAssetGroup)
 		videoV1Router.POST("/seedance-m/asset-groups/query", controller.QuerySeedanceMAssetGroups)
 		videoV1Router.GET("/seedance-m/asset-groups/:group_id", controller.GetSeedanceMAssetGroup)

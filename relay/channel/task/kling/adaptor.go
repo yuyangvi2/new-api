@@ -260,8 +260,13 @@ func (a *TaskAdaptor) GetChannelName() string {
 }
 
 func (a *TaskAdaptor) AdjustBillingOnComplete(task *model.Task, taskResult *relaycommon.TaskInfo) int {
-	if taskResult == nil || taskResult.BillingUnits <= 0 {
-		return 0
+	quota, _ := a.AdjustBillingOnCompleteWithClamp(task, taskResult)
+	return quota
+}
+
+func (a *TaskAdaptor) AdjustBillingOnCompleteWithClamp(task *model.Task, taskResult *relaycommon.TaskInfo) (int, *common.QuotaClamp) {
+	if task == nil || taskResult == nil || !relaycommon.ValidTaskBillingUnits(taskResult.BillingUnits) {
+		return 0, nil
 	}
 	modelName := task.Properties.OriginModelName
 	if bc := task.PrivateData.BillingContext; bc != nil && bc.OriginModelName != "" {
@@ -269,13 +274,13 @@ func (a *TaskAdaptor) AdjustBillingOnComplete(task *model.Task, taskResult *rela
 	}
 	modelRatio, ok, _ := ratio_setting.GetModelRatio(modelName)
 	if !ok || modelRatio <= 0 {
-		return 0
+		return 0, nil
 	}
 	groupRatio := 1.0
 	if task.Group != "" {
 		groupRatio = ratio_setting.GetGroupRatio(task.Group)
 	}
-	return common.QuotaFromFloat(taskResult.BillingUnits * modelRatio * groupRatio * common.QuotaPerUnit)
+	return common.QuotaFromFloatChecked(taskResult.BillingUnits * modelRatio * groupRatio * common.QuotaPerUnit)
 }
 
 // ============================

@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -438,6 +439,40 @@ func TestRequestOpenAI2ClaudeMessage_ClaudeOpus48ThinkingUsesAdaptiveHighEffort(
 	require.Nil(t, claudeRequest.Temperature)
 	require.Nil(t, claudeRequest.TopP)
 	require.Nil(t, claudeRequest.TopK)
+}
+
+func TestRequestOpenAI2ClaudeMessage_AdaptiveModelsKeepAdaptiveForReasoningOverrides(t *testing.T) {
+	tests := []struct {
+		name       string
+		model      string
+		effort     string
+		reasoning  json.RawMessage
+		wantEffort string
+	}{
+		{name: "reasoning effort", model: "claude-opus-4-8", effort: "high", wantEffort: "high"},
+		{name: "reasoning max tokens", model: "claude-opus-4-7", reasoning: json.RawMessage(`{"max_tokens":1280}`), wantEffort: "low"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := dto.GeneralOpenAIRequest{
+				Model:           tt.model,
+				ReasoningEffort: tt.effort,
+				Reasoning:       tt.reasoning,
+				Messages: []dto.Message{{
+					Role:    "user",
+					Content: "hello",
+				}},
+			}
+
+			claudeRequest, err := RequestOpenAI2ClaudeMessage(nil, request)
+			require.NoError(t, err)
+			require.NotNil(t, claudeRequest.Thinking)
+			assert.Equal(t, "adaptive", claudeRequest.Thinking.Type)
+			assert.Nil(t, claudeRequest.Thinking.BudgetTokens)
+			require.JSONEq(t, `{"effort":"`+tt.wantEffort+`"}`, string(claudeRequest.OutputConfig))
+		})
+	}
 }
 
 func TestRequestOpenAI2ClaudeMessageKeepsNoParameterTools(t *testing.T) {
