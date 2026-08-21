@@ -159,6 +159,36 @@ func TestLogTaskConsumptionIncludesPublicTaskID(t *testing.T) {
 	assert.Equal(t, true, other["is_task"])
 }
 
+func TestLogTaskConsumptionRecordsViduEquivalentTokens(t *testing.T) {
+	truncate(t)
+	seedUser(t, 1, 1000000)
+
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/videos/generations", nil)
+	c.Set("username", "test_user")
+	c.Set("token_name", "test_token")
+
+	LogTaskConsumption(c, &relaycommon.RelayInfo{
+		UserId:          1,
+		TokenId:         1,
+		OriginModelName: "viduq2",
+		ChannelMeta:     &relaycommon.ChannelMeta{ChannelId: 1},
+		TaskRelayInfo:   &relaycommon.TaskRelayInfo{Action: "SubmitTextToVideoJob"},
+		PriceData: types.PriceData{
+			ModelRatio: 0.5,
+			Quota:      1500,
+			GroupRatioInfo: types.GroupRatioInfo{
+				GroupRatio: 0.5,
+			},
+		},
+	})
+
+	var log model.Log
+	require.NoError(t, model.LOG_DB.Where("user_id = ?", 1).First(&log).Error)
+	assert.Equal(t, 6000, log.CompletionTokens)
+}
+
 func makeTask(userId, channelId, quota, tokenId int, billingSource string, subscriptionId int) *model.Task {
 	return &model.Task{
 		TaskID:    "task_" + time.Now().Format("150405.000"),

@@ -55,15 +55,22 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 		other["upstream_model_name"] = info.UpstreamModelName
 	}
 	attachQuotaSaturation(c, info, other)
+	completionTokens := 0
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(info.OriginModelName)), "vidu") &&
+		info.PriceData.ModelRatio > 0 && info.PriceData.GroupRatioInfo.GroupRatio > 0 {
+		completionTokens = common.QuotaRound(float64(info.PriceData.Quota) /
+			(info.PriceData.ModelRatio * info.PriceData.GroupRatioInfo.GroupRatio))
+	}
 	model.RecordConsumeLog(c, info.UserId, model.RecordConsumeLogParams{
-		ChannelId: info.ChannelId,
-		ModelName: info.OriginModelName,
-		TokenName: tokenName,
-		Quota:     info.PriceData.Quota,
-		Content:   logContent,
-		TokenId:   info.TokenId,
-		Group:     info.UsingGroup,
-		Other:     other,
+		ChannelId:        info.ChannelId,
+		CompletionTokens: completionTokens,
+		ModelName:        info.OriginModelName,
+		TokenName:        tokenName,
+		Quota:            info.PriceData.Quota,
+		Content:          logContent,
+		TokenId:          info.TokenId,
+		Group:            info.UsingGroup,
+		Other:            other,
 	})
 	model.UpdateUserUsedQuotaAndRequestCount(info.UserId, info.PriceData.Quota)
 	model.UpdateChannelUsedQuota(info.ChannelId, info.PriceData.Quota)
