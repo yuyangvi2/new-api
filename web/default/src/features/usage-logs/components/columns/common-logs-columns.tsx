@@ -49,6 +49,7 @@ import {
   formatModelName,
   getFirstResponseTimeColor,
   getResponseTimeColor,
+  getViduEquivalentCompletionTokens,
   getTieredBillingSummary,
   hasAnyCacheTokens,
   parseLogOther,
@@ -736,7 +737,7 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
         const other = parseLogOther(log.other)
 
         const promptTokens = log.prompt_tokens || 0
-        const completionTokens = log.completion_tokens || 0
+        const completionTokens = getViduEquivalentCompletionTokens(log, other)
         if (promptTokens === 0 && completionTokens === 0) {
           return <span className='text-muted-foreground text-xs'>-</span>
         }

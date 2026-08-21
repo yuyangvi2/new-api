@@ -106,6 +106,34 @@ export function parseLogOther(other: string): LogOtherData | null {
   }
 }
 
+export function getViduEquivalentCompletionTokens(
+  log: UsageLog,
+  other: LogOtherData | null
+): number {
+  if (log.completion_tokens > 0 || !/^vidu/i.test(log.model_name)) {
+    return log.completion_tokens || 0
+  }
+
+  const modelRatio = other?.model_ratio
+  const groupRatio = other?.group_ratio
+  if (
+    modelRatio == null ||
+    groupRatio == null ||
+    !Number.isFinite(modelRatio) ||
+    !Number.isFinite(groupRatio) ||
+    modelRatio <= 0 ||
+    groupRatio <= 0 ||
+    log.quota <= 0
+  ) {
+    return log.completion_tokens || 0
+  }
+
+  const equivalentTokens = log.quota / (modelRatio * groupRatio)
+  return Number.isFinite(equivalentTokens) && equivalentTokens > 0
+    ? Math.round(equivalentTokens)
+    : 0
+}
+
 /**
  * Get time color based on duration (in seconds)
  */
