@@ -248,7 +248,9 @@
     "Add tags...": "Добавить теги...",
     "Add tier": "Добавить уровень",
     "Add time condition": "Добавить условие по времени",
+    "Add time period": "Добавить временной период",
     "Add time rule group": "Добавить группу правил по времени",
+    "Add token condition": "Добавить условие токенов",
     "Add Uptime Kuma Group": "Добавить группу Uptime Kuma",
     "Add URL": "Добавить URL",
     "Add User": "Добавить пользователя",
@@ -1758,6 +1760,7 @@
     "End": "End",
     "End Error": "Ошибка завершения",
     "End Reason": "Причина завершения",
+    "End time": "Время окончания",
     "End Time": "Время окончания",
     "End-user identifier for abuse monitoring": "Идентификатор конечного пользователя для мониторинга злоупотреблений",
     "Endpoint": "Точка доступа",
@@ -3344,6 +3347,7 @@
     "of 3:": "из 3:",
     "off": "выкл.",
     "Off": "Отключено",
+    "Off-peak": "Непиковый период",
     "Official": "Официальный",
     "Official Alipay": "Официальный Alipay",
     "Official Claude Messages": "Официальные Claude Messages",
@@ -4678,6 +4682,7 @@
     "Start for free with generous limits. No credit card required.": "Начните бесплатно с щедрыми лимитами. Кредитная карта не требуется.",
     "Start in model marketplace to shortlist capability.": "Начните с витрины моделей, чтобы выбрать подходящие возможности.",
     "Start now": "Начать",
+    "Start time": "Время начала",
     "Start Time": "Время начала",
     "Start with the compatible endpoint": "Начните с совместимого эндпоинта",
     "Started": "Запущен",
@@ -5030,6 +5035,7 @@
     "tiers": "уровни",
     "Time": "Время",
     "Time Granularity": "Гранулярность времени",
+    "Time period": "Временной период",
     "Time remaining": "Осталось времени",
     "Time window for rate limiting": "Временное окно для ограничения скорости запросов",
     "Time-based": "Зависит от времени",
@@ -5056,6 +5062,7 @@
     "Toggle theme": "Переключить тему",
     "Token": "Токен",
     "Token Breakdown": "Детализация токенов",
+    "Token condition": "Условие токенов",
     "Token Endpoint": "Конечная точка токена",
     "Token Endpoint (Optional)": "Конечная точка токена (необязательно)",
     "Token estimator": "Оценка токенов",
@@ -5708,7 +5715,6 @@
     "排行榜": "Рейтинги",
     "控制台": "Консоль",
     "文档": "Документация",
-    "模型广场": "Каталог моделей",
-    "Off-peak": "Непиковый период"
+    "模型广场": "Каталог моделей"
   }
 }

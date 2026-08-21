@@ -248,7 +248,9 @@
     "Add tags...": "Add tags...",
     "Add tier": "Add tier",
     "Add time condition": "Add time condition",
+    "Add time period": "Add time period",
     "Add time rule group": "Add time rule group",
+    "Add token condition": "Add token condition",
     "Add Uptime Kuma Group": "Add Uptime Kuma Group",
     "Add URL": "Add URL",
     "Add User": "Add User",
@@ -1758,6 +1760,7 @@
     "End": "End",
     "End Error": "End Error",
     "End Reason": "End Reason",
+    "End time": "End time",
     "End Time": "End Time",
     "End-user identifier for abuse monitoring": "End-user identifier for abuse monitoring",
     "Endpoint": "Endpoint",
@@ -3344,6 +3347,7 @@
     "of 3:": "of 3:",
     "off": "off",
     "Off": "Off",
+    "Off-peak": "Off-peak",
     "Official": "Official",
     "Official Alipay": "Official Alipay",
     "Official Claude Messages": "Official Claude Messages",
@@ -4678,6 +4682,7 @@
     "Start for free with generous limits. No credit card required.": "Start for free with generous limits. No credit card required.",
     "Start in model marketplace to shortlist capability.": "Start in model marketplace to shortlist capability.",
     "Start now": "Start now",
+    "Start time": "Start time",
     "Start Time": "Start Time",
     "Start with the compatible endpoint": "Start with the compatible endpoint",
     "Started": "Started",
@@ -5030,6 +5035,7 @@
     "tiers": "tiers",
     "Time": "Time",
     "Time Granularity": "Time Granularity",
+    "Time period": "Time period",
     "Time remaining": "Time remaining",
     "Time window for rate limiting": "Time window for rate limiting",
     "Time-based": "Time-based",
@@ -5056,6 +5062,7 @@
     "Toggle theme": "Toggle theme",
     "Token": "Token",
     "Token Breakdown": "Token Breakdown",
+    "Token condition": "Token condition",
     "Token Endpoint": "Token Endpoint",
     "Token Endpoint (Optional)": "Token Endpoint (Optional)",
     "Token estimator": "Token estimator",
@@ -5708,7 +5715,6 @@
     "排行榜": "Rankings",
     "控制台": "Console",
     "文档": "Docs",
-    "模型广场": "Model Square",
-    "Off-peak": "Off-peak"
+    "模型广场": "Model Square"
   }
 }

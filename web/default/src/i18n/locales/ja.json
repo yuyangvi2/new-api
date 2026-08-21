@@ -248,7 +248,9 @@
     "Add tags...": "タグを追加...",
     "Add tier": "ティアを追加",
     "Add time condition": "時間条件を追加",
+    "Add time period": "時間帯を追加",
     "Add time rule group": "時間ルールグループを追加",
+    "Add token condition": "トークン条件を追加",
     "Add Uptime Kuma Group": "Uptime Kuma グループを追加",
     "Add URL": "URLを追加",
     "Add User": "ユーザーを追加",
@@ -1758,6 +1760,7 @@
     "End": "終了",
     "End Error": "終了エラー",
     "End Reason": "終了理由",
+    "End time": "終了時刻",
     "End Time": "終了時間",
     "End-user identifier for abuse monitoring": "悪用検知用のエンドユーザー識別子",
     "Endpoint": "エンドポイント",
@@ -3344,6 +3347,7 @@
     "of 3:": "3のうち:",
     "off": "オフ",
     "Off": "オフ",
+    "Off-peak": "オフピーク",
     "Official": "公式",
     "Official Alipay": "公式Alipay",
     "Official Claude Messages": "公式 Claude Messages",
@@ -4678,6 +4682,7 @@
     "Start for free with generous limits. No credit card required.": "豊富な無料枠で始められます。クレジットカードは不要です。",
     "Start in model marketplace to shortlist capability.": "まずモデルマーケットで機能候補を絞り込みます。",
     "Start now": "今すぐ開始",
+    "Start time": "開始時刻",
     "Start Time": "開始時間",
     "Start with the compatible endpoint": "互換エンドポイントから開始",
     "Started": "起動時刻",
@@ -5030,6 +5035,7 @@
     "tiers": "階層",
     "Time": "時間",
     "Time Granularity": "時間の粒度",
+    "Time period": "時間帯",
     "Time remaining": "残り時間",
     "Time window for rate limiting": "レート制限の時間枠",
     "Time-based": "時間条件あり",
@@ -5056,6 +5062,7 @@
     "Toggle theme": "テーマの切り替え",
     "Token": "トークン",
     "Token Breakdown": "トークン内訳",
+    "Token condition": "トークン条件",
     "Token Endpoint": "トークンエンドポイント",
     "Token Endpoint (Optional)": "トークンエンドポイント (オプション)",
     "Token estimator": "トークン見積り",
@@ -5708,7 +5715,6 @@
     "排行榜": "ランキング",
     "控制台": "コンソール",
     "文档": "ドキュメント",
-    "模型广场": "モデルマーケット",
-    "Off-peak": "オフピーク"
+    "模型广场": "モデルマーケット"
   }
 }

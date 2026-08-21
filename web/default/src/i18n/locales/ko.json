@@ -248,7 +248,9 @@
     "Add tags...": "Add tags...",
     "Add tier": "Add tier",
     "Add time condition": "Add time condition",
+    "Add time period": "시간대 추가",
     "Add time rule group": "Add time rule group",
+    "Add token condition": "토큰 조건 추가",
     "Add Uptime Kuma Group": "Add Uptime Kuma Group",
     "Add URL": "Add URL",
     "Add User": "Add User",
@@ -1758,6 +1760,7 @@
     "End": "End",
     "End Error": "End Error",
     "End Reason": "End Reason",
+    "End time": "종료 시간",
     "End Time": "End Time",
     "End-user identifier for abuse monitoring": "End-user identifier for abuse monitoring",
     "Endpoint": "Endpoint",
@@ -3344,6 +3347,7 @@
     "of 3:": "of 3:",
     "off": "off",
     "Off": "끄기",
+    "Off-peak": "비수기",
     "Official": "Official",
     "Official Alipay": "공식 Alipay",
     "Official Claude Messages": "Official Claude Messages",
@@ -4678,6 +4682,7 @@
     "Start for free with generous limits. No credit card required.": "Start for free with generous limits. No credit card required.",
     "Start in model marketplace to shortlist capability.": "먼저 모델 마켓에서 기능 후보를 좁히세요.",
     "Start now": "지금 시작",
+    "Start time": "시작 시간",
     "Start Time": "Start Time",
     "Start with the compatible endpoint": "호환 엔드포인트부터 시작",
     "Started": "Started",
@@ -5030,6 +5035,7 @@
     "tiers": "tiers",
     "Time": "Time",
     "Time Granularity": "Time Granularity",
+    "Time period": "시간대",
     "Time remaining": "Time remaining",
     "Time window for rate limiting": "Time window for rate limiting",
     "Time-based": "Time-based",
@@ -5056,6 +5062,7 @@
     "Toggle theme": "Toggle theme",
     "Token": "Token",
     "Token Breakdown": "Token Breakdown",
+    "Token condition": "토큰 조건",
     "Token Endpoint": "Token Endpoint",
     "Token Endpoint (Optional)": "Token Endpoint (Optional)",
     "Token estimator": "Token estimator",
@@ -5708,7 +5715,6 @@
     "排行榜": "랭킹",
     "控制台": "콘솔",
     "文档": "문서",
-    "模型广场": "모델 광장",
-    "Off-peak": "비수기"
+    "模型广场": "모델 광장"
   }
 }

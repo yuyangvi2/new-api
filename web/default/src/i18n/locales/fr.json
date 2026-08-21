@@ -248,7 +248,9 @@
     "Add tags...": "Ajouter des étiquettes...",
     "Add tier": "Ajouter un palier",
     "Add time condition": "Ajouter une condition temporelle",
+    "Add time period": "Ajouter une plage horaire",
     "Add time rule group": "Ajouter un groupe de règles temporelles",
+    "Add token condition": "Ajouter une condition de jetons",
     "Add Uptime Kuma Group": "Ajouter un groupe Uptime Kuma",
     "Add URL": "Ajouter une URL",
     "Add User": "Ajouter un utilisateur",
@@ -1758,6 +1760,7 @@
     "End": "End",
     "End Error": "Erreur finale",
     "End Reason": "Raison de fin",
+    "End time": "Heure de fin",
     "End Time": "Heure de fin",
     "End-user identifier for abuse monitoring": "Identifiant d'utilisateur final pour la surveillance des abus",
     "Endpoint": "Point d'accès",
@@ -3344,6 +3347,7 @@
     "of 3:": "sur 3 :",
     "off": "désactivé",
     "Off": "Désactivé",
+    "Off-peak": "Heures creuses",
     "Official": "Officiel",
     "Official Alipay": "Alipay officiel",
     "Official Claude Messages": "Messages Claude officiels",
@@ -4678,6 +4682,7 @@
     "Start for free with generous limits. No credit card required.": "Commencez gratuitement avec des limites généreuses. Aucune carte de crédit requise.",
     "Start in model marketplace to shortlist capability.": "Commencez dans le marketplace pour présélectionner les capacités.",
     "Start now": "Commencer",
+    "Start time": "Heure de début",
     "Start Time": "Heure de début",
     "Start with the compatible endpoint": "Commencez par l'endpoint compatible",
     "Started": "Démarré",
@@ -5030,6 +5035,7 @@
     "tiers": "paliers",
     "Time": "Heure",
     "Time Granularity": "Granularité temporelle",
+    "Time period": "Plage horaire",
     "Time remaining": "Temps restant",
     "Time window for rate limiting": "Fenêtre de temps pour la limitation de débit",
     "Time-based": "Selon l’heure",
@@ -5056,6 +5062,7 @@
     "Toggle theme": "Basculer le thème",
     "Token": "Jeton",
     "Token Breakdown": "Détails des tokens",
+    "Token condition": "Condition de jetons",
     "Token Endpoint": "Point de terminaison de jeton",
     "Token Endpoint (Optional)": "Point de terminaison du jeton (Facultatif)",
     "Token estimator": "Estimation des jetons",
@@ -5708,7 +5715,6 @@
     "排行榜": "Classements",
     "控制台": "Console",
     "文档": "Docs",
-    "模型广场": "Marché de modèles",
-    "Off-peak": "Heures creuses"
+    "模型广场": "Marché de modèles"
   }
 }

@@ -248,7 +248,9 @@
     "Add tags...": "Thêm thẻ...",
     "Add tier": "Thêm bậc",
     "Add time condition": "Thêm điều kiện thời gian",
+    "Add time period": "Thêm khung thời gian",
     "Add time rule group": "Thêm nhóm quy tắc theo thời gian",
+    "Add token condition": "Thêm điều kiện token",
     "Add Uptime Kuma Group": "Thêm Nhóm Uptime Kuma",
     "Add URL": "Thêm URL",
     "Add User": "Thêm người dùng",
@@ -1758,6 +1760,7 @@
     "End": "End",
     "End Error": "Lỗi kết thúc",
     "End Reason": "Lý do kết thúc",
+    "End time": "Thời gian kết thúc",
     "End Time": "Thời gian kết thúc",
     "End-user identifier for abuse monitoring": "Định danh người dùng cuối để giám sát lạm dụng",
     "Endpoint": "Endpoint",
@@ -3344,6 +3347,7 @@
     "of 3:": "of 3:",
     "off": "off",
     "Off": "Tắt",
+    "Off-peak": "Ngoài giờ cao điểm",
     "Official": "Chính thức",
     "Official Alipay": "Alipay chính thức",
     "Official Claude Messages": "Claude Messages chính thức",
@@ -4678,6 +4682,7 @@
     "Start for free with generous limits. No credit card required.": "Bắt đầu miễn phí với giới hạn hào phóng. Không cần thẻ tín dụng.",
     "Start in model marketplace to shortlist capability.": "Bắt đầu từ chợ model để rút gọn theo năng lực.",
     "Start now": "Bắt đầu ngay",
+    "Start time": "Thời gian bắt đầu",
     "Start Time": "Thời gian bắt đầu",
     "Start with the compatible endpoint": "Bắt đầu với endpoint tương thích",
     "Started": "Đã khởi động",
@@ -5030,6 +5035,7 @@
     "tiers": "tầng",
     "Time": "Thời gian",
     "Time Granularity": "Độ chi tiết thời gian",
+    "Time period": "Khung thời gian",
     "Time remaining": "Thời gian còn lại",
     "Time window for rate limiting": "Cửa sổ thời gian cho giới hạn tốc độ",
     "Time-based": "Theo thời gian",
@@ -5056,6 +5062,7 @@
     "Toggle theme": "Chuyển đổi giao diện",
     "Token": "Mã thông báo",
     "Token Breakdown": "Chi tiết token",
+    "Token condition": "Điều kiện token",
     "Token Endpoint": "Điểm cuối Token",
     "Token Endpoint (Optional)": "Điểm cuối Token (Tùy chọn)",
     "Token estimator": "Ước tính token",
@@ -5708,7 +5715,6 @@
     "排行榜": "Bảng xếp hạng",
     "控制台": "Bảng điều khiển",
     "文档": "Tài liệu",
-    "模型广场": "Chợ mô hình",
-    "Off-peak": "Ngoài giờ cao điểm"
+    "模型广场": "Chợ mô hình"
   }
 }

@@ -88,13 +88,17 @@ import {
   type CacheMode,
   type ExtraTokenValues,
   type TierConditionInput,
+  type TokenTierConditionInput,
   type VisualConfig,
   type VisualTier,
   createDefaultVisualConfig,
+  createEmptyTimePeriodTierCondition,
+  createEmptyTokenTierCondition,
   evalExprLocally,
   exprUsesExtraVars,
   generateExprFromVisualConfig,
   getTierCacheMode,
+  isTimePeriodTierCondition,
   normalizeVisualConfig,
   normalizeVisualTier,
   tryParseVisualConfig,
@@ -110,14 +114,18 @@ const MEDIA_PRICE_VARS = BILLING_EXTRA_VARS.filter(
 )
 
 const CONDITION_INPUT_OPTIONS: {
-  value: TierConditionInput['var']
+  value: TokenTierConditionInput['var']
   labelKey: string
 }[] = [
   { value: 'len', labelKey: 'Full input length' },
   { value: 'p', labelKey: 'Billable input tokens' },
   { value: 'c', labelKey: 'Billable output tokens' },
 ]
-const OPS: TierConditionInput['op'][] = ['<', '<=', '>', '>=']
+const CONDITION_TYPE_OPTIONS = [
+  { value: 'token', labelKey: 'Token condition' },
+  { value: 'time_period', labelKey: 'Time period' },
+] as const
+const OPS: TokenTierConditionInput['op'][] = ['<', '<=', '>', '>=']
 
 type Preset = {
   key: string
@@ -429,34 +437,47 @@ type ConditionRowProps = {
 
 function ConditionRow({ condition, onChange, onRemove }: ConditionRowProps) {
   const { t } = useTranslation()
+  const isTimePeriod = isTimePeriodTierCondition(condition)
+  const tokenCondition = isTimePeriod
+    ? createEmptyTokenTierCondition()
+    : condition
+  const timeCondition = isTimePeriod
+    ? condition
+    : createEmptyTimePeriodTierCondition()
   const currentInputOption = CONDITION_INPUT_OPTIONS.find(
-    (option) => option.value === condition.var
+    (option) => option.value === tokenCondition.var
   )
 
+  const handleConditionTypeChange = (value: string) => {
+    onChange(
+      value === 'time_period'
+        ? createEmptyTimePeriodTierCondition()
+        : createEmptyTokenTierCondition()
+    )
+  }
+
   return (
-    <div className='flex items-center gap-2'>
+    <div className='flex flex-wrap items-center gap-2'>
       <Select
         items={[
-          ...CONDITION_INPUT_OPTIONS.map((option) => ({
+          ...CONDITION_TYPE_OPTIONS.map((option) => ({
             value: option.value,
             label: t(option.labelKey),
           })),
         ]}
-        value={condition.var}
+        value={isTimePeriod ? 'time_period' : 'token'}
         onValueChange={(value) =>
-          onChange({ ...condition, var: value as TierConditionInput['var'] })
+          value !== null && handleConditionTypeChange(value)
         }
       >
-        <SelectTrigger className='w-32' size='sm'>
+        <SelectTrigger className='w-36' size='sm'>
           <SelectValue>
-            {currentInputOption
-              ? t(currentInputOption.labelKey)
-              : condition.var}
+            {t(isTimePeriod ? 'Time period' : 'Token condition')}
           </SelectValue>
         </SelectTrigger>
         <SelectContent alignItemWithTrigger={false}>
           <SelectGroup>
-            {CONDITION_INPUT_OPTIONS.map((option) => (
+            {CONDITION_TYPE_OPTIONS.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {t(option.labelKey)}
               </SelectItem>
@@ -464,36 +485,126 @@ function ConditionRow({ condition, onChange, onRemove }: ConditionRowProps) {
           </SelectGroup>
         </SelectContent>
       </Select>
-      <Select
-        items={OPS.map((op) => ({ value: op, label: op }))}
-        value={condition.op}
-        onValueChange={(value) =>
-          onChange({ ...condition, op: value as TierConditionInput['op'] })
-        }
-      >
-        <SelectTrigger className='w-20' size='sm'>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent alignItemWithTrigger={false}>
-          <SelectGroup>
-            {OPS.map((op) => (
-              <SelectItem key={op} value={op}>
-                {op}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-      <DraftNumberInput
-        min={0}
-        value={condition.value}
-        onValueChange={(value) => onChange({ ...condition, value })}
-        placeholder='tokens'
-        className='w-32'
-      />
-      <span className='text-muted-foreground text-xs'>
-        {formatTokenHint(condition.value)}
-      </span>
+      {isTimePeriod ? (
+        <>
+          <Select
+            items={[
+              ...COMMON_TIMEZONES.map((tz) => ({
+                value: tz.value,
+                label: tz.label,
+              })),
+            ]}
+            value={timeCondition.timezone}
+            onValueChange={(value) =>
+              value !== null && onChange({ ...timeCondition, timezone: value })
+            }
+          >
+            <SelectTrigger className='w-56' size='sm'>
+              <SelectValue>
+                {COMMON_TIMEZONES.find(
+                  (tz) => tz.value === timeCondition.timezone
+                )?.label ?? timeCondition.timezone}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false}>
+              <SelectGroup>
+                {COMMON_TIMEZONES.map((tz) => (
+                  <SelectItem key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Input
+            type='time'
+            value={timeCondition.start}
+            onChange={(event) =>
+              onChange({ ...timeCondition, start: event.target.value })
+            }
+            aria-label={t('Start time')}
+            className='w-28'
+          />
+          <span className='text-muted-foreground text-xs'>~</span>
+          <Input
+            type='time'
+            value={timeCondition.end}
+            onChange={(event) =>
+              onChange({ ...timeCondition, end: event.target.value })
+            }
+            aria-label={t('End time')}
+            className='w-28'
+          />
+        </>
+      ) : (
+        <>
+          <Select
+            items={[
+              ...CONDITION_INPUT_OPTIONS.map((option) => ({
+                value: option.value,
+                label: t(option.labelKey),
+              })),
+            ]}
+            value={tokenCondition.var}
+            onValueChange={(value) =>
+              onChange({
+                ...tokenCondition,
+                var: value as TokenTierConditionInput['var'],
+              })
+            }
+          >
+            <SelectTrigger className='w-32' size='sm'>
+              <SelectValue>
+                {currentInputOption
+                  ? t(currentInputOption.labelKey)
+                  : tokenCondition.var}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false}>
+              <SelectGroup>
+                {CONDITION_INPUT_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {t(option.labelKey)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Select
+            items={OPS.map((op) => ({ value: op, label: op }))}
+            value={tokenCondition.op}
+            onValueChange={(value) =>
+              onChange({
+                ...tokenCondition,
+                op: value as TokenTierConditionInput['op'],
+              })
+            }
+          >
+            <SelectTrigger className='w-20' size='sm'>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false}>
+              <SelectGroup>
+                {OPS.map((op) => (
+                  <SelectItem key={op} value={op}>
+                    {op}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <DraftNumberInput
+            min={0}
+            value={tokenCondition.value}
+            onValueChange={(value) => onChange({ ...tokenCondition, value })}
+            placeholder='tokens'
+            className='w-32'
+          />
+          <span className='text-muted-foreground text-xs'>
+            {formatTokenHint(tokenCondition.value)}
+          </span>
+        </>
+      )}
       <Button
         variant='ghost'
         size='icon'
@@ -544,7 +655,7 @@ type VisualTierCardProps = {
   total: number
   onChange: (next: VisualTier) => void
   onRemove: () => void
-  onAddCondition: () => void
+  onAddCondition: (type: 'token' | 'time_period') => void
 }
 
 function VisualTierCard({
@@ -649,16 +760,28 @@ function VisualTierCard({
       <div className='space-y-1.5'>
         <div className='flex h-7 items-center justify-between'>
           <Label className='text-xs font-medium'>{t('Tier conditions')}</Label>
-          <Button
-            variant='ghost'
-            size='sm'
-            onClick={onAddCondition}
-            disabled={tier.conditions.length >= 2}
-            className='h-7 px-2 text-xs'
-          >
-            <Plus className='mr-1 h-3 w-3' />
-            {t('Add condition')}
-          </Button>
+          <div className='flex gap-1'>
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={() => onAddCondition('token')}
+              disabled={tier.conditions.length >= 2}
+              className='h-7 px-2 text-xs'
+            >
+              <Plus className='mr-1 h-3 w-3' />
+              {t('Add token condition')}
+            </Button>
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={() => onAddCondition('time_period')}
+              disabled={tier.conditions.length >= 2}
+              className='h-7 px-2 text-xs'
+            >
+              <Plus className='mr-1 h-3 w-3' />
+              {t('Add time period')}
+            </Button>
+          </div>
         </div>
         {tier.conditions.length === 0 ? (
           <p className='text-muted-foreground text-xs'>
@@ -796,7 +919,7 @@ function VisualEditor({ visualConfig, onChange }: VisualEditorProps) {
     if (lastIndex >= 0 && tiers[lastIndex].conditions.length === 0) {
       tiers[lastIndex] = normalizeVisualTier({
         ...tiers[lastIndex],
-        conditions: [{ var: 'len', op: '<', value: 200000 }],
+        conditions: [createEmptyTokenTierCondition()],
       })
     }
     tiers.push(
@@ -815,15 +938,20 @@ function VisualEditor({ visualConfig, onChange }: VisualEditorProps) {
     onChange({ ...config, tiers: tiers.length > 0 ? tiers : config.tiers })
   }
 
-  const handleAddCondition = (index: number) => {
+  const handleAddCondition = (index: number, type: 'token' | 'time_period') => {
     const tier = config.tiers[index]
     if (tier.conditions.length >= 2) return
     // Prefer `len` (input length) over `p`/`c` for tier conditions because
     // `p` is subject to auto-exclusion when sub-categories like `cr` are
     // priced separately, which can misroute long-input requests into shorter
     // tiers when cache-hits reduce the effective `p`.
-    const usedVars = new Set(tier.conditions.map((c) => c.var))
-    const nextVar: TierConditionInput['var'] = usedVars.has('len') ? 'c' : 'len'
+    const tokenConditions = tier.conditions.filter(
+      (condition): condition is TokenTierConditionInput =>
+        !isTimePeriodTierCondition(condition)
+    )
+    const usedVars = new Set(tokenConditions.map((c) => c.var))
+    const nextTokenCondition = createEmptyTokenTierCondition()
+    nextTokenCondition.var = usedVars.has('len') ? 'c' : 'len'
     onChange({
       ...config,
       tiers: config.tiers.map((current, i) =>
@@ -832,7 +960,9 @@ function VisualEditor({ visualConfig, onChange }: VisualEditorProps) {
               ...current,
               conditions: [
                 ...tier.conditions,
-                { var: nextVar, op: '<', value: 200000 },
+                type === 'time_period'
+                  ? createEmptyTimePeriodTierCondition()
+                  : nextTokenCondition,
               ],
             }
           : current
@@ -855,7 +985,7 @@ function VisualEditor({ visualConfig, onChange }: VisualEditorProps) {
           total={config.tiers.length}
           onChange={(next) => handleTierChange(index, next)}
           onRemove={() => handleRemoveTier(index)}
-          onAddCondition={() => handleAddCondition(index)}
+          onAddCondition={(type) => handleAddCondition(index, type)}
         />
       ))}
       <Button

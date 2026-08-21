@@ -248,7 +248,9 @@
     "Add tags...": "添加標簽...",
     "Add tier": "新增檔位",
     "Add time condition": "新增時间條件",
+    "Add time period": "新增分時時段",
     "Add time rule group": "新增時间規則組",
+    "Add token condition": "新增 Token 條件",
     "Add Uptime Kuma Group": "添加 Uptime Kuma 分組",
     "Add URL": "添加 URL",
     "Add User": "添加用戶",
@@ -1758,6 +1760,7 @@
     "End": "結束",
     "End Error": "結束錯误",
     "End Reason": "結束原因",
+    "End time": "結束時間",
     "End Time": "結束時间",
     "End-user identifier for abuse monitoring": "用于風险審计的终端用戶標识",
     "Endpoint": "端點",
@@ -3344,6 +3347,7 @@
     "of 3:": "共 3 个：",
     "off": "關閉",
     "Off": "關閉",
+    "Off-peak": "Off-peak",
     "Official": "官方",
     "Official Alipay": "支付寶官方",
     "Official Claude Messages": "官方 Claude Messages",
@@ -4678,6 +4682,7 @@
     "Start for free with generous limits. No credit card required.": "免费開始使用，額度充足，无需绑定信用卡。",
     "Start in model marketplace to shortlist capability.": "先在模型廣場按能力縮小候選範圍。",
     "Start now": "立即開始",
+    "Start time": "開始時間",
     "Start Time": "起始時间",
     "Start with the compatible endpoint": "從相容端點開始",
     "Started": "啟動時间",
@@ -5030,6 +5035,7 @@
     "tiers": "檔",
     "Time": "時间",
     "Time Granularity": "時间粒度",
+    "Time period": "分時時段",
     "Time remaining": "剩余時间",
     "Time window for rate limiting": "速率限制的時间窗口",
     "Time-based": "含時间條件",
@@ -5056,6 +5062,7 @@
     "Toggle theme": "切換主题",
     "Token": "令牌",
     "Token Breakdown": "Token 明细",
+    "Token condition": "Token 條件",
     "Token Endpoint": "令牌端點",
     "Token Endpoint (Optional)": "Token 端點（可選）",
     "Token estimator": "Token 估算器",
@@ -5708,7 +5715,6 @@
     "排行榜": "排行榜",
     "控制台": "控制台",
     "文档": "文件",
-    "模型广场": "模型廣場",
-    "Off-peak": "Off-peak"
+    "模型广场": "模型廣場"
   }
 }
