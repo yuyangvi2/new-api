@@ -233,7 +233,7 @@ type MarketPriceEntry = {
   key: string
   labelKey: string
   formatted: string
-  unit: 'M' | 'request'
+  unit: 'M' | 'request' | 'second'
 }
 
 function formatCompactTokenCount(value?: number): string | null {
@@ -539,7 +539,7 @@ function MarketPricePanel(props: {
         props.priceRate,
         props.usdExchangeRate
       ),
-      unit: 'request',
+      unit: model.model_price_unit === 'second' ? 'second' : 'request',
     })
 
     if (savingPercent !== null) {
@@ -554,7 +554,7 @@ function MarketPricePanel(props: {
           props.usdExchangeRate,
           { __base: 1 }
         ),
-        unit: 'request',
+        unit: model.model_price_unit === 'second' ? 'second' : 'request',
       })
     }
   }
@@ -570,6 +570,9 @@ function MarketPricePanel(props: {
   const renderUnit = (entry: MarketPriceEntry) => {
     if (entry.unit === 'request') {
       return `/ ${t('request')}`
+    }
+    if (entry.unit === 'second') {
+      return `/ ${t('second')}`
     }
 
     return '/ 1M'
@@ -613,6 +616,16 @@ function MarketPricePanel(props: {
           <div className='bg-muted/30 hover:bg-muted/40 h-[124px] overflow-hidden rounded-2xl border p-3 text-left transition-colors' />
         }
       >
+        <div className='mb-2 flex items-center justify-between'>
+          <span className='text-muted-foreground text-xs font-bold tracking-[0.12em] uppercase'>
+            {t('Price')}
+          </span>
+          {officialLine ? (
+            <span className='text-muted-foreground text-[11px] font-semibold'>
+              {t('Official')} / {t('Price')}
+            </span>
+          ) : null}
+        </div>
         {primaryFallback ? (
           <div className='text-foreground flex min-h-16 items-center text-sm font-semibold'>
             {primaryFallback}
