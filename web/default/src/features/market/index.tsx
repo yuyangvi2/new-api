@@ -57,6 +57,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
@@ -152,6 +153,11 @@ function compareMarketModels(
 function getMarketSortPrice(model: IndexedMarketModel): number {
   const groupRatio = getDisplayGroupRatio(model)
 
+  const displayPricingEntries = getDisplayPricingEntries(model, groupRatio)
+  if (displayPricingEntries.length > 0) {
+    return displayPricingEntries[0]?.numericPrice ?? Number.POSITIVE_INFINITY
+  }
+
   if (model.billing_mode === 'tiered_expr' && model.billing_expr) {
     const summary = getDynamicPricingSummary(model, {
       tokenUnit: DEFAULT_TOKEN_UNIT,
@@ -231,9 +237,109 @@ function modelSignals(model: MarketModel): string[] {
 
 type MarketPriceEntry = {
   key: string
+  label?: string
   labelKey: string
   formatted: string
-  unit: 'M' | 'request' | 'second'
+  unit: 'M' | 'request' | 'second' | 'image'
+  numericPrice?: number
+}
+
+function formatDisplayPricingValue(price: number): string {
+  return formatBillingCurrencyFromUSD(price, {
+    digitsLarge: 4,
+    digitsSmall: 6,
+    abbreviate: false,
+  })
+}
+
+function getDisplayPricingEntries(
+  model: MarketModel,
+  groupRatio: number
+): MarketPriceEntry[] {
+  const config = model.display_pricing
+  if (config?.mode === 'tiered_seconds' && config.unit === 'second') {
+    return config.tiers.flatMap((tier) =>
+      tier.steps.flatMap((step, index) => {
+        if (!Number.isFinite(step.price) || step.price <= 0) return []
+        const numericPrice = step.price * groupRatio
+        if (!Number.isFinite(numericPrice) || numericPrice <= 0) return []
+        const range =
+          step.label ||
+          (step.from_second != null && step.to_second != null
+            ? `${step.from_second}-${step.to_second}s`
+            : step.from_second != null
+              ? `${step.from_second}s+`
+              : `${index + 1}s`)
+        return [
+          {
+            key: `${tier.value}:${index}`,
+            label: `${tier.label}: ${range}`,
+            labelKey: tier.label,
+            formatted: formatDisplayPricingValue(numericPrice),
+            unit: 'second' as const,
+            numericPrice,
+          },
+        ]
+      })
+    )
+  }
+  if (
+    config?.mode !== 'weighted_factors' ||
+    !Number.isFinite(config.base_price) ||
+    config.base_price <= 0 ||
+    !config.base_values ||
+    !Array.isArray(config.factors) ||
+    config.factors.length === 0
+  ) {
+    return []
+  }
+
+  const baseWeights = new Map<string, number>()
+  for (const factor of config.factors) {
+    if (
+      typeof factor.field !== 'string' ||
+      typeof factor.label !== 'string' ||
+      !Array.isArray(factor.values)
+    ) {
+      return []
+    }
+    const baseValue = config.base_values[factor.field]
+    const option = factor.values.find((value) => value.value === baseValue)
+    if (!option || !Number.isFinite(option.weight) || option.weight <= 0) {
+      return []
+    }
+    baseWeights.set(factor.field, option.weight)
+  }
+
+  const baseWeight = [...baseWeights.values()].reduce(
+    (product, weight) => product * weight,
+    1
+  )
+  if (!Number.isFinite(baseWeight) || baseWeight <= 0) return []
+
+  const entries: MarketPriceEntry[] = []
+  for (const factor of config.factors) {
+    for (const option of factor.values) {
+      if (!Number.isFinite(option.weight) || option.weight <= 0) continue
+      const factorBaseWeight = baseWeights.get(factor.field)
+      if (!factorBaseWeight) continue
+
+      const selectedWeight = (baseWeight / factorBaseWeight) * option.weight
+      const numericPrice =
+        (config.base_price * selectedWeight * groupRatio) / baseWeight
+      if (!Number.isFinite(numericPrice) || numericPrice <= 0) continue
+
+      entries.push({
+        key: `${factor.field}:${option.value}`,
+        label: `${factor.label}: ${option.label} ×${option.weight}`,
+        labelKey: factor.label,
+        formatted: formatDisplayPricingValue(numericPrice),
+        unit: config.unit,
+        numericPrice,
+      })
+    }
+  }
+  return entries
 }
 
 function formatCompactTokenCount(value?: number): string | null {
@@ -264,7 +370,7 @@ function getSavingPercent(groupRatio: number): number | null {
 }
 
 function isMutedPriceEntry(entry: MarketPriceEntry): boolean {
-  const normalizedLabel = entry.labelKey.toLowerCase()
+  const normalizedLabel = (entry.label ?? entry.labelKey).toLowerCase()
   return entry.key.includes('cache') || normalizedLabel.includes('cache')
 }
 
@@ -325,7 +431,22 @@ function MarketPricePanel(props: {
   const officialEntries: MarketPriceEntry[] = []
   let primaryFallback: ReactNode | null = null
 
-  if (seedanceOfficialEntries) {
+  const displayPricingEntries = getDisplayPricingEntries(
+    model,
+    displayGroupRatio
+  )
+
+  if (displayPricingEntries.length > 0) {
+    primaryEntries.push(...displayPricingEntries.slice(0, 2))
+    extraEntries.push(...displayPricingEntries.slice(2))
+    if (savingPercent !== null) {
+      officialEntries.push(
+        ...getDisplayPricingEntries(model, 1)
+          .slice(0, 2)
+          .map((entry) => ({ ...entry, key: `official-${entry.key}` }))
+      )
+    }
+  } else if (seedanceOfficialEntries) {
     primaryEntries.push(...seedanceOfficialEntries.primaryEntries)
     extraEntries.push(...seedanceOfficialEntries.extraEntries)
     if (savingPercent !== null) {
@@ -590,7 +711,7 @@ function MarketPricePanel(props: {
         )}
       >
         <span className='text-muted-foreground min-w-0 truncate text-xs leading-4 font-bold'>
-          {t(entry.labelKey)}
+          {entry.label ?? t(entry.labelKey)}
         </span>
         <span className='shrink-0 text-right whitespace-nowrap'>
           <span
@@ -651,7 +772,7 @@ function MarketPricePanel(props: {
                   key={entry.key}
                   className='flex items-center justify-between gap-4'
                 >
-                  <span>{t(entry.labelKey)}</span>
+                  <span>{entry.label ?? t(entry.labelKey)}</span>
                   <span className='font-mono'>
                     {entry.formatted} {renderUnit(entry)}
                   </span>
@@ -669,7 +790,7 @@ function MarketPricePanel(props: {
                   key={entry.key}
                   className='flex items-center justify-between gap-4'
                 >
-                  <span>{t(entry.labelKey)}</span>
+                  <span>{entry.label ?? t(entry.labelKey)}</span>
                   <span className='font-mono'>
                     {entry.formatted} {renderUnit(entry)}
                   </span>

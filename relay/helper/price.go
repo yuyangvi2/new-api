@@ -3,6 +3,7 @@ package helper
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
@@ -90,6 +91,7 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 	var audioRatio float64
 	var audioCompletionRatio float64
 	var freeModel bool
+	var pricingSnapshot *types.ModelPricingSnapshot
 	if !usePrice {
 		preConsumedTokens := common.Max(promptTokens, common.PreConsumedQuota)
 		if meta.MaxTokens != 0 {
@@ -109,6 +111,17 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		}
 		completionRatio = ratio_setting.GetCompletionRatio(info.OriginModelName)
 		cacheRatio, _ = ratio_setting.GetCacheRatio(info.OriginModelName)
+		var pricingConfigured bool
+		var pricingErr error
+		pricingSnapshot, pricingConfigured, pricingErr = ratio_setting.ResolveModelPricing(info.OriginModelName, time.Now())
+		if pricingErr != nil {
+			return types.PriceData{}, pricingErr
+		}
+		if pricingConfigured {
+			modelRatio = pricingSnapshot.ModelRatio
+			cacheRatio = pricingSnapshot.CacheRatio
+			completionRatio = pricingSnapshot.CompletionRatio
+		}
 		cacheCreationRatio, _ = ratio_setting.GetCreateCacheRatio(info.OriginModelName)
 		cacheCreationRatio5m = cacheCreationRatio
 		// 固定1h和5min缓存写入价格的比例
@@ -159,6 +172,7 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		CacheCreation5mRatio: cacheCreationRatio5m,
 		CacheCreation1hRatio: cacheCreationRatio1h,
 		QuotaToPreConsume:    preConsumedQuota,
+		PricingSnapshot:      pricingSnapshot,
 	}
 
 	if common.DebugEnabled {
