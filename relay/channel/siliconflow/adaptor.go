@@ -15,7 +15,6 @@ import (
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
-	"github.com/samber/lo"
 )
 
 type Adaptor struct {
@@ -53,10 +52,13 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 	if sfRequest.ImageSize == "" {
 		sfRequest.ImageSize = request.Size
 	}
-	if sfRequest.BatchSize == 0 {
+	if sfRequest.BatchSize == nil {
 		if request.N != nil {
-			sfRequest.BatchSize = lo.FromPtr(request.N)
+			sfRequest.BatchSize = common.GetPointer(*request.N)
 		}
+	}
+	if sfRequest.BatchSize != nil && (*sfRequest.BatchSize == 0 || *sfRequest.BatchSize > dto.MaxImageN) {
+		return nil, fmt.Errorf("batch_size must be an integer between 1 and %d", dto.MaxImageN)
 	}
 
 	return sfRequest, nil

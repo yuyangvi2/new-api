@@ -146,6 +146,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	if relayInfo.IsStream {
 		helper.InitializeDownstreamStreamState(c)
 	}
+	if relayFormat == types.RelayFormatGemini {
+		relay.ApplyGeminiNoThinkingPricing(relayInfo)
+	}
 
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
 	needCountToken := constant.CountToken

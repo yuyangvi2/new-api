@@ -31,6 +31,24 @@ func isNoThinkingRequest(req *dto.GeminiChatRequest) bool {
 	return false
 }
 
+// ApplyGeminiNoThinkingPricing selects the configured non-thinking model before
+// price lookup so pre-consume and final settlement use the same model.
+func ApplyGeminiNoThinkingPricing(info *relaycommon.RelayInfo) {
+	if info == nil || !model_setting.GetGeminiSettings().ThinkingAdapterEnabled {
+		return
+	}
+	request, ok := info.Request.(*dto.GeminiChatRequest)
+	if !ok || !isNoThinkingRequest(request) || strings.Contains(info.OriginModelName, "-nothinking") {
+		return
+	}
+	noThinkingModelName := info.OriginModelName + "-nothinking"
+	if !helper.HasModelBillingConfig(noThinkingModelName) {
+		return
+	}
+	info.OriginModelName = noThinkingModelName
+	info.UpstreamModelName = noThinkingModelName
+}
+
 func trimModelThinking(modelName string) string {
 	// 去除模型名称中的 -nothinking 后缀
 	if strings.HasSuffix(modelName, "-nothinking") {
@@ -53,6 +71,7 @@ func trimModelThinking(modelName string) string {
 
 func GeminiHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types.NewAPIError) {
 	info.InitChannelMeta(c)
+	ApplyGeminiNoThinkingPricing(info)
 
 	geminiReq, ok := info.Request.(*dto.GeminiChatRequest)
 	if !ok {
@@ -71,18 +90,6 @@ func GeminiHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 	}
 
 	if model_setting.GetGeminiSettings().ThinkingAdapterEnabled {
-		if isNoThinkingRequest(request) {
-			// check is thinking
-			if !strings.Contains(info.OriginModelName, "-nothinking") {
-				// try to get no thinking model price
-				noThinkingModelName := info.OriginModelName + "-nothinking"
-				containPrice := helper.HasModelBillingConfig(noThinkingModelName)
-				if containPrice {
-					info.OriginModelName = noThinkingModelName
-					info.UpstreamModelName = noThinkingModelName
-				}
-			}
-		}
 		if request.GenerationConfig.ThinkingConfig == nil {
 			gemini.ThinkingAdaptor(request, info)
 		}

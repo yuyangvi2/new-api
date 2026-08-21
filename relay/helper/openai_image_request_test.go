@@ -94,6 +94,11 @@ func TestGetAndValidOpenAIImageRequestNBounds(t *testing.T) {
 		wantN   uint
 	}{
 		{
+			name:    "explicit zero n is rejected",
+			body:    `{"model":"gpt-image-1","prompt":"a cat","n":0}`,
+			wantErr: boundErr,
+		},
+		{
 			name:    "overflowed uint64 n is rejected",
 			body:    `{"model":"gpt-image-1","prompt":"a cat","n":18446744073686646784}`,
 			wantErr: boundErr,
@@ -113,6 +118,30 @@ func TestGetAndValidOpenAIImageRequestNBounds(t *testing.T) {
 			body:  `{"model":"gpt-image-1","prompt":"a cat"}`,
 			wantN: 1,
 		},
+	}
+
+	batchBoundErr := fmt.Sprintf("batch_size must be an integer between 1 and %d", dto.MaxImageN)
+	for _, tt := range []struct {
+		name    string
+		value   string
+		wantErr bool
+	}{
+		{name: "zero", value: "0", wantErr: true},
+		{name: "above max", value: fmt.Sprint(dto.MaxImageN + 1), wantErr: true},
+		{name: "negative", value: "-1", wantErr: true},
+		{name: "max", value: fmt.Sprint(dto.MaxImageN)},
+	} {
+		t.Run("batch_size "+tt.name, func(t *testing.T) {
+			c := newJSONContext(t, fmt.Sprintf(`{"model":"test","prompt":"a cat","batch_size":%s}`, tt.value))
+			req, err := GetAndValidOpenAIImageRequest(c, relayconstant.RelayModeImagesGenerations)
+			if tt.wantErr {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), batchBoundErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Contains(t, req.Extra, "batch_size")
+		})
 	}
 
 	for _, tt := range tests {

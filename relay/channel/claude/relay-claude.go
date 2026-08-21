@@ -32,6 +32,19 @@ const (
 	DroppedParamsHeader    = "X-New-Api-Dropped-Params"
 )
 
+func isAdaptiveOpusModel(modelName string) bool {
+	return strings.HasPrefix(modelName, "claude-opus-4-7") ||
+		strings.HasPrefix(modelName, "claude-opus-4-8")
+}
+
+func configureAdaptiveThinking(request *dto.ClaudeRequest, effort string) {
+	request.Thinking = &dto.Thinking{Type: "adaptive", Display: "summarized"}
+	request.OutputConfig = json.RawMessage(fmt.Sprintf(`{"effort":"%s"}`, effort))
+	request.Temperature = nil
+	request.TopP = nil
+	request.TopK = nil
+}
+
 func stopReasonClaude2OpenAI(reason string) string {
 	return reasonmap.ClaudeStopReasonToOpenAIFinishReason(reason)
 }
@@ -234,21 +247,28 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 	}
 
 	if textRequest.ReasoningEffort != "" {
-		switch textRequest.ReasoningEffort {
-		case "low":
-			claudeRequest.Thinking = &dto.Thinking{
-				Type:         "enabled",
-				BudgetTokens: common.GetPointer[int](1280),
+		if isAdaptiveOpusModel(claudeRequest.Model) {
+			switch textRequest.ReasoningEffort {
+			case "low", "medium", "high", "max":
+				configureAdaptiveThinking(&claudeRequest, textRequest.ReasoningEffort)
 			}
-		case "medium":
-			claudeRequest.Thinking = &dto.Thinking{
-				Type:         "enabled",
-				BudgetTokens: common.GetPointer[int](2048),
-			}
-		case "high":
-			claudeRequest.Thinking = &dto.Thinking{
-				Type:         "enabled",
-				BudgetTokens: common.GetPointer[int](4096),
+		} else {
+			switch textRequest.ReasoningEffort {
+			case "low":
+				claudeRequest.Thinking = &dto.Thinking{
+					Type:         "enabled",
+					BudgetTokens: common.GetPointer[int](1280),
+				}
+			case "medium":
+				claudeRequest.Thinking = &dto.Thinking{
+					Type:         "enabled",
+					BudgetTokens: common.GetPointer[int](2048),
+				}
+			case "high":
+				claudeRequest.Thinking = &dto.Thinking{
+					Type:         "enabled",
+					BudgetTokens: common.GetPointer[int](4096),
+				}
 			}
 		}
 	}
@@ -262,9 +282,19 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 
 		budgetTokens := reasoning.MaxTokens
 		if budgetTokens > 0 {
-			claudeRequest.Thinking = &dto.Thinking{
-				Type:         "enabled",
-				BudgetTokens: &budgetTokens,
+			if isAdaptiveOpusModel(claudeRequest.Model) {
+				effort := "high"
+				if budgetTokens <= 1280 {
+					effort = "low"
+				} else if budgetTokens <= 2048 {
+					effort = "medium"
+				}
+				configureAdaptiveThinking(&claudeRequest, effort)
+			} else {
+				claudeRequest.Thinking = &dto.Thinking{
+					Type:         "enabled",
+					BudgetTokens: &budgetTokens,
+				}
 			}
 		}
 	}

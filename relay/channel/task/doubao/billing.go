@@ -243,6 +243,10 @@ func seedanceUSDExchangeRate() float64 {
 	return seedanceDefaultUSDExchangeRate
 }
 
+func SeedanceUSDExchangeRate() float64 {
+	return seedanceUSDExchangeRate()
+}
+
 func stringFromAny(value any) string {
 	switch v := value.(type) {
 	case string:

@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	"github.com/tidwall/gjson"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -195,12 +196,27 @@ func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInf
 	}
 	req = seedanceMBillingRequest(req)
 	billingModel := seedanceMBillingModel(firstNonEmpty(info.OriginModelName, req.Model, info.UpstreamModelName))
-	quota, _, _, ok := doubaotask.EstimateSeedanceQuotaForRequest(
+	hasVideo := hasVideoInput(req)
+	quota, _, pricePerMillionCNY, ok := doubaotask.EstimateSeedanceQuotaForRequest(
 		billingModel,
 		req,
-		hasVideoInput(req),
+		hasVideo,
 		info.PriceData.GroupRatioInfo.GroupRatio,
 	)
+	if ok && info.TaskRelayInfo != nil {
+		hasVideoSnapshot := hasVideo
+		resolution := requestResolution(req)
+		if resolution == "" {
+			resolution = "720p"
+		}
+		info.TaskRelayInfo.UsageBilling = &relaycommon.TaskUsageBillingContext{
+			PricingSource:      relaycommon.TaskPricingSourceSeedanceMUsage,
+			PricePerMillionCNY: pricePerMillionCNY,
+			USDExchangeRate:    doubaotask.SeedanceUSDExchangeRate(),
+			Resolution:         resolution,
+			HasVideoInput:      &hasVideoSnapshot,
+		}
+	}
 	if !ok || info.PriceData.Quota <= 0 {
 		return nil
 	}
@@ -216,6 +232,45 @@ func (a *TaskAdaptor) AdjustBillingOnComplete(task *model.Task, _ *relaycommon.T
 		return 0
 	}
 	return task.Quota
+}
+
+func (a *TaskAdaptor) AdjustBillingOnCompleteWithClamp(task *model.Task, taskResult *relaycommon.TaskInfo) (int, *common.QuotaClamp) {
+	if task == nil || taskResult == nil || taskResult.TotalTokens <= 0 {
+		return 0, nil
+	}
+	billingContext := task.PrivateData.BillingContext
+	if billingContext == nil || billingContext.UsageBilling == nil {
+		return 0, nil
+	}
+	usageBilling := billingContext.UsageBilling
+	if usageBilling.PricingSource != relaycommon.TaskPricingSourceSeedanceMUsage || usageBilling.HasVideoInput == nil {
+		return 0, nil
+	}
+
+	resolution := strings.TrimSpace(gjson.GetBytes(task.Data, "resolution").String())
+	if resolution == "" {
+		resolution = usageBilling.Resolution
+	}
+	billingModel := seedanceMBillingModel(doubaotask.TaskModelName(task))
+	pricePerMillionCNY := usageBilling.PricePerMillionCNY
+	if resolution != "" && !strings.EqualFold(resolution, usageBilling.Resolution) {
+		if price, ok := doubaotask.SeedancePricePerMillionCNY(billingModel, resolution, *usageBilling.HasVideoInput); ok {
+			pricePerMillionCNY = price
+		}
+	}
+	actualQuota, clamp, ok := doubaotask.EstimateSeedanceQuotaFromUsageTokens(
+		billingModel,
+		resolution,
+		taskResult.TotalTokens,
+		*usageBilling.HasVideoInput,
+		billingContext.GroupRatio,
+		pricePerMillionCNY,
+		usageBilling.USDExchangeRate,
+	)
+	if !ok {
+		return 0, nil
+	}
+	return actualQuota, clamp
 }
 
 func (a *TaskAdaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, requestBody io.Reader) (*http.Response, error) {
