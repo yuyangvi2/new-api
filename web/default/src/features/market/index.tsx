@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
+import type { TFunction } from 'i18next'
 import {
   ChevronLeft,
   ChevronRight,
@@ -263,13 +264,13 @@ function getDisplayPricingEntries(
         if (!Number.isFinite(step.price) || step.price <= 0) return []
         const numericPrice = step.price * groupRatio
         if (!Number.isFinite(numericPrice) || numericPrice <= 0) return []
-        const range =
-          step.label ||
-          (step.from_second != null && step.to_second != null
-            ? `${step.from_second}-${step.to_second}s`
-            : step.from_second != null
-              ? `${step.from_second}s+`
-              : `${index + 1}s`)
+        let range = `${index + 1}s`
+        if (step.from_second != null && step.to_second != null) {
+          range = `${step.from_second}-${step.to_second}s`
+        } else if (step.from_second != null) {
+          range = `${step.from_second}s+`
+        }
+        if (step.label) range = step.label
         return [
           {
             key: `${tier.value}:${index}`,
@@ -374,6 +375,111 @@ function isMutedPriceEntry(entry: MarketPriceEntry): boolean {
   return entry.key.includes('cache') || normalizedLabel.includes('cache')
 }
 
+function parsePricingMinutes(value: string): number | null {
+  const match = value.match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) return null
+
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  if (hour > 23 || minute > 59) return null
+  return hour * 60 + minute
+}
+
+function isPricingPeriodActive(
+  period: NonNullable<MarketModel['model_pricing']>['periods'][number],
+  currentMinutes: number
+): boolean {
+  const start = parsePricingMinutes(period.start)
+  const end = parsePricingMinutes(period.end)
+  if (start === null || end === null) return false
+  if (start < end) return currentMinutes >= start && currentMinutes < end
+  if (start > end) return currentMinutes >= start || currentMinutes < end
+  return true
+}
+
+function getCurrentMinutes(timeZone: string): number | null {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date())
+    const hour = Number(parts.find((part) => part.type === 'hour')?.value)
+    const minute = Number(parts.find((part) => part.type === 'minute')?.value)
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null
+    return (hour % 24) * 60 + minute
+  } catch {
+    return null
+  }
+}
+
+function getPricingPeriodLabel(
+  t: TFunction,
+  name: string
+): string {
+  if (name === 'peak') return t('Peak')
+  if (name === 'off_peak') return t('Off-peak')
+  return name
+}
+
+function getTimeBasedPricingEntries(
+  model: MarketModel,
+  groupRatio: number,
+  t: TFunction
+): { primary: MarketPriceEntry[]; extra: MarketPriceEntry[] } | null {
+  const schedule = model.model_pricing
+  if (!schedule?.periods?.length) return null
+
+  const currentMinutes = getCurrentMinutes(schedule.timezone)
+  const activePeriod =
+    currentMinutes === null
+      ? undefined
+      : schedule.periods.find((period) =>
+          isPricingPeriodActive(period, currentMinutes)
+        )
+
+  const buildEntries = (
+    period: (typeof schedule.periods)[number],
+    prefix: string
+  ): MarketPriceEntry[] => {
+    const label = getPricingPeriodLabel(t, period.name)
+    const entries: MarketPriceEntry[] = []
+    const prices = [
+      ['input', 'Input', period.input_price],
+      ['output', 'Output', period.output_price],
+      ['cache', 'Cache Read', period.cache_hit_price],
+    ] as const
+
+    for (const [key, labelKey, price] of prices) {
+      const numericPrice = price * groupRatio
+      if (!Number.isFinite(numericPrice) || numericPrice < 0) continue
+      entries.push({
+        key: `${prefix}-${key}`,
+        label: `${label} · ${t(labelKey)}`,
+        labelKey,
+        formatted: formatBillingCurrencyFromUSD(numericPrice, {
+          digitsLarge: 4,
+          digitsSmall: 6,
+          abbreviate: false,
+        }),
+        unit: 'M',
+        numericPrice,
+      })
+    }
+    return entries
+  }
+
+  const primary = activePeriod
+    ? buildEntries(activePeriod, `current-${activePeriod.name}`).slice(0, 2)
+    : []
+  const extra = schedule.periods.flatMap((period) =>
+    buildEntries(period, period.name)
+  )
+
+  return { primary, extra }
+}
+
 function formatMarketPriceValue(formatted: string): string {
   const match = formatted.match(/^([^\d-]*)([-\d,]+(?:\.\d+)?)(.*)$/)
   if (!match) return formatted
@@ -431,12 +537,21 @@ function MarketPricePanel(props: {
   const officialEntries: MarketPriceEntry[] = []
   let primaryFallback: ReactNode | null = null
 
+  const timeBasedEntries = getTimeBasedPricingEntries(
+    model,
+    displayGroupRatio,
+    t
+  )
+
   const displayPricingEntries = getDisplayPricingEntries(
     model,
     displayGroupRatio
   )
 
-  if (displayPricingEntries.length > 0) {
+  if (timeBasedEntries) {
+    primaryEntries.push(...timeBasedEntries.primary)
+    extraEntries.push(...timeBasedEntries.extra)
+  } else if (displayPricingEntries.length > 0) {
     primaryEntries.push(...displayPricingEntries.slice(0, 2))
     extraEntries.push(...displayPricingEntries.slice(2))
     if (savingPercent !== null) {

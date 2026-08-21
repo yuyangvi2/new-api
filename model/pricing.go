@@ -15,29 +15,30 @@ import (
 )
 
 type Pricing struct {
-	ModelName              string                  `json:"model_name"`
-	Description            string                  `json:"description,omitempty"`
-	Icon                   string                  `json:"icon,omitempty"`
-	Tags                   string                  `json:"tags,omitempty"`
-	VendorID               int                     `json:"vendor_id,omitempty"`
-	QuotaType              int                     `json:"quota_type"`
-	ModelType              int                     `json:"model_type"`
-	ModelRatio             float64                 `json:"model_ratio"`
-	ModelPrice             float64                 `json:"model_price"`
-	ModelPriceUnit         string                  `json:"model_price_unit,omitempty"`
-	OwnerBy                string                  `json:"owner_by"`
-	CompletionRatio        float64                 `json:"completion_ratio"`
-	CacheRatio             *float64                `json:"cache_ratio,omitempty"`
-	CreateCacheRatio       *float64                `json:"create_cache_ratio,omitempty"`
-	ImageRatio             *float64                `json:"image_ratio,omitempty"`
-	AudioRatio             *float64                `json:"audio_ratio,omitempty"`
-	AudioCompletionRatio   *float64                `json:"audio_completion_ratio,omitempty"`
-	EnableGroup            []string                `json:"enable_groups"`
-	SupportedEndpointTypes []constant.EndpointType `json:"supported_endpoint_types"`
-	BillingMode            string                  `json:"billing_mode,omitempty"`
-	BillingExpr            string                  `json:"billing_expr,omitempty"`
-	DisplayPricing         map[string]interface{}  `json:"display_pricing,omitempty"`
-	PricingVersion         string                  `json:"pricing_version,omitempty"`
+	ModelName              string                      `json:"model_name"`
+	Description            string                      `json:"description,omitempty"`
+	Icon                   string                      `json:"icon,omitempty"`
+	Tags                   string                      `json:"tags,omitempty"`
+	VendorID               int                         `json:"vendor_id,omitempty"`
+	QuotaType              int                         `json:"quota_type"`
+	ModelType              int                         `json:"model_type"`
+	ModelRatio             float64                     `json:"model_ratio"`
+	ModelPrice             float64                     `json:"model_price"`
+	ModelPriceUnit         string                      `json:"model_price_unit,omitempty"`
+	OwnerBy                string                      `json:"owner_by"`
+	CompletionRatio        float64                     `json:"completion_ratio"`
+	CacheRatio             *float64                    `json:"cache_ratio,omitempty"`
+	CreateCacheRatio       *float64                    `json:"create_cache_ratio,omitempty"`
+	ImageRatio             *float64                    `json:"image_ratio,omitempty"`
+	AudioRatio             *float64                    `json:"audio_ratio,omitempty"`
+	AudioCompletionRatio   *float64                    `json:"audio_completion_ratio,omitempty"`
+	EnableGroup            []string                    `json:"enable_groups"`
+	SupportedEndpointTypes []constant.EndpointType     `json:"supported_endpoint_types"`
+	BillingMode            string                      `json:"billing_mode,omitempty"`
+	BillingExpr            string                      `json:"billing_expr,omitempty"`
+	DisplayPricing         map[string]interface{}      `json:"display_pricing,omitempty"`
+	ModelPricing           *types.ModelPricingSchedule `json:"model_pricing,omitempty"`
+	PricingVersion         string                      `json:"pricing_version,omitempty"`
 }
 
 const (
@@ -199,6 +200,7 @@ func updatePricing() {
 
 	modelGroupsMap := make(map[string]*types.Set[string])
 	modelChannelTypes := make(map[string][]int)
+	modelPricingMap := ratio_setting.GetModelPricingMap()
 
 	for _, ability := range enableAbilities {
 		groups, ok := modelGroupsMap[ability.Model]
@@ -305,6 +307,9 @@ func updatePricing() {
 			EnableGroup:            groups.Items(),
 			SupportedEndpointTypes: modelSupportEndpointTypes[model],
 			ModelType:              pricingModelTypeText,
+		}
+		if modelPricing, ok := modelPricingMap[model]; ok {
+			pricing.ModelPricing = &modelPricing
 		}
 
 		// 补充模型元数据（描述、标签、供应商、状态）

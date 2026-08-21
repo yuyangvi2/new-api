@@ -57,6 +57,7 @@ export type PricingModel = {
   /** Raw expression describing dynamic / tiered billing */
   billing_expr?: string
   display_pricing?: DisplayPricing
+  model_pricing?: ModelPricingSchedule
   /** Pricing version returned by backend, useful for cache busting */
   pricing_version?: string
   /**
@@ -73,6 +74,20 @@ export type PricingModel = {
   capabilities?: ModelCapability[]
   cover_thumb_url?: string
   yesterday_request_count?: number
+}
+
+export type ModelPricingPeriod = {
+  name: string
+  start: string
+  end: string
+  input_price: number
+  cache_hit_price: number
+  output_price: number
+}
+
+export type ModelPricingSchedule = {
+  timezone: string
+  periods: ModelPricingPeriod[]
 }
 
 export type DisplayPricingFactorValue = {
