@@ -1831,11 +1831,12 @@ export const TieredPricingEditor = memo(function TieredPricingEditor({
   const handleRawChange = useCallback(
     (value: string) => {
       setRawExpr(value)
-      const { requestRuleExpr: ruleStr } =
+      const { billingExpr, requestRuleExpr: ruleStr } =
         splitBillingExprAndRequestRules(value)
+      onBillingExprChange(billingExpr)
       onRequestRuleExprChange(ruleStr)
     },
-    [onRequestRuleExprChange]
+    [onBillingExprChange, onRequestRuleExprChange]
   )
 
   const handleModeChange = useCallback(
