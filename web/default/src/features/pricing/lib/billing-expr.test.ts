@@ -92,4 +92,75 @@ describe('billing expression parser', () => {
       max: 2,
     })
   })
+
+  test('splits weekday-guarded peak hours into visual request rules', () => {
+    const expr =
+      'tier("base", p * 0.28 + c * 1.12 + cr * 0.028) * ' +
+      '((weekday("Asia/Shanghai") >= 1 && weekday("Asia/Shanghai") < 6 && ' +
+      '(((hour("Asia/Shanghai") * 60 + minute("Asia/Shanghai")) >= 540 && ' +
+      '(hour("Asia/Shanghai") * 60 + minute("Asia/Shanghai")) < 720) || ' +
+      '((hour("Asia/Shanghai") * 60 + minute("Asia/Shanghai")) >= 840 && ' +
+      '(hour("Asia/Shanghai") * 60 + minute("Asia/Shanghai")) < 1080)) ? 2 : 1))'
+
+    const split = splitBillingExprAndRequestRules(expr)
+    const groups = tryParseRequestRuleExpr(split.requestRuleExpr)
+
+    assert.equal(
+      split.billingExpr,
+      'tier("base", p * 0.28 + c * 1.12 + cr * 0.028)'
+    )
+    assert.equal(groups?.length, 2)
+    assert.deepEqual(groups?.[0], {
+      conditions: [
+        {
+          source: 'time',
+          timeFunc: 'weekday',
+          timezone: 'Asia/Shanghai',
+          mode: 'gte',
+          value: '1',
+          rangeStart: '',
+          rangeEnd: '',
+        },
+        {
+          source: 'time',
+          timeFunc: 'weekday',
+          timezone: 'Asia/Shanghai',
+          mode: 'lt',
+          value: '6',
+          rangeStart: '',
+          rangeEnd: '',
+        },
+        {
+          source: 'time',
+          timeFunc: 'hour',
+          timezone: 'Asia/Shanghai',
+          mode: 'range',
+          value: '',
+          rangeStart: '9',
+          rangeEnd: '12',
+        },
+      ],
+      multiplier: '2',
+    })
+    assert.deepEqual(groups?.[1]?.conditions[2], {
+      source: 'time',
+      timeFunc: 'hour',
+      timezone: 'Asia/Shanghai',
+      mode: 'range',
+      value: '',
+      rangeStart: '14',
+      rangeEnd: '18',
+    })
+    assert.equal(
+      buildRequestRuleExpr(groups || []),
+      '(weekday("Asia/Shanghai") >= 1 && weekday("Asia/Shanghai") < 6 && ' +
+        'hour("Asia/Shanghai") >= 9 && hour("Asia/Shanghai") < 12 ? 2 : 1) * ' +
+        '(weekday("Asia/Shanghai") >= 1 && weekday("Asia/Shanghai") < 6 && ' +
+        'hour("Asia/Shanghai") >= 14 && hour("Asia/Shanghai") < 18 ? 2 : 1)'
+    )
+    assert.deepEqual(getRequestRuleMultiplierRange(split.requestRuleExpr), {
+      min: 1,
+      max: 2,
+    })
+  })
 })

@@ -414,49 +414,173 @@ function timeSegmentsOverlap(
   return left.start < right.end && right.start < left.end
 }
 
+type ExclusiveTimeRangeCandidate = {
+  timeFunc: TimeFunc
+  timezone: string
+  guardSignature: string
+  multiplier: number
+  segments: Array<{ start: number; end: number }>
+}
+
+function getConditionSignature(condition: RequestCondition): string {
+  if (condition.source === SOURCE_TIME) {
+    return [
+      condition.source,
+      condition.timeFunc,
+      condition.timezone,
+      condition.mode,
+      condition.value,
+      condition.rangeStart,
+      condition.rangeEnd,
+    ].join(':')
+  }
+  return [
+    condition.source,
+    condition.path,
+    condition.mode,
+    condition.value,
+  ].join(':')
+}
+
+function getGuardSignature(
+  conditions: RequestCondition[],
+  ignoredIndexes: Set<number>
+): string {
+  return conditions
+    .flatMap((condition, index) =>
+      ignoredIndexes.has(index) ? [] : [getConditionSignature(condition)]
+    )
+    .sort()
+    .join('|')
+}
+
+function createRangeCandidate(
+  group: RequestRuleGroup,
+  condition: TimeCondition,
+  ignoredIndexes: Set<number>
+): ExclusiveTimeRangeCandidate | null {
+  const multiplier = Number(group.multiplier)
+  const segments = getTimeRangeSegments(condition)
+  if (!Number.isFinite(multiplier) || multiplier <= 0 || !segments) {
+    return null
+  }
+
+  return {
+    timeFunc: condition.timeFunc,
+    timezone: condition.timezone,
+    guardSignature: getGuardSignature(group.conditions, ignoredIndexes),
+    multiplier,
+    segments,
+  }
+}
+
+function getExclusiveTimeRangeCandidates(
+  group: RequestRuleGroup
+): ExclusiveTimeRangeCandidate[] {
+  const candidates: ExclusiveTimeRangeCandidate[] = []
+
+  group.conditions.forEach((condition, index) => {
+    if (condition.source !== SOURCE_TIME || condition.mode !== MATCH_RANGE) {
+      return
+    }
+    const candidate = createRangeCandidate(
+      group,
+      condition as TimeCondition,
+      new Set([index])
+    )
+    if (candidate) candidates.push(candidate)
+  })
+
+  for (
+    let startIndex = 0;
+    startIndex < group.conditions.length;
+    startIndex += 1
+  ) {
+    const startCondition = group.conditions[startIndex]
+    if (
+      startCondition?.source !== SOURCE_TIME ||
+      startCondition.mode !== MATCH_GTE
+    ) {
+      continue
+    }
+
+    for (let endIndex = 0; endIndex < group.conditions.length; endIndex += 1) {
+      const endCondition = group.conditions[endIndex]
+      if (
+        endCondition?.source !== SOURCE_TIME ||
+        endCondition.mode !== MATCH_LT ||
+        endCondition.timeFunc !== startCondition.timeFunc ||
+        endCondition.timezone !== startCondition.timezone
+      ) {
+        continue
+      }
+
+      const candidate = createRangeCandidate(
+        group,
+        {
+          source: SOURCE_TIME,
+          timeFunc: startCondition.timeFunc,
+          timezone: startCondition.timezone,
+          mode: MATCH_RANGE,
+          value: '',
+          rangeStart: startCondition.value,
+          rangeEnd: endCondition.value,
+        },
+        new Set([startIndex, endIndex])
+      )
+      if (candidate) candidates.push(candidate)
+    }
+  }
+
+  return candidates
+}
+
 function getExclusiveTimeRangeMultipliers(
   groups: RequestRuleGroup[]
 ): number[] | null {
-  const timeRanges: Array<{
-    condition: TimeCondition
-    multiplier: number
-    segments: Array<{ start: number; end: number }>
-  }> = []
-
-  for (const group of groups) {
-    if (!isSingleTimeRangeGroup(group)) return null
-    const condition = group.conditions[0] as TimeCondition
-    const multiplier = Number(group.multiplier)
-    const segments = getTimeRangeSegments(condition)
-    if (!Number.isFinite(multiplier) || multiplier <= 0 || !segments) {
-      return null
-    }
-    timeRanges.push({ condition, multiplier, segments })
+  const candidateGroups = groups.map(getExclusiveTimeRangeCandidates)
+  if (candidateGroups.some((candidates) => candidates.length === 0)) {
+    return null
   }
 
-  for (let i = 0; i < timeRanges.length; i += 1) {
-    for (let j = i + 1; j < timeRanges.length; j += 1) {
-      const left = timeRanges[i]
-      const right = timeRanges[j]
-      if (
-        left.condition.timeFunc !== right.condition.timeFunc ||
-        left.condition.timezone !== right.condition.timezone
-      ) {
-        return null
-      }
-      if (
-        left.segments.some((leftSegment) =>
-          right.segments.some((rightSegment) =>
-            timeSegmentsOverlap(leftSegment, rightSegment)
+  for (const baseCandidate of candidateGroups[0]) {
+    const timeRanges = [baseCandidate]
+    for (const candidates of candidateGroups.slice(1)) {
+      const match = candidates.find(
+        (candidate) =>
+          candidate.timeFunc === baseCandidate.timeFunc &&
+          candidate.timezone === baseCandidate.timezone &&
+          candidate.guardSignature === baseCandidate.guardSignature
+      )
+      if (!match) break
+      timeRanges.push(match)
+    }
+
+    if (timeRanges.length !== groups.length) continue
+
+    let hasOverlap = false
+    for (let i = 0; i < timeRanges.length; i += 1) {
+      for (let j = i + 1; j < timeRanges.length; j += 1) {
+        const left = timeRanges[i]
+        const right = timeRanges[j]
+        if (
+          left.segments.some((leftSegment) =>
+            right.segments.some((rightSegment) =>
+              timeSegmentsOverlap(leftSegment, rightSegment)
+            )
           )
-        )
-      ) {
-        return null
+        ) {
+          hasOverlap = true
+          break
+        }
       }
+      if (hasOverlap) break
     }
+
+    if (!hasOverlap) return timeRanges.map((range) => range.multiplier)
   }
 
-  return timeRanges.map((range) => range.multiplier)
+  return null
 }
 
 export function applyMultiplierRangeToTier(
@@ -747,19 +871,15 @@ function tryParseRequestCondition(expr: string): RequestCondition | null {
   return null
 }
 
-function isSingleTimeRangeGroup(group: RequestRuleGroup): boolean {
-  return (
-    group.conditions.length === 1 &&
-    group.conditions[0]?.source === SOURCE_TIME &&
-    group.conditions[0]?.mode === MATCH_RANGE
-  )
-}
-
-function tryParseRuleGroupConditions(expr: string): RequestCondition[] | null {
+function tryParseConjunctionConditions(
+  expr: string
+): RequestCondition[] | null {
   const directCondition = tryParseRequestCondition(expr)
   if (directCondition) return [directCondition]
 
   const andParts = splitTopLevelAnd(unwrapOuterParens(expr))
+  if (andParts.length <= 1) return null
+
   const conditions: RequestCondition[] = []
   for (const ap of andParts) {
     const cond = tryParseRequestCondition(ap.trim())
@@ -770,23 +890,83 @@ function tryParseRuleGroupConditions(expr: string): RequestCondition[] | null {
   return conditions
 }
 
-function tryParseRuleGroupFactors(part: string): RequestRuleGroup[] | null {
-  const m = part.match(/^\((.+)\s*\?\s*([\d.eE+-]+)\s*:\s*1\)$/s)
-  if (!m) return null
+function tryParseRuleConditionAlternatives(
+  expr: string
+): RequestCondition[][] | null {
+  const body = unwrapOuterParens(expr)
+  const directCondition = tryParseRequestCondition(body)
+  if (directCondition) return [[directCondition]]
 
-  const conditionStr = unwrapOuterParens(m[1])
-  const multiplier = m[2]
-
-  const groups: RequestRuleGroup[] = []
-  const orParts = splitTopLevelOr(conditionStr)
-  for (const part of orParts) {
-    const conditions = tryParseRuleGroupConditions(part)
-    if (!conditions) return null
-    groups.push({ conditions, multiplier })
+  const topLevelOrParts = splitTopLevelOr(body)
+  if (topLevelOrParts.length > 1) {
+    const alternatives: RequestCondition[][] = []
+    for (const part of topLevelOrParts) {
+      const conditions = tryParseConjunctionConditions(part)
+      if (!conditions) return null
+      alternatives.push(conditions)
+    }
+    return alternatives
   }
 
+  const andParts = splitTopLevelAnd(body)
+  if (andParts.length <= 1) {
+    const conditions = tryParseConjunctionConditions(body)
+    return conditions ? [conditions] : null
+  }
+
+  const sharedConditions: RequestCondition[] = []
+  let nestedAlternatives: RequestCondition[][] | null = null
+  for (const part of andParts) {
+    const directPart = tryParseRequestCondition(part.trim())
+    if (directPart) {
+      sharedConditions.push(directPart)
+      continue
+    }
+
+    const orParts = splitTopLevelOr(unwrapOuterParens(part))
+    if (orParts.length <= 1 || nestedAlternatives) return null
+
+    nestedAlternatives = []
+    for (const orPart of orParts) {
+      const conditions = tryParseConjunctionConditions(orPart)
+      if (!conditions) return null
+      nestedAlternatives.push(conditions)
+    }
+  }
+
+  if (!nestedAlternatives) {
+    return sharedConditions.length > 0 ? [sharedConditions] : null
+  }
+
+  return nestedAlternatives.map((conditions) => [
+    ...sharedConditions,
+    ...conditions,
+  ])
+}
+
+function tryParseRuleGroupFactors(part: string): RequestRuleGroup[] | null {
+  const body = unwrapOuterParens(part)
+  const ternary = findTopLevelTernary(body)
+  if (!ternary) return null
+
+  const conditionStr = body.slice(0, ternary.questionIndex)
+  const multiplier = parsePositiveNumericLiteral(
+    body.slice(ternary.questionIndex + 1, ternary.colonIndex)
+  )
+  const fallback = parsePositiveNumericLiteral(
+    body.slice(ternary.colonIndex + 1)
+  )
+  if (multiplier === null || fallback !== 1) return null
+
+  const alternatives = tryParseRuleConditionAlternatives(conditionStr)
+  if (!alternatives) return null
+
+  const groups = alternatives.map((conditions) => ({
+    conditions,
+    multiplier: String(multiplier),
+  }))
   if (groups.length <= 1) return groups
-  return groups.every(isSingleTimeRangeGroup) ? groups : null
+  return getExclusiveTimeRangeMultipliers(groups) ? groups : null
 }
 
 export function tryParseRequestRuleExpr(
