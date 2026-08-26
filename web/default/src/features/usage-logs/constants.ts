@@ -185,7 +185,29 @@ export const TASK_ACTIONS = {
   FIRST_TAIL_GENERATE: 'firstTailGenerate', // 首尾生视频
   REFERENCE_GENERATE: 'referenceGenerate', // 参照生视频
   REMIX_GENERATE: 'remixGenerate', // 视频 Remix
+
+  // VCLM video generation actions
+  VCLM_IMAGE_TO_VIDEO: 'SubmitImageToVideoJob',
+  VCLM_TEXT_TO_VIDEO: 'SubmitTextToVideoJob',
+  VCLM_GENERAL_IMAGE_TO_VIDEO: 'SubmitImageToVideoGeneralJob',
+  VCLM_HUNYUAN_VIDEO: 'SubmitHunyuanToVideoJob',
+  VCLM_VIDU_IMAGE_TO_VIDEO: 'SubmitImageToVideoViduJob',
+  VCLM_VIDU_TEXT_TO_VIDEO: 'SubmitTextToVideoViduJob',
 } as const
+
+export const VIDEO_TASK_ACTIONS = [
+  TASK_ACTIONS.GENERATE,
+  TASK_ACTIONS.TEXT_GENERATE,
+  TASK_ACTIONS.FIRST_TAIL_GENERATE,
+  TASK_ACTIONS.REFERENCE_GENERATE,
+  TASK_ACTIONS.REMIX_GENERATE,
+  TASK_ACTIONS.VCLM_IMAGE_TO_VIDEO,
+  TASK_ACTIONS.VCLM_TEXT_TO_VIDEO,
+  TASK_ACTIONS.VCLM_GENERAL_IMAGE_TO_VIDEO,
+  TASK_ACTIONS.VCLM_HUNYUAN_VIDEO,
+  TASK_ACTIONS.VCLM_VIDU_IMAGE_TO_VIDEO,
+  TASK_ACTIONS.VCLM_VIDU_TEXT_TO_VIDEO,
+] as readonly string[]
 
 /**
  * Task status
@@ -298,6 +320,30 @@ export const TASK_ACTION_MAPPINGS: Record<string, StatusMapping> = {
   },
   [TASK_ACTIONS.REMIX_GENERATE]: {
     label: 'Video Remix',
+    variant: 'blue',
+  },
+  [TASK_ACTIONS.VCLM_IMAGE_TO_VIDEO]: {
+    label: 'Image to Video',
+    variant: 'blue',
+  },
+  [TASK_ACTIONS.VCLM_TEXT_TO_VIDEO]: {
+    label: 'Text to Video',
+    variant: 'blue',
+  },
+  [TASK_ACTIONS.VCLM_GENERAL_IMAGE_TO_VIDEO]: {
+    label: 'Image to Video',
+    variant: 'blue',
+  },
+  [TASK_ACTIONS.VCLM_HUNYUAN_VIDEO]: {
+    label: 'Text to Video',
+    variant: 'blue',
+  },
+  [TASK_ACTIONS.VCLM_VIDU_IMAGE_TO_VIDEO]: {
+    label: 'Image to Video',
+    variant: 'blue',
+  },
+  [TASK_ACTIONS.VCLM_VIDU_TEXT_TO_VIDEO]: {
+    label: 'Text to Video',
     variant: 'blue',
   },
 }

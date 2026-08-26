@@ -38,8 +38,15 @@ import {
   TASK_ACTION_FIRST_TAIL_GENERATE,
   TASK_ACTION_GENERATE,
   TASK_ACTION_REFERENCE_GENERATE,
-  TASK_ACTION_TEXT_GENERATE,
   TASK_ACTION_REMIX_GENERATE,
+  TASK_ACTION_TEXT_GENERATE,
+  TASK_ACTION_VCLM_GENERAL_IMAGE_TO_VIDEO,
+  TASK_ACTION_VCLM_HUNYUAN_VIDEO,
+  TASK_ACTION_VCLM_IMAGE_TO_VIDEO,
+  TASK_ACTION_VCLM_TEXT_TO_VIDEO,
+  TASK_ACTION_VCLM_VIDU_IMAGE_TO_VIDEO,
+  TASK_ACTION_VCLM_VIDU_TEXT_TO_VIDEO,
+  VIDEO_TASK_ACTIONS,
 } from '../../../constants/common.constant';
 import { CHANNEL_OPTIONS } from '../../../constants/channel.constants';
 import { stringToColor } from '../../../helpers/render';
@@ -132,6 +139,22 @@ const renderType = (type, t) => {
       return (
         <Tag color='blue' shape='circle' prefixIcon={<Sparkles size={14} />}>
           {t('视频Remix')}
+        </Tag>
+      );
+    case TASK_ACTION_VCLM_IMAGE_TO_VIDEO:
+    case TASK_ACTION_VCLM_GENERAL_IMAGE_TO_VIDEO:
+    case TASK_ACTION_VCLM_VIDU_IMAGE_TO_VIDEO:
+      return (
+        <Tag color='blue' shape='circle' prefixIcon={<Sparkles size={14} />}>
+          {t('图生视频')}
+        </Tag>
+      );
+    case TASK_ACTION_VCLM_TEXT_TO_VIDEO:
+    case TASK_ACTION_VCLM_HUNYUAN_VIDEO:
+    case TASK_ACTION_VCLM_VIDU_TEXT_TO_VIDEO:
+      return (
+        <Tag color='blue' shape='circle' prefixIcon={<Sparkles size={14} />}>
+          {t('文生视频')}
         </Tag>
       );
     default:
@@ -301,15 +324,10 @@ export const getTaskLogsColumns = ({
         const displayText = String(record.username || userId || '?');
         return (
           <Space>
-            <Avatar
-              size='extra-small'
-              color={stringToColor(displayText)}
-            >
+            <Avatar size='extra-small' color={stringToColor(displayText)}>
               {displayText.slice(0, 1)}
             </Avatar>
-            <Typography.Text>
-              {displayText}
-            </Typography.Text>
+            <Typography.Text>{displayText}</Typography.Text>
           </Space>
         );
       },
@@ -408,15 +426,11 @@ export const getTaskLogsColumns = ({
         }
 
         // 视频预览：优先使用 result_url，兼容旧数据 fail_reason 中的 URL
-        const isVideoTask =
-          record.action === TASK_ACTION_GENERATE ||
-          record.action === TASK_ACTION_TEXT_GENERATE ||
-          record.action === TASK_ACTION_FIRST_TAIL_GENERATE ||
-          record.action === TASK_ACTION_REFERENCE_GENERATE ||
-          record.action === TASK_ACTION_REMIX_GENERATE;
+        const isVideoTask = VIDEO_TASK_ACTIONS.includes(record.action);
         const isSuccess = record.status === 'SUCCESS';
         const resultUrl = record.result_url;
-        const hasResultUrl = typeof resultUrl === 'string' && /^https?:\/\//.test(resultUrl);
+        const hasResultUrl =
+          typeof resultUrl === 'string' && /^https?:\/\//.test(resultUrl);
         if (isSuccess && isVideoTask && hasResultUrl) {
           return (
             <a

@@ -29,7 +29,7 @@ import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
 import { formatTimestampToDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-import { TASK_ACTIONS, TASK_STATUS } from '../../constants'
+import { TASK_STATUS, VIDEO_TASK_ACTIONS } from '../../constants'
 import { taskActionMapper, taskStatusMapper } from '../../lib/mappers'
 import type { TaskLog } from '../../types'
 import {
@@ -92,13 +92,7 @@ function AudioPreviewCell({ log }: { log: TaskLog }) {
 }
 
 function isVideoTaskAction(action: string): boolean {
-  return (
-    action === TASK_ACTIONS.GENERATE ||
-    action === TASK_ACTIONS.TEXT_GENERATE ||
-    action === TASK_ACTIONS.FIRST_TAIL_GENERATE ||
-    action === TASK_ACTIONS.REFERENCE_GENERATE ||
-    action === TASK_ACTIONS.REMIX_GENERATE
-  )
+  return VIDEO_TASK_ACTIONS.includes(action)
 }
 
 function canOpenVideoTask(log: TaskLog): boolean {
