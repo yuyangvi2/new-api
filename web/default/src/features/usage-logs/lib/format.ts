@@ -110,7 +110,7 @@ export function getViduEquivalentCompletionTokens(
   log: UsageLog,
   other: LogOtherData | null
 ): number {
-  if (log.completion_tokens > 0 || !/^vidu/i.test(log.model_name)) {
+  if (log.completion_tokens > 0 || other?.is_task !== true) {
     return log.completion_tokens || 0
   }
 
@@ -223,7 +223,7 @@ export function decodeBillingExprB64(exprB64: string | undefined): string {
 
     return decodeURIComponent(
       Array.prototype.map
-        .call(bytes, (byte: number) => '%' + byte.toString(16).padStart(2, '0'))
+        .call(bytes, (byte: number) => `%${byte.toString(16).padStart(2, '0')}`)
         .join('')
     )
   } catch {

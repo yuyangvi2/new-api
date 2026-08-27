@@ -144,10 +144,7 @@ function renderType(type, t) {
 
 function buildStreamStatusTooltip(ss, t) {
   if (!ss) return null;
-  const lines = [
-    t('流状态') + '：' + t('异常'),
-    (ss.end_reason || 'unknown'),
-  ];
+  const lines = [t('流状态') + '：' + t('异常'), ss.end_reason || 'unknown'];
   if (ss.error_count > 0) {
     lines.push(`${t('软错误')}: ${ss.error_count}`);
   }
@@ -185,11 +182,7 @@ function renderIsStream(bool, t, streamStatus) {
                 userSelect: 'none',
               }}
             >
-              <CircleAlert
-                size={14}
-                strokeWidth={2.5}
-                color='currentColor'
-              />
+              <CircleAlert size={14} strokeWidth={2.5} color='currentColor' />
             </span>
           </Tooltip>
         )}
@@ -344,6 +337,25 @@ function formatTokenCount(value) {
   return toTokenNumber(value).toLocaleString();
 }
 
+function getTaskEquivalentCompletionTokens(record, other) {
+  const completionTokens = toTokenNumber(record.completion_tokens);
+  if (completionTokens > 0 || other?.is_task !== true) {
+    return completionTokens;
+  }
+
+  const quota = toTokenNumber(record.quota);
+  const modelRatio = toTokenNumber(other.model_ratio);
+  const groupRatio = toTokenNumber(other.group_ratio);
+  if (quota <= 0 || modelRatio <= 0 || groupRatio <= 0) {
+    return 0;
+  }
+
+  const equivalentTokens = quota / (modelRatio * groupRatio);
+  return Number.isFinite(equivalentTokens) && equivalentTokens > 0
+    ? Math.round(equivalentTokens)
+    : 0;
+}
+
 function getPromptCacheSummary(other) {
   if (!other || typeof other !== 'object') {
     return null;
@@ -461,7 +473,11 @@ function getUsageLogDetailSummary(record, text, billingDisplayMode, t) {
     };
   }
 
-  const summaryOpts = { ...other, displayMode: billingDisplayMode, outputMode: 'segments' };
+  const summaryOpts = {
+    ...other,
+    displayMode: billingDisplayMode,
+    outputMode: 'segments',
+  };
 
   if (other?.billing_mode === 'tiered_expr') {
     return { segments: renderTieredModelPriceSimple(summaryOpts) };
@@ -790,12 +806,17 @@ export const getLogsColumns = ({
       title: t('输出'),
       dataIndex: 'completion_tokens',
       render: (text, record, index) => {
-        return parseInt(text) > 0 &&
+        const other = getLogOther(record.other);
+        const completionTokens = getTaskEquivalentCompletionTokens(
+          record,
+          other,
+        );
+        return completionTokens > 0 &&
           (record.type === 0 ||
             record.type === 2 ||
             record.type === 5 ||
             record.type === 6) ? (
-          <>{<span> {text} </span>}</>
+          <>{<span> {formatTokenCount(completionTokens)} </span>}</>
         ) : (
           <></>
         );

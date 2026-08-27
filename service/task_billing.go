@@ -56,8 +56,7 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 	}
 	attachQuotaSaturation(c, info, other)
 	completionTokens := 0
-	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(info.OriginModelName)), "vidu") &&
-		info.PriceData.ModelRatio > 0 && info.PriceData.GroupRatioInfo.GroupRatio > 0 {
+	if info.PriceData.ModelRatio > 0 && info.PriceData.GroupRatioInfo.GroupRatio > 0 {
 		completionTokens = common.QuotaRound(float64(info.PriceData.Quota) /
 			(info.PriceData.ModelRatio * info.PriceData.GroupRatioInfo.GroupRatio))
 	}
