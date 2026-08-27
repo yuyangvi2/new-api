@@ -22,8 +22,6 @@ For commercial licensing, please contact support@quantumnous.com
 import {
   getAllLogs,
   getUserLogs,
-  getAllMidjourneyLogs,
-  getUserMidjourneyLogs,
   getAllTaskLogs,
   getUserTaskLogs,
 } from '../api'
@@ -36,7 +34,6 @@ import type {
   GetLogsParams,
   GetLogsResponse,
   FetchLogsConfig,
-  GetMidjourneyLogsParams,
   GetTaskLogsParams,
 } from '../types'
 import { buildTimeRangeParams } from './time-range'
@@ -201,42 +198,36 @@ export async function fetchLogsByCategory(
   const { logCategory, isAdmin, page, pageSize, searchParams, columnFilters } =
     config
 
-  if (logCategory === 'common') {
+  if (logCategory === 'common' || logCategory === 'drawing') {
     const params = buildApiParams({
       page,
       pageSize,
-      searchParams,
+      searchParams:
+        logCategory === 'drawing'
+          ? { ...searchParams, model: searchParams.filter }
+          : searchParams,
       columnFilters,
       isAdmin,
     })
+    if (logCategory === 'drawing') {
+      params.type = 2
+      params.request_type = 'image'
+    }
     return isAdmin ? await getAllLogs(params) : await getUserLogs(params)
   }
 
-  // For drawing and task logs
   const baseParams = buildBaseParams({
     page,
     pageSize,
     searchParams,
-    logCategory,
+    logCategory: 'task',
   })
 
   const paramsWithFilter = {
     ...baseParams,
-    ...(logCategory === 'drawing'
-      ? { mj_id: searchParams.filter as string | undefined }
-      : {}),
-    ...(logCategory === 'task'
-      ? { task_id: searchParams.filter as string | undefined }
-      : {}),
+    task_id: searchParams.filter as string | undefined,
   }
 
-  if (logCategory === 'drawing') {
-    return isAdmin
-      ? await getAllMidjourneyLogs(paramsWithFilter as GetMidjourneyLogsParams)
-      : await getUserMidjourneyLogs(paramsWithFilter as GetMidjourneyLogsParams)
-  }
-
-  // task logs
   return isAdmin
     ? await getAllTaskLogs(paramsWithFilter as GetTaskLogsParams)
     : await getUserTaskLogs(paramsWithFilter as GetTaskLogsParams)

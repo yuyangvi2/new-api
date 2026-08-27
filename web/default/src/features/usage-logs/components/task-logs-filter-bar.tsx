@@ -49,7 +49,7 @@ function getFilterValue(
   logCategory: TaskLikeLogCategory
 ): string {
   if (logCategory === 'drawing') {
-    return (filters as DrawingLogFilters).mjId || ''
+    return (filters as DrawingLogFilters).model || ''
   }
   return (filters as TaskLogFilters).taskId || ''
 }
@@ -60,7 +60,7 @@ function setFilterValue(
   value: string
 ): TaskLogsFilters {
   if (logCategory === 'drawing') {
-    return { ...filters, mjId: value }
+    return { ...filters, model: value }
   }
   return { ...filters, taskId: value }
 }
@@ -93,7 +93,7 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
       props.logCategory === 'drawing'
         ? {
             ...baseFilters,
-            ...(searchParams.filter ? { mjId: searchParams.filter } : {}),
+            ...(searchParams.filter ? { model: searchParams.filter } : {}),
           }
         : {
             ...baseFilters,
@@ -163,7 +163,7 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
   const filterValue = getFilterValue(filters, props.logCategory)
   const placeholder =
     props.logCategory === 'drawing'
-      ? t('Filter by MjProxy task ID')
+      ? t('Filter by model')
       : t('Filter by task ID')
   const hasAdditionalFilters = !!filterValue || !!filters.channel
   const dateRangeFilter = (
@@ -181,7 +181,7 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
   const taskIdFilter = (
     <LogsFilterField>
       <LogsFilterInput
-        aria-label={t('Task ID')}
+        aria-label={props.logCategory === 'drawing' ? t('Model') : t('Task ID')}
         placeholder={placeholder}
         value={filterValue}
         onChange={(e) => handleFilterChange(e.target.value)}

@@ -179,7 +179,7 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
     ensurePageInRange,
   })
 
-  const isCommon = logCategory === 'common'
+  const usesCommonLogRows = logCategory !== 'task'
 
   return (
     <DataTablePage
@@ -206,7 +206,7 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
         />
       }
       toolbar={
-        isCommon ? (
+        logCategory === 'common' ? (
           <CommonLogsFilterBar table={table} />
         ) : (
           <TaskLogsFilterBar table={table} logCategory={logCategory} />
@@ -217,8 +217,10 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
           | number
           | undefined
         let tintClass =
-          isCommon && logType != null ? (logTypeRowTint[logType] ?? '') : ''
-        if (isCommon && isAdmin) {
+          usesCommonLogRows && logType != null
+            ? (logTypeRowTint[logType] ?? '')
+            : ''
+        if (usesCommonLogRows && isAdmin) {
           const other = parseLogOther(
             ((row.original as Record<string, unknown>).other as string) ?? ''
           )
@@ -232,7 +234,7 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
             key={row.id}
             row={row}
             className={cn('transition-colors', tintClass)}
-            getColumnClassName={() => (isCommon ? 'py-2' : 'py-3.5')}
+            getColumnClassName={() => (usesCommonLogRows ? 'py-2' : 'py-3.5')}
           />
         )
       }}

@@ -59,7 +59,7 @@ export interface CommonLogFilters extends CommonFilters {
  * Drawing logs specific filters
  */
 export interface DrawingLogFilters extends CommonFilters {
-  mjId?: string
+  model?: string
 }
 
 /**
@@ -298,6 +298,7 @@ export interface GetLogsParams {
   group?: string
   request_id?: string
   upstream_request_id?: string
+  request_type?: 'image'
 }
 
 export interface GetLogsResponse {
