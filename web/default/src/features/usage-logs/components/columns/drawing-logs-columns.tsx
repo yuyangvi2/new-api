@@ -48,8 +48,8 @@ import {
   mjSubmitResultMapper,
 } from '../../lib/mappers'
 import type { MidjourneyLog } from '../../types'
-import { ImageDialog } from '../dialogs/image-dialog'
 import { PromptDialog } from '../dialogs/prompt-dialog'
+import { DrawingImagePreview } from '../drawing-image-preview'
 import {
   createDurationColumn,
   createChannelColumn,
@@ -193,36 +193,25 @@ export function useDrawingLogsColumns(
     {
       accessorKey: 'image_url',
       header: t('Image'),
-      cell: function ImageCell({ row }) {
+      cell: ({ row }) => {
         const log = row.original
         const imageUrl = row.getValue('image_url') as string
-        const [dialogOpen, setDialogOpen] = useState(false)
 
         if (!imageUrl) {
           return <span className='text-muted-foreground/60 text-xs'>-</span>
         }
 
         return (
-          <>
-            <button
-              type='button'
-              className='group text-left text-xs'
-              onClick={() => setDialogOpen(true)}
-              title={t('Click to view image')}
-            >
-              <span className='text-foreground truncate leading-snug group-hover:underline'>
-                {t('View')}
-              </span>
-            </button>
-            <ImageDialog
-              imageUrl={imageUrl}
-              taskId={log.mj_id}
-              open={dialogOpen}
-              onOpenChange={setDialogOpen}
-            />
-          </>
+          <DrawingImagePreview
+            key={imageUrl}
+            imageUrl={imageUrl}
+            taskId={log.mj_id}
+          />
         )
       },
+      size: 80,
+      minSize: 80,
+      maxSize: 80,
     },
     {
       accessorKey: 'prompt',

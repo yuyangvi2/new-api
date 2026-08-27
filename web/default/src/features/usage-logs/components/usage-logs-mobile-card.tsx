@@ -275,7 +275,45 @@ function DrawingLogsCard<TData>({
 }: {
   cells: Map<string, Cell<TData, unknown>>
 }) {
-  return <CommonLogsCard cells={cells} />
+  const { t } = useTranslation()
+
+  return (
+    <div className='flex flex-col gap-2.5'>
+      <div className='flex min-w-0 items-start gap-3'>
+        <div className='flex min-w-0 flex-1 flex-col gap-2'>
+          <CompactCell cell={cells.get('mj_id')} />
+          <div className='flex flex-wrap items-center gap-2'>
+            <CompactCell cell={cells.get('action')} />
+            <CompactCell cell={cells.get('progress')} />
+          </div>
+        </div>
+        <CompactCell
+          cell={cells.get('image_url')}
+          className='shrink-0 [&_button]:max-w-none'
+        />
+      </div>
+
+      <div className='grid grid-cols-2 gap-1.5'>
+        <SummaryField
+          label={t('Submit Time')}
+          cell={cells.get('submit_time')}
+        />
+        <SummaryField label={t('Duration')} cell={cells.get('duration')} />
+        <SummaryField label={t('Channel')} cell={cells.get('channel_id')} />
+        <SummaryField label={t('Submit Result')} cell={cells.get('code')} />
+        <SummaryField
+          label={t('Prompt')}
+          cell={cells.get('prompt')}
+          className='col-span-2'
+        />
+        <SummaryField
+          label={t('Fail Reason')}
+          cell={cells.get('fail_reason')}
+          className='col-span-2 bg-transparent px-0 py-0'
+        />
+      </div>
+    </div>
+  )
 }
 
 export function UsageLogsMobileList<TData>({
