@@ -39,6 +39,9 @@ import type {
   GetMidjourneyLogsParams,
   GetTaskLogsParams,
 } from '../types'
+import { buildTimeRangeParams } from './time-range'
+
+export { getDefaultTimeRange } from './time-range'
 
 // ============================================================================
 // Type Checkers & Utilities
@@ -73,79 +76,15 @@ export function isPerCallBilling(modelPrice?: number): boolean {
 }
 
 /**
- * Get default time range (today 00:00:00 to now + 1 hour)
- */
-export function getDefaultTimeRange(): { start: Date; end: Date } {
-  const now = new Date()
-  const start = new Date(now)
-  start.setHours(0, 0, 0, 0)
-  const end = new Date(now.getTime() + 3600 * 1000) // +1 hour
-
-  return { start, end }
-}
-
-/**
- * Convert milliseconds timestamp to seconds for API
- */
-function timestampToSeconds(ms: number): number {
-  return Math.floor(ms / 1000)
-}
-
-/**
- * Build query parameters from filters
- */
-export function buildQueryParams(
-  params: Record<string, unknown>
-): URLSearchParams {
-  const queryParams = new URLSearchParams()
-
-  Object.entries(params).forEach(([key, value]) => {
-    // Keep 0 as a valid value, only filter out undefined, null, and empty string
-    if (value !== undefined && value !== null && value !== '') {
-      queryParams.append(key, String(value))
-    }
-  })
-
-  return queryParams
-}
-
-/**
- * Build time range parameters with default values
- * Shared logic for all log types
- */
-function buildTimeRangeParams(
-  searchParams: Record<string, unknown>,
-  useMilliseconds: boolean
-): { start_timestamp?: number; end_timestamp?: number } {
-  const hasTimeParams = searchParams.startTime ?? searchParams.endTime
-  const defaultTimeRange = !hasTimeParams ? getDefaultTimeRange() : null
-
-  const convertTimestamp = (timestamp: number) =>
-    useMilliseconds ? timestamp : timestampToSeconds(timestamp)
-
-  const getTimestamp = (paramTime?: unknown, defaultTime?: Date) => {
-    const time = (paramTime as number) || defaultTime?.getTime()
-    return time ? convertTimestamp(time) : undefined
-  }
-
-  return {
-    start_timestamp: getTimestamp(
-      searchParams.startTime,
-      defaultTimeRange?.start
-    ),
-    end_timestamp: getTimestamp(searchParams.endTime, defaultTimeRange?.end),
-  }
-}
-
-/**
  * Build base parameters with time range (for drawing and task logs)
- * @param useMilliseconds - Whether to use millisecond timestamps (true for drawing logs, false for task logs)
+ * Drawing logs use millisecond timestamps and default to the last 30 days.
+ * Other task logs use second timestamps and default to today.
  */
 export function buildBaseParams(config: {
   page: number
   pageSize: number
   searchParams: Record<string, unknown>
-  useMilliseconds?: boolean
+  logCategory: 'drawing' | 'task'
 }): {
   p: number
   page_size: number
@@ -153,7 +92,7 @@ export function buildBaseParams(config: {
   start_timestamp?: number
   end_timestamp?: number
 } {
-  const { page, pageSize, searchParams, useMilliseconds = false } = config
+  const { page, pageSize, searchParams, logCategory } = config
 
   return {
     p: page,
@@ -163,7 +102,7 @@ export function buildBaseParams(config: {
           channel_id: String(searchParams.channel),
         }
       : {}),
-    ...buildTimeRangeParams(searchParams, useMilliseconds),
+    ...buildTimeRangeParams(searchParams, logCategory),
   }
 }
 
@@ -215,7 +154,7 @@ export function buildApiParams(config: {
     ...(searchParams.upstreamRequestId
       ? { upstream_request_id: String(searchParams.upstreamRequestId) }
       : {}),
-    ...buildTimeRangeParams(searchParams, false),
+    ...buildTimeRangeParams(searchParams, 'common'),
   }
 
   // Override with column filters if present
@@ -278,7 +217,7 @@ export async function fetchLogsByCategory(
     page,
     pageSize,
     searchParams,
-    useMilliseconds: logCategory === 'drawing',
+    logCategory,
   })
 
   const paramsWithFilter = {
