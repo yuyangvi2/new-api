@@ -426,6 +426,9 @@ func validateSeedanceOfficialRequest(req *requestPayload) error {
 		default:
 			return fmt.Errorf("resolution must be 480p, 720p, 1080p, or 4k")
 		}
+		if strings.EqualFold(strings.TrimSpace(req.Model), "doubao-seedance-2-5") && resolution == "4k" {
+			return fmt.Errorf("doubao-seedance-2-5 resolution must be 480p, 720p, or 1080p")
+		}
 	}
 	if ratio := strings.ToLower(strings.TrimSpace(req.Ratio)); ratio != "" {
 		switch ratio {

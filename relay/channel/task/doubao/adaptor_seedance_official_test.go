@@ -165,6 +165,16 @@ func TestSeedanceOfficialValidateRequestAllowsAutoDuration(t *testing.T) {
 	assert.NoError(t, validateSeedanceOfficialRequest(req))
 }
 
+func TestSeedanceOfficialValidateRequestRejectsSeedance25Unsupported4K(t *testing.T) {
+	req := &requestPayload{
+		Model:      "doubao-seedance-2-5",
+		Content:    []ContentItem{{Type: "text", Text: "make a video"}},
+		Resolution: "4k",
+	}
+
+	assert.Error(t, validateSeedanceOfficialRequest(req))
+}
+
 func TestSeedanceOfficialDirectRequestPreservesDataURIImageURL(t *testing.T) {
 	dataURI := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"
 	body := `{

@@ -70,6 +70,26 @@ const SEEDANCE_STANDARD_TIERS: SeedanceOfficialPriceTier[] = [
   },
 ]
 
+const SEEDANCE_2_5_TIERS: SeedanceOfficialPriceTier[] = [
+  {
+    key: 'base',
+    resolutionLabelKey: '480p/720p',
+    noVideoLabelKey: '480p/720p no video input',
+    videoInputLabelKey: '480p/720p video input',
+    noVideoPriceCNY: 70,
+    videoInputPriceCNY: 42,
+    primary: true,
+  },
+  {
+    key: '1080p',
+    resolutionLabelKey: '1080p',
+    noVideoLabelKey: '1080p no video input',
+    videoInputLabelKey: '1080p video input',
+    noVideoPriceCNY: 77,
+    videoInputPriceCNY: 46,
+  },
+]
+
 const SEEDANCE_FAST_TIERS: SeedanceOfficialPriceTier[] = [
   {
     key: 'base',
@@ -98,6 +118,7 @@ const SEEDANCE_OFFICIAL_PRICE_TIERS: Record<
   string,
   SeedanceOfficialPriceTier[]
 > = {
+  'doubao-seedance-2-5': SEEDANCE_2_5_TIERS,
   'doubao-seedance-2.0': SEEDANCE_STANDARD_TIERS,
   'doubao-seedance-2-0-260128': SEEDANCE_STANDARD_TIERS,
   'doubao-seedance-2-0-fast': SEEDANCE_FAST_TIERS,
@@ -165,7 +186,10 @@ export function buildSeedanceOfficialPriceEntries(
       {
         key: `${tier.key}-video-input`,
         labelKey: tier.videoInputLabelKey,
-        formatted: formatSeedanceOfficialPrice(tier.videoInputPriceCNY, options),
+        formatted: formatSeedanceOfficialPrice(
+          tier.videoInputPriceCNY,
+          options
+        ),
         unit: 'M',
       }
     )
