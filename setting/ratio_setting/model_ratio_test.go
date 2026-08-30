@@ -58,6 +58,20 @@ func TestGrokImagineImage20HasDefaultImagePricing(t *testing.T) {
 	assert.Equal(t, 1.0, ratio)
 }
 
+func TestSeedance25HasOfficialBaseModelRatio(t *testing.T) {
+	originalRatio := ModelRatio2JSONString()
+	InitRatioSettings()
+	t.Cleanup(func() {
+		require.NoError(t, UpdateModelRatioByJSONString(originalRatio))
+	})
+
+	ratio, ok, matchName := GetModelRatio("doubao-seedance-2-5")
+
+	require.True(t, ok)
+	assert.Equal(t, 70.0/14.0, ratio)
+	assert.Equal(t, "doubao-seedance-2-5", matchName)
+}
+
 func TestGetModelRatioUsesViduQFamilyFallback(t *testing.T) {
 	original := ModelRatio2JSONString()
 	t.Cleanup(func() {

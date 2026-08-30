@@ -279,7 +279,8 @@ var defaultModelRatio = map[string]float64{
 	"MiniMax/MiniMax-M2.1":                      2.1 * RMBPerMillion,
 	"MiniMax-M2.1-highspeed":                    4.2 * RMBPerMillion,
 	"MiniMax-M2":                                2.1 * RMBPerMillion,
-	// Doubao Seedance 2.0 video base tier: official 480p/720p, no video input, RMB per 1M tokens.
+	// Doubao Seedance video base tier: official 480p/720p, no video input, RMB per 1M tokens.
+	"doubao-seedance-2-5":               70.0 / 14.0,
 	"doubao-seedance-2.0":               46.0 / 14.0,
 	"doubao-seedance-2-0-260128":        46.0 / 14.0,
 	"dreamina-seedance-2-0-260128":      46.0 / 14.0,

@@ -99,6 +99,30 @@ func TestSeedancePricePerMillionCNYSupportsOfficialStandardAlias(t *testing.T) {
 	assert.True(t, IsSeedanceModel("doubao-seedance-2.0"))
 }
 
+func TestSeedance25UsesOfficialResolutionAndInputPrices(t *testing.T) {
+	tests := []struct {
+		name          string
+		resolution    string
+		hasVideoInput bool
+		want          float64
+	}{
+		{name: "720p without video input", resolution: "720p", want: 70.0},
+		{name: "720p with video input", resolution: "720p", hasVideoInput: true, want: 42.0},
+		{name: "1080p without video input", resolution: "1080p", want: 77.0},
+		{name: "1080p with video input", resolution: "1080p", hasVideoInput: true, want: 46.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pricePerMillionCNY, ok := SeedancePricePerMillionCNY("doubao-seedance-2-5", tt.resolution, tt.hasVideoInput)
+
+			require.True(t, ok)
+			assert.Equal(t, tt.want, pricePerMillionCNY)
+			assert.True(t, IsSeedanceModel("doubao-seedance-2-5"))
+		})
+	}
+}
+
 func TestSeedancePricePerMillionCNYSupportsOfficialMiniAndFastAliases(t *testing.T) {
 	tests := []struct {
 		model         string
