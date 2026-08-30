@@ -2,6 +2,7 @@ package doubao
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -42,26 +43,24 @@ type MediaURL struct {
 }
 
 type requestPayload struct {
-	Model                 string         `json:"model"`
-	Content               []ContentItem  `json:"content,omitempty"`
-	CallbackURL           string         `json:"callback_url,omitempty"`
-	ReturnLastFrame       *dto.BoolValue `json:"return_last_frame,omitempty"`
-	ServiceTier           string         `json:"service_tier,omitempty"`
-	ExecutionExpiresAfter *dto.IntValue  `json:"execution_expires_after,omitempty"`
-	GenerateAudio         *dto.BoolValue `json:"generate_audio,omitempty"`
-	Draft                 *dto.BoolValue `json:"draft,omitempty"`
-	Tools                 []struct {
-		Type string `json:"type,omitempty"`
-	} `json:"tools,omitempty"`
-	SafetyIdentifier string         `json:"safety_identifier,omitempty"`
-	Priority         *dto.IntValue  `json:"priority,omitempty"`
-	Resolution       string         `json:"resolution,omitempty"`
-	Ratio            string         `json:"ratio,omitempty"`
-	Duration         *dto.IntValue  `json:"duration,omitempty"`
-	Frames           *dto.IntValue  `json:"frames,omitempty"`
-	Seed             *dto.IntValue  `json:"seed,omitempty"`
-	CameraFixed      *dto.BoolValue `json:"camera_fixed,omitempty"`
-	Watermark        *dto.BoolValue `json:"watermark,omitempty"`
+	Model                 string          `json:"model"`
+	Content               []ContentItem   `json:"content,omitempty"`
+	CallbackURL           string          `json:"callback_url,omitempty"`
+	ReturnLastFrame       *dto.BoolValue  `json:"return_last_frame,omitempty"`
+	ServiceTier           string          `json:"service_tier,omitempty"`
+	ExecutionExpiresAfter *dto.IntValue   `json:"execution_expires_after,omitempty"`
+	GenerateAudio         *dto.BoolValue  `json:"generate_audio,omitempty"`
+	Draft                 *dto.BoolValue  `json:"draft,omitempty"`
+	Tools                 json.RawMessage `json:"tools,omitempty"`
+	SafetyIdentifier      string          `json:"safety_identifier,omitempty"`
+	Priority              *dto.IntValue   `json:"priority,omitempty"`
+	Resolution            string          `json:"resolution,omitempty"`
+	Ratio                 string          `json:"ratio,omitempty"`
+	Duration              *dto.IntValue   `json:"duration,omitempty"`
+	Frames                *dto.IntValue   `json:"frames,omitempty"`
+	Seed                  *dto.IntValue   `json:"seed,omitempty"`
+	CameraFixed           *dto.BoolValue  `json:"camera_fixed,omitempty"`
+	Watermark             *dto.BoolValue  `json:"watermark,omitempty"`
 }
 
 type responsePayload struct {

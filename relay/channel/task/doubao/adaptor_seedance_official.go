@@ -2,6 +2,7 @@ package doubao
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -226,13 +227,18 @@ func (a *SeedanceOfficialTaskAdaptor) ParseTaskResult(respBody []byte) (*relayco
 	}
 
 	taskResult := &relaycommon.TaskInfo{
-		Code:             0,
-		TaskID:           response.ID,
-		CompletionTokens: response.Usage.CompletionTokens,
-		TotalTokens:      response.Usage.TotalTokens,
+		Code:   0,
+		TaskID: response.ID,
 	}
-	errorReason := firstNonEmptyString(response.Error.Message, response.Error.Code)
-	if response.ResponseMetadata.Error != nil {
+	if response.Usage != nil {
+		taskResult.CompletionTokens = response.Usage.CompletionTokens
+		taskResult.TotalTokens = response.Usage.TotalTokens
+	}
+	errorReason := ""
+	if response.Error != nil {
+		errorReason = firstNonEmptyString(response.Error.Message, response.Error.Code)
+	}
+	if response.ResponseMetadata != nil && response.ResponseMetadata.Error != nil {
 		errorReason = firstNonEmptyString(response.ResponseMetadata.Error.Message, response.ResponseMetadata.Error.Code, errorReason)
 	}
 	status := strings.ToLower(strings.TrimSpace(response.Status))
@@ -255,7 +261,9 @@ func (a *SeedanceOfficialTaskAdaptor) ParseTaskResult(respBody []byte) (*relayco
 	case "succeeded", "success", "completed":
 		taskResult.Status = model.TaskStatusSuccess
 		taskResult.Progress = taskcommon.ProgressComplete
-		taskResult.Url = response.Content.VideoURL
+		if response.Content != nil {
+			taskResult.Url = response.Content.VideoURL
+		}
 	case "failed", "cancelled", "canceled", "expired":
 		taskResult.Status = model.TaskStatusFailure
 		taskResult.Progress = taskcommon.ProgressComplete
@@ -294,39 +302,65 @@ func (a *SeedanceOfficialTaskAdaptor) ConvertToSeedanceVideo(originTask *model.T
 	default:
 		status = gjson.GetBytes(originTask.Data, "status").String()
 	}
-	return common.Marshal(SeedanceOfficialResponse{
-		ID:     originTask.TaskID,
-		Model:  TaskModelName(originTask),
-		Status: status,
-		Content: SeedanceOfficialResponseContent{
-			VideoURL: originTask.GetResultURL(),
-		},
-		Usage: SeedanceOfficialResponseUsage{
-			CompletionTokens: int(gjson.GetBytes(originTask.Data, "usage.completion_tokens").Int()),
-			TotalTokens:      int(gjson.GetBytes(originTask.Data, "usage.total_tokens").Int()),
-		},
-		Error: SeedanceOfficialResponseError{
-			Code:    gjson.GetBytes(originTask.Data, "error.code").String(),
-			Message: gjson.GetBytes(originTask.Data, "error.message").String(),
-		},
-		CreatedAt: originTask.CreatedAt,
-		UpdatedAt: originTask.UpdatedAt,
-	})
+
+	response := SeedanceOfficialResponse{}
+	if len(originTask.Data) > 0 {
+		_ = common.Unmarshal(originTask.Data, &response)
+	}
+	response.ID = originTask.TaskID
+	response.Model = firstNonEmptyString(TaskModelName(originTask), response.Model)
+	response.Status = status
+	if originTask.Status == model.TaskStatusSuccess {
+		videoURL := originTask.PrivateData.ResultURL
+		if response.Content != nil {
+			videoURL = firstNonEmptyString(videoURL, response.Content.VideoURL)
+		}
+		if videoURL != "" {
+			response.Content = &SeedanceOfficialResponseContent{VideoURL: videoURL}
+		}
+	} else {
+		response.Content = nil
+	}
+	if response.Usage != nil && response.Usage.CompletionTokens == 0 && response.Usage.TotalTokens == 0 {
+		response.Usage = nil
+	}
+	if response.ResponseMetadata != nil && response.ResponseMetadata.Error == nil {
+		response.ResponseMetadata = nil
+	}
+	if response.CreatedAt == 0 {
+		response.CreatedAt = originTask.CreatedAt
+	}
+	if response.UpdatedAt == 0 {
+		response.UpdatedAt = originTask.UpdatedAt
+	}
+	if originTask.Status == model.TaskStatusFailure && response.Error == nil && strings.TrimSpace(originTask.FailReason) != "" {
+		response.Error = &SeedanceOfficialResponseError{Message: originTask.FailReason}
+	}
+	return common.Marshal(response)
 }
 
 type (
 	SeedanceOfficialResponse struct {
-		ID               string                          `json:"id"`
-		Model            string                          `json:"model"`
-		Status           string                          `json:"status"`
-		Content          SeedanceOfficialResponseContent `json:"content"`
-		Usage            SeedanceOfficialResponseUsage   `json:"usage"`
-		Error            SeedanceOfficialResponseError   `json:"error,omitempty"`
-		ResponseMetadata struct {
-			Error *SeedanceOfficialResponseError `json:"Error,omitempty"`
-		} `json:"ResponseMetadata,omitempty"`
-		CreatedAt int64 `json:"created_at"`
-		UpdatedAt int64 `json:"updated_at"`
+		ID                    string                            `json:"id"`
+		Model                 string                            `json:"model"`
+		Status                string                            `json:"status"`
+		Content               *SeedanceOfficialResponseContent  `json:"content,omitempty"`
+		Usage                 *SeedanceOfficialResponseUsage    `json:"usage,omitempty"`
+		Error                 *SeedanceOfficialResponseError    `json:"error"`
+		ResponseMetadata      *SeedanceOfficialResponseMetadata `json:"ResponseMetadata,omitempty"`
+		CreatedAt             int64                             `json:"created_at"`
+		UpdatedAt             int64                             `json:"updated_at"`
+		Seed                  *int                              `json:"seed,omitempty"`
+		Resolution            *string                           `json:"resolution,omitempty"`
+		Ratio                 *string                           `json:"ratio,omitempty"`
+		Duration              *int                              `json:"duration,omitempty"`
+		FramesPerSecond       *int                              `json:"framespersecond,omitempty"`
+		GenerateAudio         *bool                             `json:"generate_audio,omitempty"`
+		Tools                 json.RawMessage                   `json:"tools,omitempty"`
+		SafetyIdentifier      *string                           `json:"safety_identifier,omitempty"`
+		Draft                 *bool                             `json:"draft,omitempty"`
+		DraftTaskID           *string                           `json:"draft_task_id,omitempty"`
+		ExecutionExpiresAfter *int                              `json:"execution_expires_after,omitempty"`
 	}
 	SeedanceOfficialResponseContent struct {
 		VideoURL string `json:"video_url"`
@@ -338,6 +372,9 @@ type (
 	SeedanceOfficialResponseError struct {
 		Code    string `json:"code"`
 		Message string `json:"message"`
+	}
+	SeedanceOfficialResponseMetadata struct {
+		Error *SeedanceOfficialResponseError `json:"Error,omitempty"`
 	}
 )
 
@@ -395,6 +432,13 @@ func validateSeedanceOfficialRequest(req *requestPayload) error {
 		case "16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "9:21", "3:2", "2:3":
 		default:
 			return fmt.Errorf("ratio is unsupported")
+		}
+	}
+	if len(req.Tools) > 0 {
+		switch common.GetJsonType(req.Tools) {
+		case "object", "array":
+		default:
+			return fmt.Errorf("tools must be an object or array")
 		}
 	}
 	return nil

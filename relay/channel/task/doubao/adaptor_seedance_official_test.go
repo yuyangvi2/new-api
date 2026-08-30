@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 func TestSeedanceOfficialParseTaskResultSuccess(t *testing.T) {
@@ -237,6 +238,153 @@ func TestSeedanceOfficialBuildRequestBodyPreservesDataURIImageURL(t *testing.T) 
 	require.Len(t, req.Content, 2)
 	require.NotNil(t, req.Content[1].ImageURL)
 	assert.Equal(t, dataURI, req.Content[1].ImageURL.URL)
+}
+
+func TestSeedanceOfficialDirectRequestPreservesObjectTools(t *testing.T) {
+	body := `{
+		"model":"doubao-seedance-2.0",
+		"content":[{"type":"text","text":"make a video"}],
+		"tools":{"type":"web_search","config":{"max_results":3}}
+	}`
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/v1/video/tasks", strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	req, err := parseSeedanceOfficialRequest(ctx)
+	require.NoError(t, err)
+	require.NoError(t, validateSeedanceOfficialRequest(req))
+	ctx.Set(seedanceOfficialTaskContextKey, *req)
+
+	out, err := (&SeedanceOfficialTaskAdaptor{}).BuildRequestBody(ctx, &relaycommon.RelayInfo{
+		ChannelMeta: &relaycommon.ChannelMeta{},
+	})
+	require.NoError(t, err)
+	data, err := io.ReadAll(out)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"type":"web_search","config":{"max_results":3}}`, gjson.GetBytes(data, "tools").Raw)
+}
+
+func TestSeedanceOfficialDirectRequestPreservesArrayToolsWithExtraFields(t *testing.T) {
+	body := `{
+		"model":"doubao-seedance-2.0",
+		"content":[{"type":"text","text":"make a video"}],
+		"tools":[{"type":"web_search","config":{"max_results":3}}]
+	}`
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/v1/video/tasks", strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	req, err := parseSeedanceOfficialRequest(ctx)
+	require.NoError(t, err)
+	require.NoError(t, validateSeedanceOfficialRequest(req))
+	ctx.Set(seedanceOfficialTaskContextKey, *req)
+
+	out, err := (&SeedanceOfficialTaskAdaptor{}).BuildRequestBody(ctx, &relaycommon.RelayInfo{
+		ChannelMeta: &relaycommon.ChannelMeta{},
+	})
+	require.NoError(t, err)
+	data, err := io.ReadAll(out)
+	require.NoError(t, err)
+	assert.JSONEq(t, `[{"type":"web_search","config":{"max_results":3}}]`, gjson.GetBytes(data, "tools").Raw)
+}
+
+func TestSeedanceOfficialValidateRequestRejectsInvalidToolsType(t *testing.T) {
+	body := `{
+		"model":"doubao-seedance-2.0",
+		"content":[{"type":"text","text":"make a video"}],
+		"tools":"web_search"
+	}`
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/v1/video/tasks", strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	req, err := parseSeedanceOfficialRequest(ctx)
+	require.NoError(t, err)
+	assert.Error(t, validateSeedanceOfficialRequest(req))
+}
+
+func TestSeedanceOfficialConvertToSeedanceVideoPreservesRunyuanTaskFields(t *testing.T) {
+	task := &model.Task{
+		TaskID:    "task_public",
+		Status:    model.TaskStatusSuccess,
+		CreatedAt: 1718049470,
+		UpdatedAt: 1718049480,
+		PrivateData: model.TaskPrivateData{
+			ResultURL: "https://example.com/public-video.mp4",
+		},
+		Properties: model.Properties{
+			OriginModelName: "doubao-seedance-2.0",
+		},
+		Data: []byte(`{
+			"id":"cgt-upstream",
+			"model":"doubao-seedance-2.0",
+			"status":"succeeded",
+			"error":null,
+			"created_at":1718049470,
+			"updated_at":1718049480,
+			"content":{"video_url":"https://example.com/upstream-video.mp4"},
+			"seed":0,
+			"resolution":"720p",
+			"ratio":"16:9",
+			"duration":4,
+			"framespersecond":24,
+			"generate_audio":false,
+			"tools":{},
+			"safety_identifier":"",
+			"draft":false,
+			"draft_task_id":"",
+			"execution_expires_after":3600,
+			"usage":{"completion_tokens":35800,"total_tokens":35800}
+		}`),
+	}
+
+	data, err := (&SeedanceOfficialTaskAdaptor{}).ConvertToSeedanceVideo(task)
+	require.NoError(t, err)
+
+	assert.Equal(t, "task_public", gjson.GetBytes(data, "id").String())
+	assert.Equal(t, "succeeded", gjson.GetBytes(data, "status").String())
+	assert.Equal(t, "https://example.com/public-video.mp4", gjson.GetBytes(data, "content.video_url").String())
+	assert.Equal(t, int64(0), gjson.GetBytes(data, "seed").Int())
+	assert.Equal(t, "720p", gjson.GetBytes(data, "resolution").String())
+	assert.Equal(t, "16:9", gjson.GetBytes(data, "ratio").String())
+	assert.Equal(t, int64(4), gjson.GetBytes(data, "duration").Int())
+	assert.Equal(t, int64(24), gjson.GetBytes(data, "framespersecond").Int())
+	assert.False(t, gjson.GetBytes(data, "generate_audio").Bool())
+	assert.True(t, gjson.GetBytes(data, "generate_audio").Exists())
+	assert.JSONEq(t, `{}`, gjson.GetBytes(data, "tools").Raw)
+	assert.Equal(t, "", gjson.GetBytes(data, "safety_identifier").String())
+	assert.True(t, gjson.GetBytes(data, "safety_identifier").Exists())
+	assert.False(t, gjson.GetBytes(data, "draft").Bool())
+	assert.True(t, gjson.GetBytes(data, "draft").Exists())
+	assert.Equal(t, "", gjson.GetBytes(data, "draft_task_id").String())
+	assert.True(t, gjson.GetBytes(data, "draft_task_id").Exists())
+	assert.Equal(t, int64(3600), gjson.GetBytes(data, "execution_expires_after").Int())
+	assert.True(t, gjson.GetBytes(data, "error").Exists())
+	assert.Equal(t, "null", gjson.GetBytes(data, "error").Raw)
+}
+
+func TestSeedanceOfficialConvertToSeedanceVideoFailureOmitsEmptySuccessFields(t *testing.T) {
+	task := &model.Task{
+		TaskID:     "task_public",
+		Status:     model.TaskStatusFailure,
+		FailReason: "sensitive content detected",
+		CreatedAt:  100,
+		UpdatedAt:  200,
+		Data:       []byte(`{"id":"upstream_task","status":"failed"}`),
+	}
+
+	data, err := (&SeedanceOfficialTaskAdaptor{}).ConvertToSeedanceVideo(task)
+	require.NoError(t, err)
+
+	assert.Equal(t, "task_public", gjson.GetBytes(data, "id").String())
+	assert.Equal(t, "failed", gjson.GetBytes(data, "status").String())
+	assert.Equal(t, "sensitive content detected", gjson.GetBytes(data, "error.message").String())
+	assert.False(t, gjson.GetBytes(data, "content").Exists())
+	assert.False(t, gjson.GetBytes(data, "usage").Exists())
+	assert.False(t, gjson.GetBytes(data, "ResponseMetadata").Exists())
 }
 
 func TestSeedanceOfficialEstimateBillingDistinguishesVideoInput(t *testing.T) {
