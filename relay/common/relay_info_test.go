@@ -3,6 +3,8 @@ package common
 import (
 	"testing"
 
+	"github.com/QuantumNous/new-api/dto"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/stretchr/testify/require"
 )
@@ -37,4 +39,52 @@ func TestRelayInfoGetFinalRequestRelayFormatFallsBackToRelayFormat(t *testing.T)
 func TestRelayInfoGetFinalRequestRelayFormatNilReceiver(t *testing.T) {
 	var info *RelayInfo
 	require.Equal(t, types.RelayFormat(""), info.GetFinalRequestRelayFormat())
+}
+
+func TestRelayInfoShouldUseChatCompletionsForResponses(t *testing.T) {
+	tests := []struct {
+		name     string
+		info     *RelayInfo
+		expected bool
+	}{
+		{
+			name: "responses mode enabled",
+			info: &RelayInfo{
+				RelayMode: relayconstant.RelayModeResponses,
+				ChannelMeta: &ChannelMeta{ChannelSetting: dto.ChannelSettings{
+					ResponsesViaChatCompletions: true,
+				}},
+			},
+			expected: true,
+		},
+		{
+			name: "responses compact stays native",
+			info: &RelayInfo{
+				RelayMode: relayconstant.RelayModeResponsesCompact,
+				ChannelMeta: &ChannelMeta{ChannelSetting: dto.ChannelSettings{
+					ResponsesViaChatCompletions: true,
+				}},
+			},
+			expected: false,
+		},
+		{
+			name: "setting disabled",
+			info: &RelayInfo{
+				RelayMode:   relayconstant.RelayModeResponses,
+				ChannelMeta: &ChannelMeta{},
+			},
+			expected: false,
+		},
+		{
+			name:     "nil relay info",
+			info:     nil,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, tt.info.ShouldUseChatCompletionsForResponses())
+		})
+	}
 }
