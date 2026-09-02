@@ -71,7 +71,7 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 	}
 	adaptor.Init(info)
 	var requestBody io.Reader
-	responsesViaChatCompletions := info.ChannelSetting.ResponsesViaChatCompletions
+	responsesViaChatCompletions := info.ShouldUseChatCompletionsForResponses()
 	if (model_setting.GetGlobalSettings().PassThroughRequestEnabled || info.ChannelSetting.PassThroughBodyEnabled) && !responsesViaChatCompletions {
 		storage, err := common.GetBodyStorage(c)
 		if err != nil {

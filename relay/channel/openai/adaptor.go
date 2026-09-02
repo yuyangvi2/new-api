@@ -108,7 +108,7 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 		}
 	}
 	requestURLPath := info.RequestURLPath
-	if shouldUseChatCompletionsForResponses(info) {
+	if info.ShouldUseChatCompletionsForResponses() {
 		requestURLPath = "/v1/chat/completions"
 	}
 	switch info.ChannelType {
@@ -128,7 +128,7 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 		}
 
 		// 特殊处理 responses API（包含 compact）
-		if !shouldUseChatCompletionsForResponses(info) &&
+		if !info.ShouldUseChatCompletionsForResponses() &&
 			(info.RelayMode == relayconstant.RelayModeResponses || info.RelayMode == relayconstant.RelayModeResponsesCompact) {
 			responsesApiVersion := "preview"
 
@@ -618,7 +618,7 @@ func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommo
 	if info != nil && request.Reasoning != nil && request.Reasoning.Effort != "" {
 		info.ReasoningEffort = request.Reasoning.Effort
 	}
-	if shouldUseChatCompletionsForResponses(info) {
+	if info.ShouldUseChatCompletionsForResponses() {
 		chatRequest, err := service.ResponsesRequestToChatCompletionsRequest(&request)
 		if err != nil {
 			return nil, err
@@ -659,7 +659,7 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 	case relayconstant.RelayModeRerank:
 		usage, err = common_handler.RerankHandler(c, info, resp)
 	case relayconstant.RelayModeResponses:
-		if shouldUseChatCompletionsForResponses(info) {
+		if info.ShouldUseChatCompletionsForResponses() {
 			if info.IsStream {
 				usage, err = OaiChatToResponsesStreamHandler(c, info, resp)
 			} else {
@@ -682,13 +682,6 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 		}
 	}
 	return
-}
-
-func shouldUseChatCompletionsForResponses(info *relaycommon.RelayInfo) bool {
-	return info != nil &&
-		info.RelayMode == relayconstant.RelayModeResponses &&
-		info.ChannelMeta != nil &&
-		info.ChannelSetting.ResponsesViaChatCompletions
 }
 
 func (a *Adaptor) GetModelList() []string {
