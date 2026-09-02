@@ -2,6 +2,7 @@ package doubao
 
 import (
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -18,6 +19,30 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 )
+
+func TestSeedanceOfficialDoResponseReturnsPublicAndUpstreamTaskIDs(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	resp := &http.Response{
+		Body: io.NopCloser(strings.NewReader(`{"id":"sd_1788341122024_7309"}`)),
+	}
+	info := &relaycommon.RelayInfo{
+		TaskRelayInfo: &relaycommon.TaskRelayInfo{
+			PublicTaskID: "task_Ol9ZSRFPwcH6SBDnlv5zo3LUGBG74KPq",
+		},
+	}
+
+	upstreamTaskID, _, taskErr := (&SeedanceOfficialTaskAdaptor{}).DoResponse(ctx, resp, info)
+
+	require.Nil(t, taskErr)
+	assert.Equal(t, "sd_1788341122024_7309", upstreamTaskID)
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	var response map[string]string
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
+	assert.Equal(t, "task_Ol9ZSRFPwcH6SBDnlv5zo3LUGBG74KPq", response["id"])
+	assert.Equal(t, "sd_1788341122024_7309", response["upstream_task_id"])
+}
 
 func TestSeedanceOfficialParseTaskResultSuccess(t *testing.T) {
 	result, err := (&SeedanceOfficialTaskAdaptor{}).ParseTaskResult([]byte(`{
