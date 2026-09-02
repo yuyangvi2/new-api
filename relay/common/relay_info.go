@@ -644,10 +644,18 @@ func (info *RelayInfo) GetFinalRequestRelayFormat() types.RelayFormat {
 }
 
 func (info *RelayInfo) ShouldUseChatCompletionsForResponses() bool {
-	return info != nil &&
-		info.RelayMode == relayconstant.RelayModeResponses &&
-		info.ChannelMeta != nil &&
-		info.ChannelSetting.ResponsesViaChatCompletions
+	if info == nil || info.ChannelMeta == nil || info.RelayMode != relayconstant.RelayModeResponses {
+		return false
+	}
+	if !info.ChannelSetting.ResponsesViaChatCompletions {
+		return false
+	}
+	switch info.ApiType {
+	case constant.APITypeOpenAI, constant.APITypeOpenRouter, constant.APITypeXinference:
+		return true
+	default:
+		return false
+	}
 }
 
 func GenRelayInfoResponsesCompaction(c *gin.Context, request *dto.OpenAIResponsesCompactionRequest) *RelayInfo {

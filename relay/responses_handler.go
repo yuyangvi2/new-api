@@ -81,6 +81,14 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 	} else {
 		convertedRequest, err := adaptor.ConvertOpenAIResponsesRequest(c, info, *request)
 		if err != nil {
+			if responsesViaChatCompletions {
+				return types.NewErrorWithStatusCode(
+					err,
+					types.ErrorCodeInvalidRequest,
+					http.StatusBadRequest,
+					types.ErrOptionWithSkipRetry(),
+				)
+			}
 			if isUnsupportedResponsesConversionError(err) {
 				return types.NewErrorWithStatusCode(
 					fmt.Errorf("api type %d does not support /v1/responses", info.ApiType),
