@@ -3684,6 +3684,8 @@
     "默认折叠侧边栏": "Réduire la barre latérale par défaut",
     "默认测试模型": "Modèle de test par défaut",
     "默认用户消息": "Bonjour",
-    "默认补全倍率": "Taux de complétion par défaut"
+    "默认补全倍率": "Taux de complétion par défaut",
+    "通过 Chat Completions 转发 Responses": "Acheminer Responses via Chat Completions",
+    "将 /v1/responses 请求转换为上游 /v1/chat/completions，并将响应转换回来，仅用于不原生支持 Responses 的 OpenAI 兼容上游": "Convertit les requêtes /v1/responses en requêtes /v1/chat/completions en amont, puis reconvertit les réponses. À utiliser uniquement avec les services en amont compatibles OpenAI sans prise en charge native de Responses."
   }
 }

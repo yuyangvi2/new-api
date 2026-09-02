@@ -5716,6 +5716,8 @@
     "排行榜": "랭킹",
     "控制台": "콘솔",
     "文档": "문서",
-    "模型广场": "모델 광장"
+    "模型广场": "모델 광장",
+    "Route Responses through Chat Completions": "Responses를 Chat Completions를 통해 전달",
+    "Convert /v1/responses requests to /v1/chat/completions upstream and convert responses back. Use only for OpenAI-compatible upstreams without native Responses support.": "/v1/responses 요청을 업스트림 /v1/chat/completions로 변환하고 응답을 다시 변환합니다. Responses를 기본 지원하지 않는 OpenAI 호환 업스트림에서만 사용하세요."
   }
 }

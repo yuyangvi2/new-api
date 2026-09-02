@@ -5716,6 +5716,8 @@
     "排行榜": "Bảng xếp hạng",
     "控制台": "Bảng điều khiển",
     "文档": "Tài liệu",
-    "模型广场": "Chợ mô hình"
+    "模型广场": "Chợ mô hình",
+    "Route Responses through Chat Completions": "Định tuyến Responses qua Chat Completions",
+    "Convert /v1/responses requests to /v1/chat/completions upstream and convert responses back. Use only for OpenAI-compatible upstreams without native Responses support.": "Chuyển đổi yêu cầu /v1/responses thành /v1/chat/completions ở thượng nguồn rồi chuyển đổi phản hồi trở lại. Chỉ dùng cho thượng nguồn tương thích OpenAI nhưng không hỗ trợ Responses nguyên bản."
   }
 }

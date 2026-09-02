@@ -5716,6 +5716,8 @@
     "排行榜": "ランキング",
     "控制台": "コンソール",
     "文档": "ドキュメント",
-    "模型广场": "モデルマーケット"
+    "模型广场": "モデルマーケット",
+    "Route Responses through Chat Completions": "Responses を Chat Completions 経由で転送",
+    "Convert /v1/responses requests to /v1/chat/completions upstream and convert responses back. Use only for OpenAI-compatible upstreams without native Responses support.": "/v1/responses リクエストを上流の /v1/chat/completions に変換し、レスポンスを元に戻します。Responses をネイティブ対応していない OpenAI 互換上流でのみ使用してください。"
   }
 }

@@ -5716,6 +5716,8 @@
     "排行榜": "Рейтинги",
     "控制台": "Консоль",
     "文档": "Документация",
-    "模型广场": "Каталог моделей"
+    "模型广场": "Каталог моделей",
+    "Route Responses through Chat Completions": "Направлять Responses через Chat Completions",
+    "Convert /v1/responses requests to /v1/chat/completions upstream and convert responses back. Use only for OpenAI-compatible upstreams without native Responses support.": "Преобразует запросы /v1/responses в запросы /v1/chat/completions для вышестоящего сервиса и преобразует ответы обратно. Используйте только с OpenAI-совместимыми сервисами без встроенной поддержки Responses."
   }
 }

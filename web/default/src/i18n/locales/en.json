@@ -5716,6 +5716,8 @@
     "排行榜": "Rankings",
     "控制台": "Console",
     "文档": "Docs",
-    "模型广场": "Model Square"
+    "模型广场": "Model Square",
+    "Route Responses through Chat Completions": "Route Responses through Chat Completions",
+    "Convert /v1/responses requests to /v1/chat/completions upstream and convert responses back. Use only for OpenAI-compatible upstreams without native Responses support.": "Convert /v1/responses requests to /v1/chat/completions upstream and convert responses back. Use only for OpenAI-compatible upstreams without native Responses support."
   }
 }

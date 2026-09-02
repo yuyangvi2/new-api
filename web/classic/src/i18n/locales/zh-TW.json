@@ -3677,6 +3677,8 @@
     "默认折叠侧边栏": "預設摺疊側邊欄",
     "默认测试模型": "預設測試模型",
     "默认用户消息": "你好",
-    "默认补全倍率": "預設補全倍率"
+    "默认补全倍率": "預設補全倍率",
+    "通过 Chat Completions 转发 Responses": "透過 Chat Completions 轉送 Responses",
+    "将 /v1/responses 请求转换为上游 /v1/chat/completions，并将响应转换回来，仅用于不原生支持 Responses 的 OpenAI 兼容上游": "將 /v1/responses 請求轉換為上游 /v1/chat/completions，並將回應轉換回來，僅用於不原生支援 Responses 的 OpenAI 相容上游"
   }
 }

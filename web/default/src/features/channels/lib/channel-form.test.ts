@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 
 import {
   transformChannelToFormDefaults,
@@ -6,7 +6,7 @@ import {
 } from './channel-form'
 
 describe('channel Responses compatibility setting', () => {
-  test('preserves responses_via_chat_completions when editing a channel', () => {
+  it('preserves responses_via_chat_completions when editing a channel', () => {
     const channel = {
       id: 37,
       name: 'FW - DeepSeek',

@@ -5716,6 +5716,8 @@
     "排行榜": "排行榜",
     "控制台": "控制台",
     "文档": "文件",
-    "模型广场": "模型廣場"
+    "模型广场": "模型廣場",
+    "Route Responses through Chat Completions": "透過 Chat Completions 轉送 Responses",
+    "Convert /v1/responses requests to /v1/chat/completions upstream and convert responses back. Use only for OpenAI-compatible upstreams without native Responses support.": "將 /v1/responses 請求轉換為上游 /v1/chat/completions，並將回應轉換回來。僅用於不原生支援 Responses 的 OpenAI 相容上游。"
   }
 }

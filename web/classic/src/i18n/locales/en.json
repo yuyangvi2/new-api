@@ -3830,6 +3830,8 @@
     "默认折叠侧边栏": "Default collapse sidebar",
     "默认测试模型": "Default Test Model",
     "默认用户消息": "Default User Message",
-    "默认补全倍率": "Default completion ratio"
+    "默认补全倍率": "Default completion ratio",
+    "通过 Chat Completions 转发 Responses": "Route Responses through Chat Completions",
+    "将 /v1/responses 请求转换为上游 /v1/chat/completions，并将响应转换回来，仅用于不原生支持 Responses 的 OpenAI 兼容上游": "Convert /v1/responses requests to /v1/chat/completions upstream and convert responses back. Use only for OpenAI-compatible upstreams without native Responses support."
   }
 }

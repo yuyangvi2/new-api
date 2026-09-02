@@ -5716,6 +5716,8 @@
     "排行榜": "Classements",
     "控制台": "Console",
     "文档": "Docs",
-    "模型广场": "Marché de modèles"
+    "模型广场": "Marché de modèles",
+    "Route Responses through Chat Completions": "Acheminer Responses via Chat Completions",
+    "Convert /v1/responses requests to /v1/chat/completions upstream and convert responses back. Use only for OpenAI-compatible upstreams without native Responses support.": "Convertit les requêtes /v1/responses en requêtes /v1/chat/completions en amont, puis reconvertit les réponses. À utiliser uniquement avec les services en amont compatibles OpenAI sans prise en charge native de Responses."
   }
 }

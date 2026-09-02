@@ -3813,6 +3813,8 @@
     "默认折叠侧边栏": "默认折叠侧边栏",
     "默认测试模型": "默认测试模型",
     "默认用户消息": "你好",
-    "默认补全倍率": "默认补全倍率"
+    "默认补全倍率": "默认补全倍率",
+    "通过 Chat Completions 转发 Responses": "通过 Chat Completions 转发 Responses",
+    "将 /v1/responses 请求转换为上游 /v1/chat/completions，并将响应转换回来，仅用于不原生支持 Responses 的 OpenAI 兼容上游": "将 /v1/responses 请求转换为上游 /v1/chat/completions，并将响应转换回来，仅用于不原生支持 Responses 的 OpenAI 兼容上游"
   }
 }
