@@ -28,13 +28,16 @@ func TestConvertOpenAIResponsesRequestUsesChatCompletionsWhenEnabled(t *testing.
 		Model: "deepseek-v4",
 		Input: *input,
 	}
-	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{
-		ChannelType:      constant.ChannelTypeOpenAI,
-		UpstreamModelName: "deepseek-v4",
-		ChannelSetting: dto.ChannelSettings{
-			ResponsesViaChatCompletions: true,
+	info := &relaycommon.RelayInfo{
+		RelayMode: relayconstant.RelayModeResponses,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelType:       constant.ChannelTypeOpenAI,
+			UpstreamModelName: "deepseek-v4",
+			ChannelSetting: dto.ChannelSettings{
+				ResponsesViaChatCompletions: true,
+			},
 		},
-	}}
+	}
 
 	converted, err := (&Adaptor{}).ConvertOpenAIResponsesRequest(nil, info, request)
 
@@ -60,7 +63,7 @@ func TestConvertOpenAIResponsesRequestKeepsNativeFormatByDefault(t *testing.T) {
 		Input: []byte(`"hello"`),
 	}
 	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{
-		ChannelType:      constant.ChannelTypeOpenAI,
+		ChannelType:       constant.ChannelTypeOpenAI,
 		UpstreamModelName: "gpt-test",
 	}}
 
@@ -96,11 +99,11 @@ func TestGetRequestURLUsesChatCompletionsForResponsesCompatibility(t *testing.T)
 				RelayMode:      relayconstant.RelayModeResponses,
 				RequestURLPath: "/v1/responses",
 				ChannelMeta: &relaycommon.ChannelMeta{
-					ChannelType:      constant.ChannelTypeAzure,
-					ChannelBaseUrl:   "https://azure.example",
-					ApiVersion:       "2025-04-01-preview",
+					ChannelType:       constant.ChannelTypeAzure,
+					ChannelBaseUrl:    "https://azure.example",
+					ApiVersion:        "2025-04-01-preview",
 					UpstreamModelName: "deepseek-v4",
-					ChannelSetting:   dto.ChannelSettings{ResponsesViaChatCompletions: true},
+					ChannelSetting:    dto.ChannelSettings{ResponsesViaChatCompletions: true},
 				},
 			},
 			wantPath: "/openai/deployments/deepseek-v4/chat/completions",
@@ -142,7 +145,7 @@ func TestDoResponseConvertsChatCompletionBackToResponsesWhenEnabled(t *testing.T
 		RelayMode:   relayconstant.RelayModeResponses,
 		RelayFormat: types.RelayFormatOpenAIResponses,
 		ChannelMeta: &relaycommon.ChannelMeta{
-			ChannelType:      constant.ChannelTypeOpenAI,
+			ChannelType:       constant.ChannelTypeOpenAI,
 			UpstreamModelName: "deepseek-v4",
 			ChannelSetting: dto.ChannelSettings{
 				ResponsesViaChatCompletions: true,
@@ -155,5 +158,5 @@ func TestDoResponseConvertsChatCompletionBackToResponsesWhenEnabled(t *testing.T
 	require.Nil(t, newAPIError)
 	require.NotNil(t, usage)
 	assert.Contains(t, recorder.Body.String(), `"object":"response"`)
-	assert.Contains(t, recorder.Body.String(), `"output_text":"hello"`)
+	assert.Contains(t, recorder.Body.String(), `"type":"output_text","text":"hello"`)
 }

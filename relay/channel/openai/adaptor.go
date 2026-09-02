@@ -107,6 +107,10 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 			info.ChannelBaseUrl = baseUrl
 		}
 	}
+	requestURLPath := info.RequestURLPath
+	if shouldUseChatCompletionsForResponses(info) {
+		requestURLPath = "/v1/chat/completions"
+	}
 	switch info.ChannelType {
 	case constant.ChannelTypeAzure:
 		apiVersion := info.ApiVersion
@@ -114,7 +118,7 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 			apiVersion = constant.AzureDefaultAPIVersion
 		}
 		// https://learn.microsoft.com/en-us/azure/cognitive-services/openai/chatgpt-quickstart?pivots=rest-api&tabs=command-line#rest-api
-		requestURL := strings.Split(info.RequestURLPath, "?")[0]
+		requestURL := strings.Split(requestURLPath, "?")[0]
 		requestURL = fmt.Sprintf("%s?api-version=%s", requestURL, apiVersion)
 		task := strings.TrimPrefix(requestURL, "/v1/")
 
@@ -124,7 +128,8 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 		}
 
 		// 特殊处理 responses API（包含 compact）
-		if info.RelayMode == relayconstant.RelayModeResponses || info.RelayMode == relayconstant.RelayModeResponsesCompact {
+		if !shouldUseChatCompletionsForResponses(info) &&
+			(info.RelayMode == relayconstant.RelayModeResponses || info.RelayMode == relayconstant.RelayModeResponsesCompact) {
 			responsesApiVersion := "preview"
 
 			subUrl := "/openai/v1/responses"
@@ -169,7 +174,7 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 			info.RelayMode != relayconstant.RelayModeResponsesCompact {
 			return fmt.Sprintf("%s/v1/chat/completions", info.ChannelBaseUrl), nil
 		}
-		return relaycommon.GetFullRequestURL(info.ChannelBaseUrl, info.RequestURLPath, info.ChannelType), nil
+		return relaycommon.GetFullRequestURL(info.ChannelBaseUrl, requestURLPath, info.ChannelType), nil
 	}
 }
 
@@ -613,6 +618,13 @@ func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommo
 	if info != nil && request.Reasoning != nil && request.Reasoning.Effort != "" {
 		info.ReasoningEffort = request.Reasoning.Effort
 	}
+	if shouldUseChatCompletionsForResponses(info) {
+		chatRequest, err := service.ResponsesRequestToChatCompletionsRequest(&request)
+		if err != nil {
+			return nil, err
+		}
+		return a.ConvertOpenAIRequest(c, info, chatRequest)
+	}
 	return request, nil
 }
 
@@ -647,10 +659,18 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 	case relayconstant.RelayModeRerank:
 		usage, err = common_handler.RerankHandler(c, info, resp)
 	case relayconstant.RelayModeResponses:
-		if info.IsStream {
-			usage, err = OaiResponsesStreamHandler(c, info, resp)
+		if shouldUseChatCompletionsForResponses(info) {
+			if info.IsStream {
+				usage, err = OaiChatToResponsesStreamHandler(c, info, resp)
+			} else {
+				usage, err = OaiChatToResponsesHandler(c, info, resp)
+			}
 		} else {
-			usage, err = OaiResponsesHandler(c, info, resp)
+			if info.IsStream {
+				usage, err = OaiResponsesStreamHandler(c, info, resp)
+			} else {
+				usage, err = OaiResponsesHandler(c, info, resp)
+			}
 		}
 	case relayconstant.RelayModeResponsesCompact:
 		usage, err = OaiResponsesCompactionHandler(c, resp)
@@ -662,6 +682,13 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 		}
 	}
 	return
+}
+
+func shouldUseChatCompletionsForResponses(info *relaycommon.RelayInfo) bool {
+	return info != nil &&
+		info.RelayMode == relayconstant.RelayModeResponses &&
+		info.ChannelMeta != nil &&
+		info.ChannelSetting.ResponsesViaChatCompletions
 }
 
 func (a *Adaptor) GetModelList() []string {
