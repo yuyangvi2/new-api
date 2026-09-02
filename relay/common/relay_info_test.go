@@ -3,6 +3,7 @@ package common
 import (
 	"testing"
 
+	appconstant "github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/types"
@@ -51,11 +52,27 @@ func TestRelayInfoShouldUseChatCompletionsForResponses(t *testing.T) {
 			name: "responses mode enabled",
 			info: &RelayInfo{
 				RelayMode: relayconstant.RelayModeResponses,
-				ChannelMeta: &ChannelMeta{ChannelSetting: dto.ChannelSettings{
-					ResponsesViaChatCompletions: true,
-				}},
+				ChannelMeta: &ChannelMeta{
+					ApiType: appconstant.APITypeOpenAI,
+					ChannelSetting: dto.ChannelSettings{
+						ResponsesViaChatCompletions: true,
+					},
+				},
 			},
 			expected: true,
+		},
+		{
+			name: "unsupported adaptor stays native",
+			info: &RelayInfo{
+				RelayMode: relayconstant.RelayModeResponses,
+				ChannelMeta: &ChannelMeta{
+					ApiType: appconstant.APITypeDeepSeek,
+					ChannelSetting: dto.ChannelSettings{
+						ResponsesViaChatCompletions: true,
+					},
+				},
+			},
+			expected: false,
 		},
 		{
 			name: "responses compact stays native",
