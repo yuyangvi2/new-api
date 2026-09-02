@@ -161,9 +161,11 @@ func ClaudeMessagesRequestToOpenAIChat(claudeRequest dto.ClaudeRequest, info *re
 				switch mediaMsg.Type {
 				case "text", "input_text":
 					message := dto.MediaContent{
-						Type:         "text",
-						Text:         mediaMsg.GetText(),
-						CacheControl: mediaMsg.CacheControl,
+						Type: "text",
+						Text: mediaMsg.GetText(),
+					}
+					if isOpenRouter {
+						message.CacheControl = mediaMsg.CacheControl
 					}
 					mediaMessages = append(mediaMessages, message)
 				case "image":
@@ -213,8 +215,21 @@ func ClaudeMessagesRequestToOpenAIChat(claudeRequest dto.ClaudeRequest, info *re
 			if len(toolCalls) > 0 {
 				openAIMessage.SetToolCalls(toolCalls)
 			}
-			if len(mediaMessages) > 0 && len(toolCalls) == 0 {
-				openAIMessage.SetMediaContent(mediaMessages)
+			if len(mediaMessages) > 0 {
+				allText := !isOpenRouter
+				var textContent strings.Builder
+				for _, mediaMessage := range mediaMessages {
+					if mediaMessage.Type != "text" {
+						allText = false
+						break
+					}
+					textContent.WriteString(mediaMessage.Text)
+				}
+				if allText {
+					openAIMessage.SetStringContent(textContent.String())
+				} else {
+					openAIMessage.SetMediaContent(mediaMessages)
+				}
 			}
 		}
 		if len(openAIMessage.ParseContent()) > 0 || len(openAIMessage.ToolCalls) > 0 {
