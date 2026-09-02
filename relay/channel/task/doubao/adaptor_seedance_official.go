@@ -196,7 +196,10 @@ func (a *SeedanceOfficialTaskAdaptor) DoResponse(c *gin.Context, resp *http.Resp
 		return "", nil, service.TaskErrorWrapperLocal(fmt.Errorf("task_id is empty"), "invalid_response", http.StatusInternalServerError)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"id": info.PublicTaskID})
+	c.JSON(http.StatusOK, gin.H{
+		"id":               info.PublicTaskID,
+		"upstream_task_id": taskID,
+	})
 	return taskID, body, nil
 }
 
