@@ -21,15 +21,15 @@ func TestResponsesHelperReturnsClientErrorWhenAdaptorDoesNotSupportResponses(t *
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
-	common.SetContextKey(ctx, constant.ContextKeyChannelType, constant.ChannelTypeAnthropic)
-	common.SetContextKey(ctx, constant.ContextKeyOriginalModel, "claude-opus-4-1")
+	common.SetContextKey(ctx, constant.ContextKeyChannelType, constant.ChannelTypeReplicate)
+	common.SetContextKey(ctx, constant.ContextKeyOriginalModel, "replicate-model")
 
 	err := ResponsesHelper(ctx, &relaycommon.RelayInfo{
 		RelayMode:       relayconstant.RelayModeResponses,
 		RelayFormat:     types.RelayFormatOpenAIResponses,
-		OriginModelName: "claude-opus-4-1",
+		OriginModelName: "replicate-model",
 		Request: &dto.OpenAIResponsesRequest{
-			Model: "claude-opus-4-1",
+			Model: "replicate-model",
 			Input: []byte(`"hi"`),
 		},
 	})
