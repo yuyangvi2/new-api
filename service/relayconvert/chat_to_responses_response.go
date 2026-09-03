@@ -281,6 +281,17 @@ func (s *ChatToResponsesStreamState) appendTextDelta(delta string) []ChatToRespo
 				Content: []dto.ResponsesOutputContent{},
 			},
 		}))
+		events = append(events, responsesStreamEvent("response.content_part.added", dto.ResponsesStreamResponse{
+			Type:         "response.content_part.added",
+			OutputIndex:  intPtr(s.textOutputIndex),
+			ContentIndex: intPtr(0),
+			ItemID:       s.messageID(),
+			Part: &dto.ResponsesReasoningSummaryPart{
+				Type:        "output_text",
+				Text:        "",
+				Annotations: []interface{}{},
+			},
+		}))
 	}
 	s.text.WriteString(delta)
 	events = append(events, responsesStreamEvent(responsesEventOutputTextDelta, dto.ResponsesStreamResponse{
@@ -380,6 +391,18 @@ func (s *ChatToResponsesStreamState) doneDeltaEvents() []ChatToResponsesStreamEv
 			OutputIndex:  intPtr(s.textOutputIndex),
 			ContentIndex: intPtr(0),
 			ItemID:       s.messageID(),
+			Text:         s.text.String(),
+		}))
+		events = append(events, responsesStreamEvent("response.content_part.done", dto.ResponsesStreamResponse{
+			Type:         "response.content_part.done",
+			OutputIndex:  intPtr(s.textOutputIndex),
+			ContentIndex: intPtr(0),
+			ItemID:       s.messageID(),
+			Part: &dto.ResponsesReasoningSummaryPart{
+				Type:        "output_text",
+				Text:        s.text.String(),
+				Annotations: []interface{}{},
+			},
 		}))
 		events = append(events, responsesStreamEvent(responsesEventOutputItemDone, dto.ResponsesStreamResponse{
 			Type:        responsesEventOutputItemDone,
