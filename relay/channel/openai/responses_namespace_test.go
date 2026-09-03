@@ -135,6 +135,9 @@ func TestOaiResponsesHandlerRestoresNamespaceFunctionCalls(t *testing.T) {
 
 func TestOaiResponsesStreamHandlerRestoresNamespaceAcrossEvents(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	oldTimeout := constant.StreamingTimeout
+	constant.StreamingTimeout = 30
+	t.Cleanup(func() { constant.StreamingTimeout = oldTimeout })
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)

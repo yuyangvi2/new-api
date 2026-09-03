@@ -26,6 +26,10 @@ func OaiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeReadResponseBodyFailed, http.StatusInternalServerError)
 	}
+	responseBody, _, err = restoreResponsesNamespaceCalls(responseBody, responsesNamespaceToolNames(c))
+	if err != nil {
+		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+	}
 	err = common.Unmarshal(responseBody, &responsesResponse)
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
@@ -80,6 +84,13 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 	var responseTextBuilder strings.Builder
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
+		restoredData, _, err := restoreResponsesNamespaceCalls([]byte(data), responsesNamespaceToolNames(c))
+		if err != nil {
+			logger.LogError(c, "failed to restore namespace tool call: "+err.Error())
+			sr.Error(err)
+			return
+		}
+		data = string(restoredData)
 
 		// 检查当前数据是否包含 completed 状态和 usage 信息
 		var streamResponse dto.ResponsesStreamResponse
@@ -147,4 +158,16 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 	usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 
 	return usage, nil
+}
+
+func responsesNamespaceToolNames(c *gin.Context) map[string]responsesNamespaceToolName {
+	if c == nil {
+		return nil
+	}
+	value, exists := c.Get(responsesNamespaceToolNamesContextKey)
+	if !exists {
+		return nil
+	}
+	names, _ := value.(map[string]responsesNamespaceToolName)
+	return names
 }
