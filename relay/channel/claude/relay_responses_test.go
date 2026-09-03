@@ -108,6 +108,7 @@ func TestClaudeResponsesStreamHandlerPreservesToolEventOrderAndUsage(t *testing.
 	got := recorder.Body.String()
 	assert.Equal(t, "text/event-stream", recorder.Header().Get("Content-Type"))
 	assert.Contains(t, got, `event: response.created`)
+	assert.Contains(t, got, `"id":"resp_claude-responses-test"`)
 	assert.Contains(t, got, `event: response.function_call_arguments.delta`)
 	assert.Contains(t, got, `event: response.completed`)
 	assert.Contains(t, got, `"input_tokens":18`)
