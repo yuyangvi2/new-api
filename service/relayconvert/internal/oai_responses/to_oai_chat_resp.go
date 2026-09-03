@@ -219,13 +219,34 @@ func ExtractReasoningTextFromResponses(resp *dto.OpenAIResponsesResponse) string
 		if out.Type != responsesOutputTypeReasoning {
 			continue
 		}
-		for _, c := range out.Content {
+		var parts []dto.ResponsesReasoningSummaryPart
+		if out.Summary != nil {
+			parts = *out.Summary
+		}
+		if len(parts) == 0 {
+			parts = responsesReasoningSummaryFromLegacyContent(out.Content)
+		}
+		for _, c := range parts {
 			if c.Text != "" {
 				sb.WriteString(c.Text)
 			}
 		}
 	}
 	return sb.String()
+}
+
+func responsesReasoningSummaryFromLegacyContent(content []dto.ResponsesOutputContent) []dto.ResponsesReasoningSummaryPart {
+	if len(content) == 0 {
+		return nil
+	}
+	parts := make([]dto.ResponsesReasoningSummaryPart, 0, len(content))
+	for _, item := range content {
+		parts = append(parts, dto.ResponsesReasoningSummaryPart{
+			Type: item.Type,
+			Text: item.Text,
+		})
+	}
+	return parts
 }
 
 func responseStatusString(resp *dto.OpenAIResponsesResponse) string {

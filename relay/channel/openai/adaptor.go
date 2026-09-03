@@ -625,6 +625,9 @@ func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommo
 		}
 		return a.ConvertOpenAIRequest(c, info, chatRequest)
 	}
+	if err := normalizeResponsesRequestCompatibility(&request); err != nil {
+		return nil, err
+	}
 	return request, nil
 }
 

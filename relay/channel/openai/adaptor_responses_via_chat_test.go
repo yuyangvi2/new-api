@@ -137,6 +137,54 @@ func TestConvertOpenAIResponsesRequestMovesLegacyReasoningContentToSummary(t *te
 	assert.Equal(t, "thinking", gjson.GetBytes(native.Input, "0.summary.0.text").String())
 }
 
+func TestConvertOpenAIResponsesRequestPreservesValidSchemaAndMessageContent(t *testing.T) {
+	tools := []byte(`[{"type":"function","name":"lookup","parameters":{"type":"object","properties":{"id":{"anyOf":[{"type":"string"},{"type":"null"}]}},"required":["id"]}}]`)
+	input := []byte(`[{"type":"reasoning","summary":[{"type":"summary_text","text":"current"}],"content":[{"type":"summary_text","text":"legacy"}]},{"role":"user","content":[{"type":"input_text","text":"hello"}]}]`)
+	request := dto.OpenAIResponsesRequest{Model: "test-model", Tools: tools, Input: input}
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{
+		ChannelType:       constant.ChannelTypeOpenAI,
+		UpstreamModelName: "test-model",
+	}}
+
+	converted, err := (&Adaptor{}).ConvertOpenAIResponsesRequest(nil, info, request)
+	require.NoError(t, err)
+	native, ok := converted.(dto.OpenAIResponsesRequest)
+	require.True(t, ok)
+
+	assert.Equal(t, string(tools), string(native.Tools))
+	assert.False(t, gjson.GetBytes(native.Input, "0.content").Exists())
+	assert.Equal(t, "current", gjson.GetBytes(native.Input, "0.summary.0.text").String())
+	assert.Equal(t, "hello", gjson.GetBytes(native.Input, "1.content.0.text").String())
+}
+
+func TestConvertOpenAIResponsesRequestMergesSchemaCombinatorRequirements(t *testing.T) {
+	tools := []byte(`[
+		{"type":"function","name":"any_tool","parameters":{"anyOf":[
+			{"type":"object","properties":{"shared":{"type":"string"},"left":{"type":"string"}},"required":["shared","left"]},
+			{"type":"object","properties":{"shared":{"type":"string"},"right":{"type":"string"}},"required":["shared","right"]}
+		]}},
+		{"type":"function","name":"all_tool","parameters":{"allOf":[
+			{"type":"object","properties":{"first":{"type":"string"}},"required":["first"]},
+			{"type":"object","properties":{"second":{"type":"string"}},"required":["second"]}
+		]}}
+	]`)
+	request := dto.OpenAIResponsesRequest{Model: "test-model", Tools: tools}
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{
+		ChannelType:       constant.ChannelTypeOpenAI,
+		UpstreamModelName: "test-model",
+	}}
+
+	converted, err := (&Adaptor{}).ConvertOpenAIResponsesRequest(nil, info, request)
+	require.NoError(t, err)
+	native, ok := converted.(dto.OpenAIResponsesRequest)
+	require.True(t, ok)
+
+	assert.Len(t, gjson.GetBytes(native.Tools, "0.parameters.required").Array(), 1)
+	assert.Equal(t, "shared", gjson.GetBytes(native.Tools, "0.parameters.required.0").String())
+	assert.Equal(t, "first", gjson.GetBytes(native.Tools, "1.parameters.required.0").String())
+	assert.Equal(t, "second", gjson.GetBytes(native.Tools, "1.parameters.required.1").String())
+}
+
 func TestGetRequestURLUsesChatCompletionsForResponsesCompatibility(t *testing.T) {
 	tests := []struct {
 		name     string

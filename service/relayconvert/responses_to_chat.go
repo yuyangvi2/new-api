@@ -219,7 +219,14 @@ func ExtractReasoningTextFromResponses(resp *dto.OpenAIResponsesResponse) string
 		if out.Type != responsesOutputTypeReasoning {
 			continue
 		}
-		for _, c := range out.Content {
+		var parts []dto.ResponsesReasoningSummaryPart
+		if out.Summary != nil {
+			parts = *out.Summary
+		}
+		if len(parts) == 0 {
+			parts = responsesReasoningSummaryFromLegacyContent(out.Content)
+		}
+		for _, c := range parts {
 			if c.Text != "" {
 				sb.WriteString(c.Text)
 			}
@@ -397,7 +404,14 @@ func (s *ResponsesToChatStreamState) terminalOutputChunks(response *dto.OpenAIRe
 			chunks = append(chunks, s.textDelta(text.String())...)
 		case out.Type == responsesOutputTypeReasoning && !s.hasSentReasoning:
 			var reasoning strings.Builder
-			for _, c := range out.Content {
+			var parts []dto.ResponsesReasoningSummaryPart
+			if out.Summary != nil {
+				parts = *out.Summary
+			}
+			if len(parts) == 0 {
+				parts = responsesReasoningSummaryFromLegacyContent(out.Content)
+			}
+			for _, c := range parts {
 				if c.Text != "" {
 					reasoning.WriteString(c.Text)
 				}
@@ -825,7 +839,7 @@ func (a *ResponsesBufferedAccumulator) BuildOutput() []dto.ResponsesOutput {
 	if a.reasoning.Len() > 0 {
 		out = append(out, dto.ResponsesOutput{
 			Type: responsesOutputTypeReasoning,
-			Content: []dto.ResponsesOutputContent{
+			Summary: &[]dto.ResponsesReasoningSummaryPart{
 				{Type: "summary_text", Text: a.reasoning.String()},
 			},
 		})
@@ -853,6 +867,20 @@ func (a *ResponsesBufferedAccumulator) BuildOutput() []dto.ResponsesOutput {
 		})
 	}
 	return out
+}
+
+func responsesReasoningSummaryFromLegacyContent(content []dto.ResponsesOutputContent) []dto.ResponsesReasoningSummaryPart {
+	if len(content) == 0 {
+		return nil
+	}
+	parts := make([]dto.ResponsesReasoningSummaryPart, 0, len(content))
+	for _, item := range content {
+		parts = append(parts, dto.ResponsesReasoningSummaryPart{
+			Type: item.Type,
+			Text: item.Text,
+		})
+	}
+	return parts
 }
 
 func (a *ResponsesBufferedAccumulator) ensureTool(event *dto.ResponsesStreamResponse) *responsesBufferedTool {

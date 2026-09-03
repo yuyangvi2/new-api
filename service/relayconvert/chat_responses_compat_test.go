@@ -659,6 +659,35 @@ func TestChatCompletionsStreamToResponsesUsesMessageIDPrefixConsistently(t *test
 	assert.Equal(t, wantMessageID, finalEvents[3].Payload.Response.Output[0].ID)
 }
 
+func TestChatCompletionsStreamToResponsesEmitsReasoningSummaryItems(t *testing.T) {
+	state := NewChatToResponsesStreamState("resp_reasoning", "deepseek-v4-flash")
+	events, err := ChatCompletionsStreamChunkToResponsesEvents(&dto.ChatCompletionsStreamResponse{
+		Choices: []dto.ChatCompletionsStreamResponseChoice{{
+			Delta: dto.ChatCompletionsStreamResponseChoiceDelta{ReasoningContent: common.GetPointer("thinking")},
+		}},
+	}, state)
+	require.NoError(t, err)
+	require.Len(t, events, 3)
+	require.NotNil(t, events[1].Payload.Item)
+
+	addedBody, err := common.Marshal(events[1].Payload.Item)
+	require.NoError(t, err)
+	assert.False(t, gjson.GetBytes(addedBody, "content").Exists())
+	assert.True(t, gjson.GetBytes(addedBody, "summary").IsArray())
+	assert.Equal(t, 0, len(gjson.GetBytes(addedBody, "summary").Array()))
+
+	finalEvents := FinalizeChatCompletionsStreamToResponses(state)
+	require.Len(t, finalEvents, 3)
+	require.NotNil(t, finalEvents[1].Payload.Item)
+	doneBody, err := common.Marshal(finalEvents[1].Payload.Item)
+	require.NoError(t, err)
+	assert.False(t, gjson.GetBytes(doneBody, "content").Exists())
+	assert.Equal(t, "thinking", gjson.GetBytes(doneBody, "summary.0.text").String())
+	require.NotNil(t, finalEvents[2].Payload.Response)
+	require.Len(t, finalEvents[2].Payload.Response.Output, 1)
+	assert.NotNil(t, finalEvents[2].Payload.Response.Output[0].Summary)
+}
+
 func TestChatCompletionsResponseToResponsesMapsIncompleteFinishReasons(t *testing.T) {
 	tests := []struct {
 		name         string

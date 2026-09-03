@@ -179,7 +179,14 @@ func (s *ResponsesToChatStreamState) terminalOutputChunks(response *dto.OpenAIRe
 			chunks = append(chunks, s.textDelta(text.String())...)
 		case out.Type == responsesOutputTypeReasoning && !s.hasSentReasoning:
 			var reasoning strings.Builder
-			for _, c := range out.Content {
+			var parts []dto.ResponsesReasoningSummaryPart
+			if out.Summary != nil {
+				parts = *out.Summary
+			}
+			if len(parts) == 0 {
+				parts = responsesReasoningSummaryFromLegacyContent(out.Content)
+			}
+			for _, c := range parts {
 				if c.Text != "" {
 					reasoning.WriteString(c.Text)
 				}
@@ -610,7 +617,7 @@ func (a *ResponsesBufferedAccumulator) BuildOutput() []dto.ResponsesOutput {
 	if a.reasoning.Len() > 0 {
 		out = append(out, dto.ResponsesOutput{
 			Type: responsesOutputTypeReasoning,
-			Content: []dto.ResponsesOutputContent{
+			Summary: &[]dto.ResponsesReasoningSummaryPart{
 				{Type: "summary_text", Text: a.reasoning.String()},
 			},
 		})
