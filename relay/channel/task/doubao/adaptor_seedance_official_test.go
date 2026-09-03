@@ -360,19 +360,29 @@ func TestSeedanceOfficialConvertToSeedanceVideoPreservesRunyuanTaskFields(t *tes
 			"error":null,
 			"created_at":1718049470,
 			"updated_at":1718049480,
-			"content":{"video_url":"https://example.com/upstream-video.mp4"},
+			"content":{
+				"video_url":"https://example.com/upstream-video.mp4",
+				"last_frame_url":"https://example.com/last-frame.png"
+			},
 			"seed":0,
 			"resolution":"720p",
 			"ratio":"16:9",
 			"duration":4,
 			"framespersecond":24,
+			"output_format":"mp4",
+			"service_tier":"default",
 			"generate_audio":false,
+			"priority":0,
 			"tools":{},
 			"safety_identifier":"",
 			"draft":false,
 			"draft_task_id":"",
 			"execution_expires_after":3600,
-			"usage":{"completion_tokens":35800,"total_tokens":35800}
+			"usage":{
+				"completion_tokens":35800,
+				"total_tokens":35800,
+				"tool_usage":{"web_search":0}
+			}
 		}`),
 	}
 
@@ -382,13 +392,18 @@ func TestSeedanceOfficialConvertToSeedanceVideoPreservesRunyuanTaskFields(t *tes
 	assert.Equal(t, "task_public", gjson.GetBytes(data, "id").String())
 	assert.Equal(t, "succeeded", gjson.GetBytes(data, "status").String())
 	assert.Equal(t, "https://example.com/public-video.mp4", gjson.GetBytes(data, "content.video_url").String())
+	assert.Equal(t, "https://example.com/last-frame.png", gjson.GetBytes(data, "content.last_frame_url").String())
 	assert.Equal(t, int64(0), gjson.GetBytes(data, "seed").Int())
 	assert.Equal(t, "720p", gjson.GetBytes(data, "resolution").String())
 	assert.Equal(t, "16:9", gjson.GetBytes(data, "ratio").String())
 	assert.Equal(t, int64(4), gjson.GetBytes(data, "duration").Int())
+	assert.False(t, gjson.GetBytes(data, "frames").Exists())
 	assert.Equal(t, int64(24), gjson.GetBytes(data, "framespersecond").Int())
+	assert.Equal(t, "mp4", gjson.GetBytes(data, "output_format").String())
+	assert.False(t, gjson.GetBytes(data, "service_tier").Exists())
 	assert.False(t, gjson.GetBytes(data, "generate_audio").Bool())
 	assert.True(t, gjson.GetBytes(data, "generate_audio").Exists())
+	assert.False(t, gjson.GetBytes(data, "priority").Exists())
 	assert.JSONEq(t, `{}`, gjson.GetBytes(data, "tools").Raw)
 	assert.Equal(t, "", gjson.GetBytes(data, "safety_identifier").String())
 	assert.True(t, gjson.GetBytes(data, "safety_identifier").Exists())
@@ -397,8 +412,28 @@ func TestSeedanceOfficialConvertToSeedanceVideoPreservesRunyuanTaskFields(t *tes
 	assert.Equal(t, "", gjson.GetBytes(data, "draft_task_id").String())
 	assert.True(t, gjson.GetBytes(data, "draft_task_id").Exists())
 	assert.Equal(t, int64(3600), gjson.GetBytes(data, "execution_expires_after").Int())
+	assert.False(t, gjson.GetBytes(data, "usage.tool_usage").Exists())
 	assert.True(t, gjson.GetBytes(data, "error").Exists())
 	assert.Equal(t, "null", gjson.GetBytes(data, "error").Raw)
+}
+
+func TestSeedanceOfficialConvertToSeedanceVideoPreservesFrames(t *testing.T) {
+	task := &model.Task{
+		TaskID: "task_public",
+		Status: model.TaskStatusSuccess,
+		Data: []byte(`{
+			"id":"cgt-upstream",
+			"status":"succeeded",
+			"content":{"video_url":"https://example.com/video.mp4"},
+			"frames":121
+		}`),
+	}
+
+	data, err := (&SeedanceOfficialTaskAdaptor{}).ConvertToSeedanceVideo(task)
+	require.NoError(t, err)
+
+	assert.Equal(t, int64(121), gjson.GetBytes(data, "frames").Int())
+	assert.False(t, gjson.GetBytes(data, "duration").Exists())
 }
 
 func TestSeedanceOfficialConvertToSeedanceVideoFailureOmitsEmptySuccessFields(t *testing.T) {

@@ -319,7 +319,10 @@ func (a *SeedanceOfficialTaskAdaptor) ConvertToSeedanceVideo(originTask *model.T
 			videoURL = firstNonEmptyString(videoURL, response.Content.VideoURL)
 		}
 		if videoURL != "" {
-			response.Content = &SeedanceOfficialResponseContent{VideoURL: videoURL}
+			if response.Content == nil {
+				response.Content = &SeedanceOfficialResponseContent{}
+			}
+			response.Content.VideoURL = videoURL
 		}
 	} else {
 		response.Content = nil
@@ -357,8 +360,10 @@ type (
 		Resolution            *string                           `json:"resolution,omitempty"`
 		Ratio                 *string                           `json:"ratio,omitempty"`
 		Duration              *int                              `json:"duration,omitempty"`
+		Frames                *int                              `json:"frames,omitempty"`
 		FramesPerSecond       *int                              `json:"framespersecond,omitempty"`
 		GenerateAudio         *bool                             `json:"generate_audio,omitempty"`
+		OutputFormat          *string                           `json:"output_format,omitempty"`
 		Tools                 json.RawMessage                   `json:"tools,omitempty"`
 		SafetyIdentifier      *string                           `json:"safety_identifier,omitempty"`
 		Draft                 *bool                             `json:"draft,omitempty"`
@@ -366,7 +371,8 @@ type (
 		ExecutionExpiresAfter *int                              `json:"execution_expires_after,omitempty"`
 	}
 	SeedanceOfficialResponseContent struct {
-		VideoURL string `json:"video_url"`
+		VideoURL     string `json:"video_url"`
+		LastFrameURL string `json:"last_frame_url,omitempty"`
 	}
 	SeedanceOfficialResponseUsage struct {
 		CompletionTokens int `json:"completion_tokens"`
