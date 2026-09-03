@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/types"
 )
 
 const (
@@ -112,7 +114,11 @@ func validateResponsesRequestChatUnsupportedFields(req *dto.OpenAIResponsesReque
 		unsupported = append(unsupported, "context_management")
 	}
 	if len(unsupported) > 0 {
-		return fmt.Errorf("responses to chat conversion does not support stateful fields: %s", strings.Join(unsupported, ", "))
+		return types.NewErrorWithStatusCode(
+			fmt.Errorf("responses to chat conversion does not support stateful fields: %s", strings.Join(unsupported, ", ")),
+			types.ErrorCodeInvalidRequest,
+			http.StatusBadRequest,
+		)
 	}
 	return nil
 }
