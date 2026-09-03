@@ -69,3 +69,29 @@ func TestResponsesHelperReturnsBadRequestForUnsupportedChatCompatibilityFields(t
 	assert.Contains(t, err.Error(), "previous_response_id")
 	assert.True(t, types.IsSkipRetryError(err))
 }
+
+func TestResponsesHelperReturnsBadRequestForUnsupportedClaudeStatefulFields(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	common.SetContextKey(ctx, constant.ContextKeyChannelType, constant.ChannelTypeAnthropic)
+	common.SetContextKey(ctx, constant.ContextKeyOriginalModel, "claude-sonnet-test")
+
+	err := ResponsesHelper(ctx, &relaycommon.RelayInfo{
+		RelayMode:       relayconstant.RelayModeResponses,
+		RelayFormat:     types.RelayFormatOpenAIResponses,
+		OriginModelName: "claude-sonnet-test",
+		Request: &dto.OpenAIResponsesRequest{
+			Model:              "claude-sonnet-test",
+			Input:              []byte(`"hi"`),
+			PreviousResponseID: "resp_previous",
+		},
+	})
+
+	require.NotNil(t, err)
+	assert.Equal(t, http.StatusBadRequest, err.StatusCode)
+	assert.Equal(t, types.ErrorCodeInvalidRequest, err.GetErrorCode())
+	assert.Contains(t, err.Error(), "previous_response_id")
+	assert.True(t, types.IsSkipRetryError(err))
+}
