@@ -1091,8 +1091,12 @@ func ClaudeResponsesHandler(c *gin.Context, resp *http.Response, info *relaycomm
 func ClaudeResponsesStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (*dto.Usage, *types.NewAPIError) {
 	defer service.CloseResponseBodyGracefully(resp)
 
+	responseID := c.GetString(common.RequestIdKey)
+	if responseID == "" {
+		responseID = common.GetUUID()
+	}
 	claudeInfo := &ClaudeResponseInfo{
-		ResponseId:   helper.GetResponseID(c),
+		ResponseId:   "resp_" + responseID,
 		Created:      common.GetTimestamp(),
 		Model:        info.UpstreamModelName,
 		ResponseText: strings.Builder{},
