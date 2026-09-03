@@ -139,6 +139,7 @@ func (s *ChatToResponsesStreamState) UsageText() string {
 func (s *ChatToResponsesStreamState) appendTextDelta(delta string) []ChatToResponsesStreamEvent {
 	events := make([]ChatToResponsesStreamEvent, 0, 2)
 	if !s.textStarted {
+		emptyAnnotations := []interface{}{}
 		s.textStarted = true
 		s.textOutputIndex = s.nextIndex("message", -1)
 		events = append(events, responsesStreamEvent(responsesEventOutputItemAdded, dto.ResponsesStreamResponse{
@@ -160,7 +161,7 @@ func (s *ChatToResponsesStreamState) appendTextDelta(delta string) []ChatToRespo
 			Part: &dto.ResponsesReasoningSummaryPart{
 				Type:        "output_text",
 				Text:        "",
-				Annotations: []interface{}{},
+				Annotations: &emptyAnnotations,
 			},
 		}))
 	}
@@ -256,6 +257,7 @@ func (s *ChatToResponsesStreamState) doneDeltaEvents() []ChatToResponsesStreamEv
 	events := make([]ChatToResponsesStreamEvent, 0)
 	status := s.outputStatus()
 	if s.textStarted && !s.textDone {
+		emptyAnnotations := []interface{}{}
 		s.textDone = true
 		events = append(events, responsesStreamEvent("response.output_text.done", dto.ResponsesStreamResponse{
 			Type:         "response.output_text.done",
@@ -272,7 +274,7 @@ func (s *ChatToResponsesStreamState) doneDeltaEvents() []ChatToResponsesStreamEv
 			Part: &dto.ResponsesReasoningSummaryPart{
 				Type:        "output_text",
 				Text:        s.text.String(),
-				Annotations: []interface{}{},
+				Annotations: &emptyAnnotations,
 			},
 		}))
 		events = append(events, responsesStreamEvent(responsesEventOutputItemDone, dto.ResponsesStreamResponse{
