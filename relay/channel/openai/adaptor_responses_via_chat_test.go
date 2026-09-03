@@ -110,11 +110,13 @@ func TestConvertOpenAIResponsesRequestNormalizesNestedFunctionSchema(t *testing.
 	native, ok := converted.(dto.OpenAIResponsesRequest)
 	require.True(t, ok)
 
-	assert.Equal(t, "object", gjson.GetBytes(native.Tools, "0.tools.0.parameters.type").String())
-	assert.False(t, gjson.GetBytes(native.Tools, "0.tools.0.parameters.oneOf").Exists())
-	assert.Equal(t, "string", gjson.GetBytes(native.Tools, "0.tools.0.parameters.properties.id.type").String())
-	assert.Equal(t, "string", gjson.GetBytes(native.Tools, "0.tools.0.parameters.properties.status.type").String())
-	assert.False(t, gjson.GetBytes(native.Tools, "0.tools.0.parameters.required").Exists())
+	assert.Equal(t, "function", gjson.GetBytes(native.Tools, "0.type").String())
+	assert.Equal(t, "automation__automation_update", gjson.GetBytes(native.Tools, "0.name").String())
+	assert.Equal(t, "object", gjson.GetBytes(native.Tools, "0.parameters.type").String())
+	assert.False(t, gjson.GetBytes(native.Tools, "0.parameters.oneOf").Exists())
+	assert.Equal(t, "string", gjson.GetBytes(native.Tools, "0.parameters.properties.id.type").String())
+	assert.Equal(t, "string", gjson.GetBytes(native.Tools, "0.parameters.properties.status.type").String())
+	assert.False(t, gjson.GetBytes(native.Tools, "0.parameters.required").Exists())
 }
 
 func TestConvertOpenAIResponsesRequestMovesLegacyReasoningContentToSummary(t *testing.T) {
