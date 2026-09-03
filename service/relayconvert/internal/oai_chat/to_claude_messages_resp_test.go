@@ -231,6 +231,224 @@ func TestStreamResponseOpenAI2ClaudeClosesTextThinkingAndToolBlocks(t *testing.T
 	assert.Equal(t, "message_stop", finishResponses[2].Type)
 }
 
+func TestStreamResponseOpenAI2ClaudeStartsEveryParallelToolInFirstChunk(t *testing.T) {
+	info := &relaycommon.RelayInfo{
+		SendResponseCount: 1,
+		ClaudeConvertInfo: &relaycommon.ClaudeConvertInfo{
+			LastMessagesType: relaycommon.LastMessageTypeNone,
+		},
+	}
+
+	responses := StreamResponseOpenAI2Claude(&dto.ChatCompletionsStreamResponse{
+		Id:    "chatcmpl_parallel",
+		Model: "gpt-test",
+		Choices: []dto.ChatCompletionsStreamResponseChoice{
+			{
+				Delta: dto.ChatCompletionsStreamResponseChoiceDelta{
+					ToolCalls: []dto.ToolCallResponse{
+						{
+							Index: ptr(0),
+							ID:    "call_1",
+							Type:  "function",
+							Function: dto.FunctionResponse{
+								Name:      "read_file",
+								Arguments: `{"path":"a.txt"}`,
+							},
+						},
+						{
+							Index: ptr(1),
+							ID:    "call_2",
+							Type:  "function",
+							Function: dto.FunctionResponse{
+								Name:      "read_file",
+								Arguments: `{"path":"b.txt"}`,
+							},
+						},
+					},
+				},
+			},
+		},
+	}, info)
+
+	require.Len(t, responses, 5)
+	assert.Equal(t, "message_start", responses[0].Type)
+	assert.Equal(t, "content_block_start", responses[1].Type)
+	assert.Equal(t, 0, responses[1].GetIndex())
+	assert.Equal(t, "call_1", responses[1].ContentBlock.Id)
+	assert.Equal(t, "content_block_delta", responses[2].Type)
+	assert.Equal(t, 0, responses[2].GetIndex())
+	assert.Equal(t, "content_block_start", responses[3].Type)
+	assert.Equal(t, 1, responses[3].GetIndex())
+	assert.Equal(t, "call_2", responses[3].ContentBlock.Id)
+	assert.Equal(t, "content_block_delta", responses[4].Type)
+	assert.Equal(t, 1, responses[4].GetIndex())
+}
+
+func TestStreamResponseOpenAI2ClaudeBuffersArgumentsUntilToolStart(t *testing.T) {
+	info := &relaycommon.RelayInfo{
+		SendResponseCount: 1,
+		ClaudeConvertInfo: &relaycommon.ClaudeConvertInfo{
+			LastMessagesType: relaycommon.LastMessageTypeNone,
+		},
+	}
+
+	firstResponses := StreamResponseOpenAI2Claude(&dto.ChatCompletionsStreamResponse{
+		Id:    "chatcmpl_arguments_first",
+		Model: "gpt-test",
+		Choices: []dto.ChatCompletionsStreamResponseChoice{
+			{
+				Delta: dto.ChatCompletionsStreamResponseChoiceDelta{
+					ToolCalls: []dto.ToolCallResponse{
+						{
+							Index: ptr(0),
+							ID:    "call_1",
+							Function: dto.FunctionResponse{
+								Arguments: `{"path":`,
+							},
+						},
+					},
+				},
+			},
+		},
+	}, info)
+
+	require.Len(t, firstResponses, 1)
+	assert.Equal(t, "message_start", firstResponses[0].Type)
+
+	info.SendResponseCount = 2
+	secondResponses := StreamResponseOpenAI2Claude(&dto.ChatCompletionsStreamResponse{
+		Id:    "chatcmpl_arguments_first",
+		Model: "gpt-test",
+		Choices: []dto.ChatCompletionsStreamResponseChoice{
+			{
+				Delta: dto.ChatCompletionsStreamResponseChoiceDelta{
+					ToolCalls: []dto.ToolCallResponse{
+						{
+							Index: ptr(0),
+							Function: dto.FunctionResponse{
+								Name:      "read_file",
+								Arguments: `"a.txt"}`,
+							},
+						},
+					},
+				},
+			},
+		},
+	}, info)
+
+	require.Len(t, secondResponses, 2)
+	assert.Equal(t, "content_block_start", secondResponses[0].Type)
+	assert.Equal(t, 0, secondResponses[0].GetIndex())
+	assert.Equal(t, "call_1", secondResponses[0].ContentBlock.Id)
+	assert.Equal(t, "read_file", secondResponses[0].ContentBlock.Name)
+	assert.Equal(t, "content_block_delta", secondResponses[1].Type)
+	assert.Equal(t, 0, secondResponses[1].GetIndex())
+	require.NotNil(t, secondResponses[1].Delta.PartialJson)
+	assert.Equal(t, `{"path":"a.txt"}`, *secondResponses[1].Delta.PartialJson)
+}
+
+func TestStreamResponseOpenAI2ClaudeDoesNotRestartToolOnLaterChunks(t *testing.T) {
+	info := &relaycommon.RelayInfo{
+		SendResponseCount: 1,
+		ClaudeConvertInfo: &relaycommon.ClaudeConvertInfo{
+			LastMessagesType: relaycommon.LastMessageTypeNone,
+		},
+	}
+
+	firstResponses := StreamResponseOpenAI2Claude(&dto.ChatCompletionsStreamResponse{
+		Id:    "chatcmpl_repeated_name",
+		Model: "gpt-test",
+		Choices: []dto.ChatCompletionsStreamResponseChoice{
+			{
+				Delta: dto.ChatCompletionsStreamResponseChoiceDelta{
+					ToolCalls: []dto.ToolCallResponse{
+						{
+							Index: ptr(0),
+							ID:    "call_1",
+							Function: dto.FunctionResponse{
+								Name:      "lookup",
+								Arguments: `{"q":`,
+							},
+						},
+					},
+				},
+			},
+		},
+	}, info)
+	require.Len(t, firstResponses, 3)
+
+	info.SendResponseCount = 2
+	secondResponses := StreamResponseOpenAI2Claude(&dto.ChatCompletionsStreamResponse{
+		Id:    "chatcmpl_repeated_name",
+		Model: "gpt-test",
+		Choices: []dto.ChatCompletionsStreamResponseChoice{
+			{
+				Delta: dto.ChatCompletionsStreamResponseChoiceDelta{
+					ToolCalls: []dto.ToolCallResponse{
+						{
+							Index: ptr(0),
+							ID:    "call_1",
+							Function: dto.FunctionResponse{
+								Name:      "lookup",
+								Arguments: `"x"}`,
+							},
+						},
+					},
+				},
+			},
+		},
+	}, info)
+
+	require.Len(t, secondResponses, 1)
+	assert.Equal(t, "content_block_delta", secondResponses[0].Type)
+	assert.Equal(t, 0, secondResponses[0].GetIndex())
+}
+
+func TestStreamResponseOpenAI2ClaudeClosesOnlyStartedSparseTools(t *testing.T) {
+	info := &relaycommon.RelayInfo{
+		SendResponseCount: 1,
+		ClaudeConvertInfo: &relaycommon.ClaudeConvertInfo{
+			LastMessagesType: relaycommon.LastMessageTypeNone,
+		},
+	}
+
+	startResponses := StreamResponseOpenAI2Claude(&dto.ChatCompletionsStreamResponse{
+		Id:    "chatcmpl_sparse",
+		Model: "gpt-test",
+		Choices: []dto.ChatCompletionsStreamResponseChoice{
+			{
+				Delta: dto.ChatCompletionsStreamResponseChoiceDelta{
+					ToolCalls: []dto.ToolCallResponse{
+						{Index: ptr(0), ID: "call_1", Function: dto.FunctionResponse{Name: "first"}},
+						{Index: ptr(2), ID: "call_2", Function: dto.FunctionResponse{Name: "second"}},
+					},
+				},
+			},
+		},
+	}, info)
+	require.Len(t, startResponses, 3)
+	assert.Equal(t, 0, startResponses[1].GetIndex())
+	assert.Equal(t, 1, startResponses[2].GetIndex())
+
+	info.SendResponseCount = 2
+	finishResponses := StreamResponseOpenAI2Claude(&dto.ChatCompletionsStreamResponse{
+		Id:    "chatcmpl_sparse",
+		Model: "gpt-test",
+		Choices: []dto.ChatCompletionsStreamResponseChoice{
+			{FinishReason: ptr("tool_calls")},
+		},
+		Usage: &dto.Usage{PromptTokens: 3, CompletionTokens: 2, TotalTokens: 5},
+	}, info)
+
+	require.Len(t, finishResponses, 4)
+	assert.Equal(t, "content_block_stop", finishResponses[0].Type)
+	assert.Equal(t, 0, finishResponses[0].GetIndex())
+	assert.Equal(t, "content_block_stop", finishResponses[1].Type)
+	assert.Equal(t, 1, finishResponses[1].GetIndex())
+	assert.Equal(t, "message_delta", finishResponses[2].Type)
+	assert.Equal(t, "message_stop", finishResponses[3].Type)
+}
+
 func TestNormalizeCacheCreationSplit(t *testing.T) {
 	cache5m, cache1h := NormalizeCacheCreationSplit(10, 3, 2)
 	assert.Equal(t, 8, cache5m)
