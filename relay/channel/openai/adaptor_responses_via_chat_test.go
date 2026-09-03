@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 func TestConvertOpenAIResponsesRequestUsesChatCompletionsWhenEnabled(t *testing.T) {
@@ -72,6 +73,68 @@ func TestConvertOpenAIResponsesRequestKeepsNativeFormatByDefault(t *testing.T) {
 	require.NoError(t, err)
 	_, ok := converted.(dto.OpenAIResponsesRequest)
 	assert.True(t, ok)
+}
+
+func TestConvertOpenAIResponsesRequestNormalizesNestedFunctionSchema(t *testing.T) {
+	tools, err := common.Marshal([]map[string]any{{
+		"type": "namespace",
+		"name": "automation",
+		"tools": []any{map[string]any{
+			"type": "function",
+			"name": "automation_update",
+			"parameters": map[string]any{
+				"oneOf": []any{
+					map[string]any{
+						"type":       "object",
+						"properties": map[string]any{"id": map[string]any{"type": "string"}},
+						"required":   []any{"id"},
+					},
+					map[string]any{
+						"type":       "object",
+						"properties": map[string]any{"status": map[string]any{"type": "string"}},
+						"required":   []any{"status"},
+					},
+				},
+			},
+		}},
+	}})
+	require.NoError(t, err)
+	request := dto.OpenAIResponsesRequest{Model: "deepseek-v4-flash", Tools: tools}
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{
+		ChannelType:       constant.ChannelTypeOpenAI,
+		UpstreamModelName: "deepseek-v4-flash",
+	}}
+
+	converted, err := (&Adaptor{}).ConvertOpenAIResponsesRequest(nil, info, request)
+	require.NoError(t, err)
+	native, ok := converted.(dto.OpenAIResponsesRequest)
+	require.True(t, ok)
+
+	assert.Equal(t, "object", gjson.GetBytes(native.Tools, "0.tools.0.parameters.type").String())
+	assert.False(t, gjson.GetBytes(native.Tools, "0.tools.0.parameters.oneOf").Exists())
+	assert.Equal(t, "string", gjson.GetBytes(native.Tools, "0.tools.0.parameters.properties.id.type").String())
+	assert.Equal(t, "string", gjson.GetBytes(native.Tools, "0.tools.0.parameters.properties.status.type").String())
+	assert.False(t, gjson.GetBytes(native.Tools, "0.tools.0.parameters.required").Exists())
+}
+
+func TestConvertOpenAIResponsesRequestMovesLegacyReasoningContentToSummary(t *testing.T) {
+	request := dto.OpenAIResponsesRequest{
+		Model: "deepseek-v4-flash",
+		Input: []byte(`[{"type":"reasoning","id":"rs_1","content":[{"type":"summary_text","text":"thinking"}]}]`),
+	}
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{
+		ChannelType:       constant.ChannelTypeOpenAI,
+		UpstreamModelName: "deepseek-v4-flash",
+	}}
+
+	converted, err := (&Adaptor{}).ConvertOpenAIResponsesRequest(nil, info, request)
+	require.NoError(t, err)
+	native, ok := converted.(dto.OpenAIResponsesRequest)
+	require.True(t, ok)
+
+	assert.False(t, gjson.GetBytes(native.Input, "0.content").Exists())
+	assert.Equal(t, "summary_text", gjson.GetBytes(native.Input, "0.summary.0.type").String())
+	assert.Equal(t, "thinking", gjson.GetBytes(native.Input, "0.summary.0.text").String())
 }
 
 func TestGetRequestURLUsesChatCompletionsForResponsesCompatibility(t *testing.T) {

@@ -269,6 +269,24 @@ func TestResponsesResponseToChatCompletionsPreservesReasoningSummary(t *testing.
 	assert.Equal(t, "final", chat.Choices[0].Message.StringContent())
 }
 
+func TestChatCompletionsResponseToResponsesEmitsReasoningSummaryField(t *testing.T) {
+	message := dto.Message{Role: "assistant", Content: "final", ReasoningContent: common.GetPointer("thinking")}
+	resp, _, err := ChatCompletionsResponseToResponsesResponse(&dto.OpenAITextResponse{
+		Model: "deepseek-v4-flash",
+		Choices: []dto.OpenAITextResponseChoice{{
+			Message: message,
+		}},
+	}, "resp_reasoning")
+	require.NoError(t, err)
+	require.Len(t, resp.Output, 2)
+
+	body, err := common.Marshal(resp.Output[1])
+	require.NoError(t, err)
+	assert.False(t, gjson.GetBytes(body, "content").Exists())
+	assert.Equal(t, "summary_text", gjson.GetBytes(body, "summary.0.type").String())
+	assert.Equal(t, "thinking", gjson.GetBytes(body, "summary.0.text").String())
+}
+
 func TestResponsesFinishReasonFromIncompleteStatus(t *testing.T) {
 	tests := []struct {
 		name   string
