@@ -725,3 +725,34 @@ func mustResponsesEventsFromChatChunk(t *testing.T, state *ChatToResponsesStream
 	require.NoError(t, err)
 	return events
 }
+
+func TestChatCompletionsStreamTextEmitsContentPartLifecycle(t *testing.T) {
+	state := NewChatToResponsesStreamState("resp_test", "claude-sonnet-test")
+	chunk := &dto.ChatCompletionsStreamResponse{
+		Choices: []dto.ChatCompletionsStreamResponseChoice{
+			{Delta: dto.ChatCompletionsStreamResponseChoiceDelta{Content: common.GetPointer("hello")}},
+		},
+	}
+
+	events, err := ChatCompletionsStreamChunkToResponsesEvents(chunk, state)
+	require.NoError(t, err)
+	require.Len(t, events, 4)
+	assert.Equal(t, responsesEventCreated, events[0].Type)
+	assert.Equal(t, responsesEventOutputItemAdded, events[1].Type)
+	assert.Equal(t, "response.content_part.added", events[2].Type)
+	assert.Equal(t, responsesEventOutputTextDelta, events[3].Type)
+	require.NotNil(t, events[2].Payload.Part)
+	assert.Equal(t, "output_text", events[2].Payload.Part.Type)
+
+	finishReason := "stop"
+	events, err = ChatCompletionsStreamChunkToResponsesEvents(&dto.ChatCompletionsStreamResponse{
+		Choices: []dto.ChatCompletionsStreamResponseChoice{{FinishReason: &finishReason}},
+	}, state)
+	require.NoError(t, err)
+	require.Len(t, events, 3)
+	assert.Equal(t, "response.output_text.done", events[0].Type)
+	assert.Equal(t, "response.content_part.done", events[1].Type)
+	assert.Equal(t, responsesEventOutputItemDone, events[2].Type)
+	require.NotNil(t, events[1].Payload.Part)
+	assert.Equal(t, "hello", events[1].Payload.Part.Text)
+}
