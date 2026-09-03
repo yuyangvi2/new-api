@@ -599,6 +599,48 @@ func TestChatCompletionsResponseToResponsesPreservesTextToolCallsAndUsage(t *tes
 	assert.Equal(t, `"{\"q\":\"x\"}"`, string(resp.Output[1].Arguments))
 }
 
+func TestChatCompletionsResponseToResponsesUsesMessageIDPrefix(t *testing.T) {
+	chat := &dto.OpenAITextResponse{
+		Model: "deepseek-v4-flash",
+		Choices: []dto.OpenAITextResponseChoice{{
+			Message: dto.Message{Role: "assistant", Content: "done"},
+		}},
+	}
+
+	resp, _, err := ChatCompletionsResponseToResponsesResponse(chat, "resp_chat_0000000000000349")
+	require.NoError(t, err)
+	require.Len(t, resp.Output, 1)
+	assert.Equal(t, "msg_chat_0000000000000349_0", resp.Output[0].ID)
+}
+
+func TestChatCompletionsStreamToResponsesUsesMessageIDPrefixConsistently(t *testing.T) {
+	state := NewChatToResponsesStreamState("resp_chat_0000000000000349", "deepseek-v4-flash")
+
+	events, err := ChatCompletionsStreamChunkToResponsesEvents(&dto.ChatCompletionsStreamResponse{
+		Choices: []dto.ChatCompletionsStreamResponseChoice{{
+			Delta: dto.ChatCompletionsStreamResponseChoiceDelta{Content: common.GetPointer("done")},
+		}},
+	}, state)
+	require.NoError(t, err)
+	require.Len(t, events, 4)
+
+	const wantMessageID = "msg_chat_0000000000000349_0"
+	require.NotNil(t, events[1].Payload.Item)
+	assert.Equal(t, wantMessageID, events[1].Payload.Item.ID)
+	assert.Equal(t, wantMessageID, events[2].Payload.ItemID)
+	assert.Equal(t, wantMessageID, events[3].Payload.ItemID)
+
+	finalEvents := FinalizeChatCompletionsStreamToResponses(state)
+	require.Len(t, finalEvents, 4)
+	assert.Equal(t, wantMessageID, finalEvents[0].Payload.ItemID)
+	assert.Equal(t, wantMessageID, finalEvents[1].Payload.ItemID)
+	require.NotNil(t, finalEvents[2].Payload.Item)
+	assert.Equal(t, wantMessageID, finalEvents[2].Payload.Item.ID)
+	require.NotNil(t, finalEvents[3].Payload.Response)
+	require.Len(t, finalEvents[3].Payload.Response.Output, 1)
+	assert.Equal(t, wantMessageID, finalEvents[3].Payload.Response.Output[0].ID)
+}
+
 func TestChatCompletionsResponseToResponsesMapsIncompleteFinishReasons(t *testing.T) {
 	tests := []struct {
 		name         string
