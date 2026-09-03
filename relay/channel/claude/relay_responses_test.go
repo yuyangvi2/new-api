@@ -28,7 +28,8 @@ func TestClaudeResponsesHandlerReturnsOpenAIResponsesJSON(t *testing.T) {
 		Model:      "claude-sonnet-test",
 		StopReason: "tool_use",
 		Content: []dto.ClaudeMediaMessage{
-			{Type: "text", Text: common.GetPointer("I will inspect it.")},
+			{Type: "text", Text: common.GetPointer("I will ")},
+			{Type: "text", Text: common.GetPointer("inspect it.")},
 			{Type: "tool_use", Id: "toolu_1", Name: "read_file", Input: map[string]any{"path": "README.md"}},
 		},
 		Usage: &dto.ClaudeUsage{
