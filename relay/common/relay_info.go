@@ -42,8 +42,17 @@ type ClaudeConvertInfo struct {
 	FinishReason     string
 	Done             bool
 
-	ToolCallBaseIndex      int
-	ToolCallMaxIndexOffset int
+	ToolCallBaseIndex int
+	ToolCallStates    map[int]*ClaudeToolCallState
+	ToolCallOrder     []int
+}
+
+type ClaudeToolCallState struct {
+	ContentBlockIndex int
+	ID                string
+	Name              string
+	PendingArguments  string
+	Started           bool
 }
 
 type RerankerInfo struct {
