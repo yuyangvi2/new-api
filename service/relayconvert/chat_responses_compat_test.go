@@ -743,6 +743,9 @@ func TestChatCompletionsStreamTextEmitsContentPartLifecycle(t *testing.T) {
 	assert.Equal(t, responsesEventOutputTextDelta, events[3].Type)
 	require.NotNil(t, events[2].Payload.Part)
 	assert.Equal(t, "output_text", events[2].Payload.Part.Type)
+	data, err := common.Marshal(events[2].Payload)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"annotations":[]`)
 
 	finishReason := "stop"
 	events, err = ChatCompletionsStreamChunkToResponsesEvents(&dto.ChatCompletionsStreamResponse{
