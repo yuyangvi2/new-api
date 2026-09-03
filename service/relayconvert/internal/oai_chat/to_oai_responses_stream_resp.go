@@ -393,7 +393,15 @@ func (s *ChatToResponsesStreamState) outputStatus() string {
 }
 
 func (s *ChatToResponsesStreamState) messageID() string {
-	return fmt.Sprintf("%s_msg_0", s.ID)
+	return responsesMessageID(s.ID, 0)
+}
+
+func responsesMessageID(responseID string, index int) string {
+	idSuffix := strings.TrimPrefix(strings.TrimSpace(responseID), "resp_")
+	if idSuffix == "" {
+		return fmt.Sprintf("msg_%d", index)
+	}
+	return fmt.Sprintf("msg_%s_%d", idSuffix, index)
 }
 
 func (s *ChatToResponsesStreamState) reasoningID() string {

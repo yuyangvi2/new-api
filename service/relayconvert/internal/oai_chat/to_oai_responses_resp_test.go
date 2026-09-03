@@ -34,6 +34,7 @@ func TestChatCompletionsResponseToResponsesPreservesTextToolCallsAndUsage(t *tes
 	assert.Equal(t, 5, resp.Usage.OutputTokens)
 	require.Len(t, resp.Output, 2)
 	assert.Equal(t, responsesOutputTypeMessage, resp.Output[0].Type)
+	assert.Equal(t, "msg_1_0", resp.Output[0].ID)
 	assert.Equal(t, "I will call.", resp.Output[0].Content[0].Text)
 	assert.Equal(t, responsesOutputTypeFunctionCall, resp.Output[1].Type)
 	assert.Equal(t, "call_1", resp.Output[1].CallId)
