@@ -26,7 +26,10 @@ func TestConvertOpenAIResponsesRequestToClaude(t *testing.T) {
 		ToolChoice:        []byte(`"auto"`),
 		Tools:             []byte(`[{"type":"function","name":"read_file","description":"Read one file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}]`),
 	}
-	info := &relaycommon.RelayInfo{RelayFormat: types.RelayFormatOpenAIResponses}
+	info := &relaycommon.RelayInfo{
+		RelayFormat:            types.RelayFormatOpenAIResponses,
+		RequestConversionChain: []types.RelayFormat{types.RelayFormatOpenAIResponses},
+	}
 
 	converted, err := (&Adaptor{}).ConvertOpenAIResponsesRequest(nil, info, request)
 	require.NoError(t, err)

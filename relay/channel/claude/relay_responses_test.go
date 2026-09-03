@@ -41,8 +41,10 @@ func TestClaudeResponsesHandlerReturnsOpenAIResponsesJSON(t *testing.T) {
 	body, err := common.Marshal(response)
 	require.NoError(t, err)
 
-	usage, apiErr := ClaudeHandler(c, &http.Response{Body: io.NopCloser(bytes.NewReader(body))}, newClaudeResponsesRelayInfo(false))
+	usageValue, apiErr := (&Adaptor{}).DoResponse(c, &http.Response{Body: io.NopCloser(bytes.NewReader(body))}, newClaudeResponsesRelayInfo(false))
 	require.Nil(t, apiErr)
+	usage, ok := usageValue.(*dto.Usage)
+	require.True(t, ok)
 	require.NotNil(t, usage)
 	assert.Equal(t, 10, usage.PromptTokens)
 	assert.Equal(t, 4, usage.CompletionTokens)
@@ -59,7 +61,7 @@ func TestClaudeResponsesHandlerReturnsOpenAIResponsesJSON(t *testing.T) {
 	assert.Equal(t, "function_call", got.Output[1].Type)
 	assert.Equal(t, "toolu_1", got.Output[1].CallId)
 	assert.Equal(t, "read_file", got.Output[1].Name)
-	assert.JSONEq(t, `{"path":"README.md"}`, string(got.Output[1].Arguments))
+	assert.JSONEq(t, `{"path":"README.md"}`, dto.ResponsesArgumentsString(got.Output[1].Arguments))
 	require.NotNil(t, got.Usage)
 	assert.Equal(t, 18, got.Usage.InputTokens)
 	assert.Equal(t, 6, got.Usage.InputTokensDetails.CachedTokens)
@@ -95,8 +97,10 @@ func TestClaudeResponsesStreamHandlerPreservesToolEventOrderAndUsage(t *testing.
 		``,
 	}, "\n")
 
-	usage, apiErr := ClaudeStreamHandler(c, &http.Response{Body: io.NopCloser(strings.NewReader(streamBody))}, newClaudeResponsesRelayInfo(true))
+	usageValue, apiErr := (&Adaptor{}).DoResponse(c, &http.Response{Body: io.NopCloser(strings.NewReader(streamBody))}, newClaudeResponsesRelayInfo(true))
 	require.Nil(t, apiErr)
+	usage, ok := usageValue.(*dto.Usage)
+	require.True(t, ok)
 	require.NotNil(t, usage)
 	assert.Equal(t, 14, usage.TotalTokens)
 

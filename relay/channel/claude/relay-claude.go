@@ -16,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/relay/reasonmap"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/relayconvert"
 	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/setting/reasoning"
 	"github.com/QuantumNous/new-api/types"
@@ -683,6 +684,7 @@ func buildOpenAIStyleUsageFromClaudeUsage(usage *dto.Usage) dto.Usage {
 		usage.ClaudeCacheCreation1hTokens,
 	)
 	cacheCreationTokens := cacheCreationTokensForOpenAIUsage(usage)
+	clone.PromptTokensDetails.CacheWriteTokens = cacheCreationTokens
 	totalInputTokens := usage.PromptTokens + usage.PromptTokensDetails.CachedTokens + cacheCreationTokens
 	clone.PromptTokens = totalInputTokens
 	clone.InputTokens = totalInputTokens
@@ -1051,6 +1053,173 @@ func ClaudeHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayI
 		return nil, handleErr
 	}
 	return claudeInfo.Usage, nil
+}
+
+func ClaudeResponsesHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (*dto.Usage, *types.NewAPIError) {
+	defer service.CloseResponseBodyGracefully(resp)
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, types.NewOpenAIError(err, types.ErrorCodeReadResponseBodyFailed, http.StatusInternalServerError)
+	}
+	logger.LogDebug(c, "Claude responses response body: %s", responseBody)
+
+	var claudeResponse dto.ClaudeResponse
+	if err := common.Unmarshal(responseBody, &claudeResponse); err != nil {
+		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+	}
+	if claudeError := claudeResponse.GetClaudeError(); claudeError != nil && claudeError.Type != "" {
+		return nil, types.WithClaudeError(*claudeError, resp.StatusCode)
+	}
+	maybeMarkClaudeRefusal(c, claudeResponse.StopReason)
+
+	result, err := service.ConvertResponse(c, info, types.RelayFormatOpenAIResponses, &claudeResponse)
+	if err != nil {
+		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+	}
+	responsesResponse, ok := result.Value.(*dto.OpenAIResponsesResponse)
+	if !ok {
+		return nil, types.NewOpenAIError(
+			fmt.Errorf("expected OpenAI Responses response, got %T", result.Value),
+			types.ErrorCodeBadResponseBody,
+			http.StatusInternalServerError,
+		)
+	}
+	responseData, err := common.Marshal(responsesResponse)
+	if err != nil {
+		return nil, types.NewOpenAIError(err, types.ErrorCodeJsonMarshalFailed, http.StatusInternalServerError)
+	}
+
+	if claudeResponse.Usage != nil && claudeResponse.Usage.ServerToolUse != nil && claudeResponse.Usage.ServerToolUse.WebSearchRequests > 0 {
+		c.Set("claude_web_search_requests", claudeResponse.Usage.ServerToolUse.WebSearchRequests)
+	}
+	service.IOCopyBytesGracefully(c, resp, responseData)
+	return claudeUsageForBilling(claudeResponse.Usage), nil
+}
+
+func ClaudeResponsesStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (*dto.Usage, *types.NewAPIError) {
+	defer service.CloseResponseBodyGracefully(resp)
+
+	claudeInfo := &ClaudeResponseInfo{
+		ResponseId:   helper.GetResponseID(c),
+		Created:      common.GetTimestamp(),
+		Model:        info.UpstreamModelName,
+		ResponseText: strings.Builder{},
+		Usage:        &dto.Usage{},
+	}
+	state, err := service.NewResponseStreamState(types.RelayFormatClaude, types.RelayFormatOpenAIResponses, relayconvert.ResponseStreamOptions{
+		ID:      claudeInfo.ResponseId,
+		Model:   claudeInfo.Model,
+		Created: claudeInfo.Created,
+	})
+	if err != nil {
+		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
+	}
+
+	var streamErr *types.NewAPIError
+	writeResults := func(results []relayconvert.ResponseResult) bool {
+		for _, result := range results {
+			var event dto.ResponsesStreamResponse
+			switch value := result.Value.(type) {
+			case relayconvert.ChatToResponsesStreamEvent:
+				event = value.Payload
+			case *relayconvert.ChatToResponsesStreamEvent:
+				if value == nil {
+					continue
+				}
+				event = value.Payload
+			case *dto.ResponsesStreamResponse:
+				if value == nil {
+					continue
+				}
+				event = *value
+			case dto.ResponsesStreamResponse:
+				event = value
+			default:
+				streamErr = types.NewOpenAIError(
+					fmt.Errorf("expected OpenAI Responses stream event, got %T", result.Value),
+					types.ErrorCodeBadResponse,
+					http.StatusInternalServerError,
+				)
+				return false
+			}
+			data, err := common.Marshal(event)
+			if err != nil {
+				streamErr = types.NewOpenAIError(err, types.ErrorCodeJsonMarshalFailed, http.StatusInternalServerError)
+				return false
+			}
+			if err := helper.ResponseChunkData(c, event, string(data)); err != nil {
+				streamErr = types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
+				return false
+			}
+		}
+		return true
+	}
+
+	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
+		var claudeResponse dto.ClaudeResponse
+		if err := common.UnmarshalJsonStr(data, &claudeResponse); err != nil {
+			streamErr = types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+			sr.Stop(streamErr)
+			return
+		}
+		if claudeError := claudeResponse.GetClaudeError(); claudeError != nil && claudeError.Type != "" {
+			streamErr = types.WithClaudeError(*claudeError, resp.StatusCode)
+			sr.Stop(streamErr)
+			return
+		}
+		if claudeResponse.StopReason != "" {
+			maybeMarkClaudeRefusal(c, claudeResponse.StopReason)
+		}
+		if claudeResponse.Delta != nil && claudeResponse.Delta.StopReason != nil {
+			maybeMarkClaudeRefusal(c, *claudeResponse.Delta.StopReason)
+		}
+
+		FormatClaudeResponseInfo(&claudeResponse, nil, claudeInfo)
+		if claudeResponse.Type == "message_start" && claudeResponse.Message != nil {
+			info.UpstreamModelName = claudeResponse.Message.Model
+		}
+		results, err := service.ConvertStreamResponseChunk(c, info, state, &claudeResponse)
+		if err != nil {
+			streamErr = types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
+			sr.Stop(streamErr)
+			return
+		}
+		if !writeResults(results) {
+			sr.Stop(streamErr)
+		}
+	})
+	if streamErr != nil {
+		return nil, streamErr
+	}
+
+	HandleStreamFinalResponse(c, info, claudeInfo)
+	state.SetUsage(common.GetPointer(buildOpenAIStyleUsageFromClaudeUsage(claudeInfo.Usage)))
+	results, err := service.FinalizeStreamResponse(c, info, state)
+	if err != nil {
+		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
+	}
+	if !writeResults(results) {
+		return nil, streamErr
+	}
+	return claudeInfo.Usage, nil
+}
+
+func claudeUsageForBilling(usage *dto.ClaudeUsage) *dto.Usage {
+	if usage == nil {
+		return &dto.Usage{}
+	}
+	return &dto.Usage{
+		PromptTokens:                usage.InputTokens,
+		CompletionTokens:            usage.OutputTokens,
+		TotalTokens:                 usage.InputTokens + usage.OutputTokens,
+		UsageSemantic:               "anthropic",
+		UsageSource:                 "anthropic",
+		PromptTokensDetails:         dto.InputTokenDetails{CachedTokens: usage.CacheReadInputTokens, CachedCreationTokens: usage.CacheCreationInputTokens},
+		ClaudeCacheCreation5mTokens: usage.GetCacheCreation5mTokens(),
+		ClaudeCacheCreation1hTokens: usage.GetCacheCreation1hTokens(),
+		BillingUsage:                dto.NewClaudeMessagesBillingUsage(usage),
+	}
 }
 
 func mapToolChoice(toolChoice any, parallelToolCalls *bool) *dto.ClaudeToolChoice {
