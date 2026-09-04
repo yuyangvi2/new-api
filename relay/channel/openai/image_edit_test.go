@@ -18,8 +18,8 @@ import (
 
 // TestConvertImageEditRequestMultipart verifies that ConvertImageRequest
 // re-serializes multipart image edit requests with all fields (including
-// stream) and the file intact, both when the form was already parsed and when
-// it must be re-parsed from the reusable body.
+// stream) and the file intact, without retaining the rebuilt multipart body in
+// a bytes.Buffer while the upstream image request is running.
 func TestConvertImageEditRequestMultipart(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -54,10 +54,16 @@ func TestConvertImageEditRequestMultipart(t *testing.T) {
 
 		converted, err := (&Adaptor{}).ConvertImageRequest(c, info, request)
 		require.NoError(t, err)
-		convertedBody, ok := converted.(*bytes.Buffer)
-		require.True(t, ok)
+		convertedBody, ok := converted.(interface {
+			io.Reader
+			io.Closer
+			Size() int64
+		})
+		require.True(t, ok, "image edit bodies must be temp-backed and explicitly releasable")
+		defer convertedBody.Close()
+		require.Positive(t, convertedBody.Size())
 
-		replayedRequest := httptest.NewRequest(http.MethodPost, "/v1/images/edits", bytes.NewReader(convertedBody.Bytes()))
+		replayedRequest := httptest.NewRequest(http.MethodPost, "/v1/images/edits", convertedBody)
 		replayedRequest.Header.Set("Content-Type", c.Request.Header.Get("Content-Type"))
 		require.NoError(t, replayedRequest.ParseMultipartForm(32<<20))
 
