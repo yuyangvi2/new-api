@@ -22,6 +22,10 @@ func (b *imageEditBody) Size() int64 {
 	return b.size
 }
 
+func (b *imageEditBody) NewReader() (io.ReadCloser, error) {
+	return os.Open(b.path)
+}
+
 func (b *imageEditBody) Close() error {
 	b.closeOnce.Do(func() {
 		closeErr := b.file.Close()

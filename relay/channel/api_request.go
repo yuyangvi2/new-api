@@ -42,6 +42,18 @@ func applyUpstreamContentLength(req *http.Request, info *common.RelayInfo) {
 	}
 }
 
+func applyUpstreamBodyReplay(req *http.Request, body io.Reader) {
+	if req == nil || body == nil {
+		return
+	}
+	replayable, ok := body.(interface {
+		NewReader() (io.ReadCloser, error)
+	})
+	if ok {
+		req.GetBody = replayable.NewReader
+	}
+}
+
 func SetupApiRequestHeader(info *common.RelayInfo, c *gin.Context, req *http.Header) {
 	if info.RelayMode == constant.RelayModeAudioTranscription || info.RelayMode == constant.RelayModeAudioTranslation {
 		// multipart/form-data
@@ -314,6 +326,7 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 	if err != nil {
 		return nil, fmt.Errorf("new request failed: %w", err)
 	}
+	applyUpstreamBodyReplay(req, requestBody)
 	applyUpstreamContentLength(req, info)
 	headers := req.Header
 	err = a.SetupRequestHeader(c, &headers, info)
@@ -344,6 +357,7 @@ func DoFormRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBod
 	if err != nil {
 		return nil, fmt.Errorf("new request failed: %w", err)
 	}
+	applyUpstreamBodyReplay(req, requestBody)
 	applyUpstreamContentLength(req, info)
 	// set form data
 	req.Header.Set("Content-Type", c.Request.Header.Get("Content-Type"))

@@ -6,6 +6,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
@@ -15,6 +16,21 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+func TestImageEditBodyCloseRemovesTempFile(t *testing.T) {
+	body, err := newImageEditBody()
+	require.NoError(t, err)
+	path := body.path
+
+	_, err = body.file.Write([]byte("multipart body"))
+	require.NoError(t, err)
+	require.NoError(t, body.finish())
+	require.NoError(t, body.Close())
+	require.NoError(t, body.Close(), "close must be idempotent")
+
+	_, err = os.Stat(path)
+	require.ErrorIs(t, err, os.ErrNotExist)
+}
 
 // TestConvertImageEditRequestMultipart verifies that ConvertImageRequest
 // re-serializes multipart image edit requests with all fields (including

@@ -302,9 +302,19 @@ func CreateBodyStorageFromReader(reader io.Reader, contentLength int64, maxBytes
 	return storage, nil
 }
 
+type reopenableReader interface {
+	io.Reader
+	NewReader() (io.ReadCloser, error)
+}
+
 // ReaderOnly wraps an io.Reader to hide io.Closer, preventing http.NewRequest
 // from type-asserting io.ReadCloser and closing the underlying BodyStorage.
+// If the reader can create a fresh reader, preserve that capability so HTTP
+// clients can replay request bodies across 307/308 redirects.
 func ReaderOnly(r io.Reader) io.Reader {
+	if reopenable, ok := r.(reopenableReader); ok {
+		return struct{ reopenableReader }{reopenable}
+	}
 	return struct{ io.Reader }{r}
 }
 
