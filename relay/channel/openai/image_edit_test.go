@@ -58,10 +58,17 @@ func TestConvertImageEditRequestMultipart(t *testing.T) {
 			io.Reader
 			io.Closer
 			Size() int64
+			NewReader() (io.ReadCloser, error)
 		})
-		require.True(t, ok, "image edit bodies must be temp-backed and explicitly releasable")
+		require.True(t, ok, "image edit bodies must be temp-backed, releasable, and replayable across redirects")
 		defer convertedBody.Close()
 		require.Positive(t, convertedBody.Size())
+		reopened, err := convertedBody.NewReader()
+		require.NoError(t, err)
+		replayedBytes, err := io.ReadAll(reopened)
+		require.NoError(t, err)
+		require.NoError(t, reopened.Close())
+		require.Equal(t, convertedBody.Size(), int64(len(replayedBytes)))
 
 		replayedRequest := httptest.NewRequest(http.MethodPost, "/v1/images/edits", convertedBody)
 		replayedRequest.Header.Set("Content-Type", c.Request.Header.Get("Content-Type"))
