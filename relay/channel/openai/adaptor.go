@@ -444,10 +444,21 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 			return request, nil
 		}
 
-		var requestBody bytes.Buffer
-		writer := multipart.NewWriter(&requestBody)
+		requestBody, err := newImageEditBody()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create image edit request body: %w", err)
+		}
+		completed := false
+		defer func() {
+			if !completed {
+				_ = requestBody.Close()
+			}
+		}()
+		writer := multipart.NewWriter(requestBody.file)
 
-		writer.WriteField("model", request.Model)
+		if err := writer.WriteField("model", request.Model); err != nil {
+			return nil, fmt.Errorf("failed to write model field: %w", err)
+		}
 		// 使用已解析的 multipart 表单，避免重复解析
 		mf := c.Request.MultipartForm
 		if mf == nil {
@@ -467,7 +478,9 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 					continue
 				}
 				for _, value := range values {
-					writer.WriteField(key, value)
+					if err := writer.WriteField(key, value); err != nil {
+						return nil, fmt.Errorf("failed to write form field %q: %w", key, err)
+					}
 				}
 			}
 		}
@@ -562,9 +575,15 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 		}
 
 		// 关闭 multipart 编写器以设置分界线
-		writer.Close()
+		if err := writer.Close(); err != nil {
+			return nil, fmt.Errorf("failed to finalize image edit request body: %w", err)
+		}
+		if err := requestBody.finish(); err != nil {
+			return nil, fmt.Errorf("failed to prepare image edit request body: %w", err)
+		}
 		c.Request.Header.Set("Content-Type", writer.FormDataContentType())
-		return &requestBody, nil
+		completed = true
+		return requestBody, nil
 
 	default:
 		return request, nil

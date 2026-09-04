@@ -257,8 +257,7 @@ func ParseMultipartFormReusable(c *gin.Context) (*multipart.Form, error) {
 	if err != nil {
 		return nil, err
 	}
-	requestBody, err := storage.Bytes()
-	if err != nil {
+	if _, err := storage.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
 
@@ -276,9 +275,10 @@ func ParseMultipartFormReusable(c *gin.Context) (*multipart.Form, error) {
 		return nil, err
 	}
 
-	reader := multipart.NewReader(bytes.NewReader(requestBody), boundary)
+	reader := multipart.NewReader(ReaderOnly(storage), boundary)
 	form, err := reader.ReadForm(multipartMemoryLimit())
 	if err != nil {
+		_, _ = storage.Seek(0, io.SeekStart)
 		return nil, err
 	}
 
