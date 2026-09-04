@@ -24,6 +24,35 @@ func (s *streamingOnlyBodyStorage) Bytes() ([]byte, error) {
 	return nil, errors.New("multipart parser must not materialize disk-backed storage")
 }
 
+type reopenableTestReader struct {
+	*bytes.Reader
+}
+
+func (r *reopenableTestReader) Close() error { return nil }
+func (r *reopenableTestReader) NewReader() (io.ReadCloser, error) {
+	return io.NopCloser(bytes.NewReader([]byte("replayed"))), nil
+}
+
+func TestReaderOnlyPreservesReplayWithoutExposingClose(t *testing.T) {
+	original := &reopenableTestReader{Reader: bytes.NewReader([]byte("original"))}
+	reader := ReaderOnly(original)
+
+	_, exposesClose := reader.(io.Closer)
+	require.False(t, exposesClose)
+
+	replayable, ok := reader.(interface {
+		NewReader() (io.ReadCloser, error)
+	})
+	require.True(t, ok, "non-closing wrapper must preserve request body replay")
+
+	replayed, err := replayable.NewReader()
+	require.NoError(t, err)
+	defer replayed.Close()
+	data, err := io.ReadAll(replayed)
+	require.NoError(t, err)
+	require.Equal(t, []byte("replayed"), data)
+}
+
 func TestParseMultipartFormReusableStreamsBodyStorage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

@@ -1,6 +1,8 @@
 package channel
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,6 +12,29 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+type replayableRequestBodyStub struct {
+	*bytes.Reader
+}
+
+func (b *replayableRequestBodyStub) NewReader() (io.ReadCloser, error) {
+	return io.NopCloser(bytes.NewReader([]byte("replayed body"))), nil
+}
+
+func TestApplyUpstreamBodyReplay(t *testing.T) {
+	body := &replayableRequestBodyStub{Reader: bytes.NewReader([]byte("original body"))}
+	req := httptest.NewRequest(http.MethodPost, "https://example.com/v1/images/edits", body)
+
+	applyUpstreamBodyReplay(req, body)
+	require.NotNil(t, req.GetBody)
+
+	replayed, err := req.GetBody()
+	require.NoError(t, err)
+	defer replayed.Close()
+	data, err := io.ReadAll(replayed)
+	require.NoError(t, err)
+	require.Equal(t, []byte("replayed body"), data)
+}
 
 func TestProcessHeaderOverride_ChannelTestSkipsPassthroughRules(t *testing.T) {
 	t.Parallel()
