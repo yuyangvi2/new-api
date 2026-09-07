@@ -112,18 +112,21 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 		return
 	}
 
-	if common.GetJsonType(errResponse.Error) == "object" {
-		// General format error (OpenAI, Anthropic, Gemini, etc.)
-		oaiError := errResponse.TryToOpenAIError()
-		if oaiError != nil {
-			newApiErr = types.WithOpenAIError(*oaiError, resp.StatusCode)
-			if showBodyWhenFail {
-				newApiErr.Err = buildErrWithBody(newApiErr.Error())
-			}
-			return
+	// General format error (OpenAI, Anthropic, Gemini, etc.). This also
+	// preserves providers that put message/type/param/code at the top level.
+	if oaiError := errResponse.TryToOpenAIError(); oaiError != nil {
+		newApiErr = types.WithOpenAIError(*oaiError, resp.StatusCode)
+		if showBodyWhenFail {
+			newApiErr.Err = buildErrWithBody(newApiErr.Error())
 		}
+		return
 	}
-	newApiErr = types.NewOpenAIError(errors.New(errResponse.ToMessage()), types.ErrorCodeBadResponseStatusCode, resp.StatusCode)
+	message := strings.TrimSpace(errResponse.ToMessage())
+	if message == "" {
+		logger.LogError(ctx, fmt.Sprintf("upstream returned status %d without error details, body: %s", resp.StatusCode, responseBodyPreview))
+		message = "Upstream returned an error without details"
+	}
+	newApiErr = types.NewOpenAIError(errors.New(message), types.ErrorCodeBadResponseStatusCode, resp.StatusCode)
 	if showBodyWhenFail {
 		newApiErr.Err = buildErrWithBody(newApiErr.Error())
 	}
