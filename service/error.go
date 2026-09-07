@@ -172,19 +172,7 @@ func sanitizeUpstreamOpenAIError(upstreamError types.OpenAIError, statusCode int
 		return upstreamError
 	}
 
-	upstreamError.Message = common.MaskSensitiveErrorText(strings.TrimSpace(upstreamError.Message))
-	upstreamError.Param = sanitizeUpstreamErrorParameter(upstreamError.Param)
-	upstreamError.Type = sanitizeUpstreamErrorIdentifier(upstreamError.Type, "upstream_error")
-	upstreamError.Code = sanitizeUpstreamErrorCode(upstreamError.Code, types.ErrorCodeBadResponseStatusCode)
-	if len(upstreamError.Metadata) > 0 {
-		maskedMetadata, err := common.MaskSensitiveErrorJSON(upstreamError.Metadata)
-		if err == nil {
-			upstreamError.Metadata = json.RawMessage(maskedMetadata)
-		} else {
-			upstreamError.Metadata = nil
-		}
-	}
-	return upstreamError
+	return types.SanitizeOpenAIErrorForClient(upstreamError)
 }
 
 // SanitizeUpstreamTaskError converts an asynchronous upstream failure into a
@@ -247,42 +235,6 @@ func SanitizeTaskRelayError(taskErr *dto.TaskError) *dto.TaskError {
 	taskErr.Data = nil
 	taskErr.Error = errors.New(safeError.Message)
 	return taskErr
-}
-
-func sanitizeUpstreamErrorIdentifier(value string, fallback string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return fallback
-	}
-	masked := common.MaskSensitiveErrorText(value)
-	if masked != value || len(value) > 128 || strings.ContainsAny(value, "\r\n") {
-		return fallback
-	}
-	return value
-}
-
-func sanitizeUpstreamErrorParameter(value string) string {
-	value = strings.TrimSpace(value)
-	if len(value) > 256 || strings.ContainsAny(value, "\r\n") {
-		return ""
-	}
-	return common.MaskSensitiveErrorText(value)
-}
-
-func sanitizeUpstreamErrorCode(code any, fallback any) any {
-	switch value := code.(type) {
-	case nil:
-		return fallback
-	case string:
-		if strings.TrimSpace(value) == "" {
-			return fallback
-		}
-		return sanitizeUpstreamErrorIdentifier(value, fmt.Sprint(fallback))
-	case json.Number, float64, float32, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-		return value
-	default:
-		return fallback
-	}
 }
 
 func upstreamErrorCodeText(code any) string {

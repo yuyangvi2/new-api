@@ -18,6 +18,64 @@ type OpenAIError struct {
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 }
 
+// SanitizeOpenAIErrorForClient applies the final disclosure policy to
+// structured errors, including adapters that construct OpenAIError directly.
+func SanitizeOpenAIErrorForClient(result OpenAIError) OpenAIError {
+	result.Message = common.MaskSensitiveErrorText(strings.TrimSpace(result.Message))
+	result.Param = strings.TrimSpace(result.Param)
+	if len(result.Param) > 256 || strings.ContainsAny(result.Param, "\r\n") {
+		result.Param = ""
+	} else {
+		result.Param = common.MaskSensitiveErrorText(result.Param)
+	}
+	result.Type = sanitizeErrorIdentifier(result.Type, "upstream_error")
+	result.Code = sanitizeErrorCode(result.Code)
+	if len(result.Metadata) > 0 {
+		maskedMetadata, err := common.MaskSensitiveErrorJSON(result.Metadata)
+		if err == nil {
+			result.Metadata = json.RawMessage(maskedMetadata)
+		} else {
+			result.Metadata = nil
+		}
+	}
+	return result
+}
+
+func sanitizeErrorIdentifier(value string, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	masked := common.MaskSensitiveErrorText(value)
+	if masked != value || len(value) > 128 || strings.ContainsAny(value, "\r\n") {
+		return fallback
+	}
+	return value
+}
+
+func sanitizeErrorCode(code any) any {
+	switch value := code.(type) {
+	case nil:
+		return ErrorCodeBadResponseStatusCode
+	case ErrorCode:
+		safeValue := sanitizeErrorIdentifier(string(value), "")
+		if safeValue == "" {
+			return ErrorCodeBadResponseStatusCode
+		}
+		return value
+	case string:
+		safeValue := sanitizeErrorIdentifier(value, "")
+		if safeValue == "" {
+			return ErrorCodeBadResponseStatusCode
+		}
+		return safeValue
+	case json.Number, float64, float32, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return value
+	default:
+		return ErrorCodeBadResponseStatusCode
+	}
+}
+
 type ClaudeError struct {
 	Type    string `json:"type,omitempty"`
 	Message string `json:"message,omitempty"`
@@ -208,8 +266,10 @@ func (e *NewAPIError) ToOpenAIError() OpenAIError {
 			Code:    e.errorCode,
 		}
 	}
-	if e.errorCode != ErrorCodeCountTokenFailed {
-		result.Message = common.MaskSensitiveErrorText(result.Message)
+	originalMessage := result.Message
+	result = SanitizeOpenAIErrorForClient(result)
+	if e.errorCode == ErrorCodeCountTokenFailed {
+		result.Message = originalMessage
 	}
 	if result.Message == "" {
 		result.Message = string(e.errorType)
