@@ -204,6 +204,49 @@ func TestRelayErrorHandlerKeepsPolicyViolationReason(t *testing.T) {
 	require.Equal(t, message, newAPIError.Error())
 }
 
+func TestRelayErrorHandlerMasksSensitiveFallbackMessageBeforeLogging(t *testing.T) {
+	resp := &http.Response{
+		StatusCode: http.StatusBadRequest,
+		Body: io.NopCloser(strings.NewReader(`{
+			"msg":"Authorization: Bearer token.payload.signature failed for user@example.com"
+		}`)),
+	}
+
+	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+
+	require.NotNil(t, newAPIError)
+	require.NotContains(t, newAPIError.Error(), "token.payload.signature")
+	require.NotContains(t, newAPIError.Error(), "user@example.com")
+}
+
+func TestRelayErrorHandlerMasksSensitiveInvalidJSONBodyInLog(t *testing.T) {
+	withDebugEnabled(t, false)
+
+	body := "upstream failed Authorization: Bearer token.payload.signature for user@example.com"
+	var logBuffer bytes.Buffer
+
+	common.LogWriterMu.Lock()
+	oldWriter := gin.DefaultErrorWriter
+	gin.DefaultErrorWriter = &logBuffer
+	common.LogWriterMu.Unlock()
+	t.Cleanup(func() {
+		common.LogWriterMu.Lock()
+		gin.DefaultErrorWriter = oldWriter
+		common.LogWriterMu.Unlock()
+	})
+
+	resp := &http.Response{
+		StatusCode: http.StatusBadGateway,
+		Body:       io.NopCloser(strings.NewReader(body)),
+	}
+
+	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+
+	require.NotNil(t, newAPIError)
+	require.NotContains(t, logBuffer.String(), "token.payload.signature")
+	require.NotContains(t, logBuffer.String(), "user@example.com")
+}
+
 func TestRelayErrorHandlerKeepsInvalidJSONBodyInDebugLog(t *testing.T) {
 	withDebugEnabled(t, true)
 
