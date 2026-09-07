@@ -52,3 +52,27 @@ func TestTaskModel2UserDtoSanitizesSensitiveFailureReason(t *testing.T) {
 	assert.False(t, gjson.GetBytes(data, "result_url").Exists())
 	assert.NotContains(t, string(data), "sk-proj-")
 }
+
+func TestSanitizeOpenAIVideoTaskResponseOverridesUnsafeAdapterError(t *testing.T) {
+	task := &model.Task{
+		TaskID:     "task_public",
+		Status:     model.TaskStatusFailure,
+		FailReason: "Rate limit exceeded, retry after 10 seconds.",
+	}
+	rawResponse := []byte(`{
+		"id":"task_public",
+		"object":"video",
+		"status":"failed",
+		"error":{"code":"AccessDenied","message":"Invalid API key sk-proj-abcdefghijklmnop"},
+		"metadata":{"url":"https://internal.example.com/private-result"}
+	}`)
+
+	data, err := sanitizeOpenAIVideoTaskResponse(task, rawResponse)
+
+	require.NoError(t, err)
+	assert.Equal(t, "Rate limit exceeded, retry after 10 seconds.", gjson.GetBytes(data, "error.message").String())
+	assert.Equal(t, "upstream_task_failed", gjson.GetBytes(data, "error.code").String())
+	assert.False(t, gjson.GetBytes(data, "metadata.url").Exists())
+	assert.NotContains(t, string(data), "sk-proj-")
+	assert.NotContains(t, string(data), "internal.example.com")
+}
