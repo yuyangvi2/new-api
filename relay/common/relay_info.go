@@ -849,6 +849,7 @@ func (t *TaskSubmitReq) UnmarshalMetadata(v any) error {
 
 type TaskInfo struct {
 	Code             int     `json:"code"`
+	ErrorCode        string  `json:"error_code,omitempty"`
 	TaskID           string  `json:"task_id"`
 	Status           string  `json:"status"`
 	Reason           string  `json:"reason,omitempty"`

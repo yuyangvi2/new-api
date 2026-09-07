@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/types"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/samber/lo"
@@ -472,7 +474,7 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 		return fmt.Errorf("readAll failed for task %s: %w", taskId, err)
 	}
 
-	logger.LogDebug(ctx, "updateVideoSingleTask response: %s", responseBody)
+	logger.LogDebug(ctx, "updateVideoSingleTask response: %s", common.MaskSensitiveInfo(common.LocalLogPreview(string(responseBody))))
 
 	snap := task.Snapshot()
 
@@ -498,21 +500,27 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 		}
 	}
 
-	task.Data = redactVideoResponseBody(responseBody)
-
-	logger.LogDebug(ctx, "updateVideoSingleTask taskResult: %+v", taskResult)
+	logger.LogDebug(ctx, "updateVideoSingleTask taskResult: status=%s code=%d error_code=%s progress=%s",
+		taskResult.Status, taskResult.Code, taskResult.ErrorCode, taskResult.Progress)
 
 	now := time.Now().Unix()
 	if taskResult.Status == "" {
-		reason, retry := parseTaskPollingError(responseBody)
+		upstreamError, retry := parseTaskPollingErrorDetails(responseBody)
 		if retry {
 			return nil
 		}
+		reason := upstreamError.Message
 		if reason == "upstream returned unrecognized message" {
 			safePreview := common.MaskSensitiveInfo(common.LocalLogPreview(string(responseBody)))
 			logger.LogError(ctx, fmt.Sprintf("Task %s returned empty status with unrecognized error format, response: %s", taskId, safePreview))
 		}
 		taskResult = relaycommon.FailTaskInfo(reason)
+		taskResult.ErrorCode = upstreamErrorCodeText(upstreamError.Code)
+	}
+
+	task.Data = redactVideoResponseBody(responseBody)
+	if taskResult.Status == model.TaskStatusFailure {
+		task.Data = sanitizeFailedVideoResponseBody(task.Data)
 	}
 
 	shouldRefund := false
@@ -552,8 +560,18 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 		if task.FinishTime == 0 {
 			task.FinishTime = now
 		}
-		safeError := SanitizeUpstreamTaskError(taskResult.Reason)
+		errorCode := strings.TrimSpace(taskResult.ErrorCode)
+		if errorCode == "" && taskResult.Code != 0 {
+			errorCode = strconv.Itoa(taskResult.Code)
+		}
+		if errorCode == "" {
+			if upstreamError, _ := parseTaskPollingErrorDetails(responseBody); isUsableTaskErrorCode(upstreamError.Code) {
+				errorCode = upstreamErrorCodeText(upstreamError.Code)
+			}
+		}
+		safeError := SanitizeUpstreamTaskErrorWithCode(taskResult.Reason, errorCode)
 		task.FailReason = safeError.Message
+		task.PrivateData.ErrorCode = fmt.Sprint(safeError.Code)
 		logger.LogInfo(ctx, fmt.Sprintf("Task %s failed: %s", task.TaskID, task.FailReason))
 		taskResult.Progress = taskcommon.ProgressComplete
 		if quota != 0 {
@@ -598,22 +616,32 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 }
 
 func parseTaskPollingError(responseBody []byte) (string, bool) {
+	upstreamError, retry := parseTaskPollingErrorDetails(responseBody)
+	return upstreamError.Message, retry
+}
+
+func parseTaskPollingErrorDetails(responseBody []byte) (types.OpenAIError, bool) {
 	var errorResult dto.GeneralErrorResponse
 	if err := common.Unmarshal(responseBody, &errorResult); err != nil {
-		return "upstream returned unrecognized message", false
+		return SanitizeUpstreamTaskError("upstream returned unrecognized message"), false
 	}
 	if openAIError := errorResult.TryToOpenAIError(); openAIError != nil {
 		code := strings.TrimSpace(fmt.Sprint(openAIError.Code))
 		descriptor := strings.ToLower(fmt.Sprintf("%s %s", code, openAIError.Type))
 		if code == "429" || strings.Contains(descriptor, "rate_limit") {
-			return "", true
+			return types.OpenAIError{}, true
 		}
-		return openAIError.Message, false
+		return SanitizeUpstreamTaskErrorWithCode(openAIError.Message, openAIError.Code), false
 	}
 	if message := strings.TrimSpace(errorResult.ToMessage()); message != "" {
-		return message, false
+		return SanitizeUpstreamTaskError(message), false
 	}
-	return "upstream returned unrecognized message", false
+	return SanitizeUpstreamTaskError("upstream returned unrecognized message"), false
+}
+
+func isUsableTaskErrorCode(code any) bool {
+	codeText := upstreamErrorCodeText(code)
+	return codeText != "" && codeText != "0" && codeText != string(types.ErrorCodeBadResponseStatusCode) && codeText != "upstream_task_failed"
 }
 
 func redactVideoResponseBody(body []byte) []byte {
@@ -640,6 +668,20 @@ func redactVideoResponseBody(body []byte) []byte {
 		return body
 	}
 	return b
+}
+
+func sanitizeFailedVideoResponseBody(body []byte) []byte {
+	masked, err := common.MaskSensitiveJSON(body)
+	if err == nil {
+		return masked
+	}
+	fallback, marshalErr := common.Marshal(map[string]string{
+		"error": common.MaskSensitiveInfo(common.LocalLogPreview(string(body))),
+	})
+	if marshalErr != nil {
+		return nil
+	}
+	return fallback
 }
 
 func truncateBase64(s string) string {

@@ -2,6 +2,7 @@ package relay
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -25,6 +26,7 @@ import (
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/sjson"
 )
 
 type TaskSubmitResult struct {
@@ -241,7 +243,7 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	// 11. 解析响应
 	upstreamTaskID, taskData, taskErr := adaptor.DoResponse(c, resp, info)
 	if taskErr != nil {
-		return nil, taskErr
+		return nil, service.SanitizeTaskRelayError(taskErr)
 	}
 
 	// 11. 提交后计费调整：让适配器根据上游实际返回调整 OtherRatios
@@ -722,7 +724,7 @@ func taskFailureForClient(task *model.Task) (string, *dto.OpenAIVideoError) {
 	if task.Status != model.TaskStatusFailure {
 		return task.FailReason, nil
 	}
-	safeError := service.SanitizeUpstreamTaskError(task.FailReason)
+	safeError := service.SanitizeUpstreamTaskErrorWithCode(task.FailReason, task.PrivateData.ErrorCode)
 	return safeError.Message, &dto.OpenAIVideoError{
 		Message: safeError.Message,
 		Code:    fmt.Sprint(safeError.Code),
@@ -733,18 +735,27 @@ func sanitizeOpenAIVideoTaskResponse(task *model.Task, data []byte) ([]byte, err
 	if task == nil || task.Status != model.TaskStatusFailure {
 		return data, nil
 	}
-	var response dto.OpenAIVideo
+	var response map[string]json.RawMessage
 	if err := common.Unmarshal(data, &response); err != nil {
 		return nil, err
 	}
-	safeError := service.SanitizeUpstreamTaskError(task.FailReason)
-	response.Error = &dto.OpenAIVideoError{
+	safeError := service.SanitizeUpstreamTaskErrorWithCode(task.FailReason, task.PrivateData.ErrorCode)
+	errorBody, err := common.Marshal(dto.OpenAIVideoError{
 		Message: safeError.Message,
 		Code:    fmt.Sprint(safeError.Code),
+	})
+	if err != nil {
+		return nil, err
 	}
-	delete(response.Metadata, "url")
-	if len(response.Metadata) == 0 {
-		response.Metadata = nil
+	data, err = sjson.SetRawBytes(data, "error", errorBody)
+	if err != nil {
+		return nil, err
 	}
-	return common.Marshal(response)
+	for _, path := range []string{"metadata.url", "video.url", "content.video_url", "result_url", "url"} {
+		data, err = sjson.DeleteBytes(data, path)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return data, nil
 }

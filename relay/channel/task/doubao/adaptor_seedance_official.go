@@ -238,11 +238,14 @@ func (a *SeedanceOfficialTaskAdaptor) ParseTaskResult(respBody []byte) (*relayco
 		taskResult.TotalTokens = response.Usage.TotalTokens
 	}
 	errorReason := ""
+	errorCode := ""
 	if response.Error != nil {
 		errorReason = firstNonEmptyString(response.Error.Message, response.Error.Code)
+		errorCode = response.Error.Code
 	}
 	if response.ResponseMetadata != nil && response.ResponseMetadata.Error != nil {
 		errorReason = firstNonEmptyString(response.ResponseMetadata.Error.Message, response.ResponseMetadata.Error.Code, errorReason)
+		errorCode = firstNonEmptyString(response.ResponseMetadata.Error.Code, errorCode)
 	}
 	status := strings.ToLower(strings.TrimSpace(response.Status))
 	if status == "" {
@@ -252,6 +255,7 @@ func (a *SeedanceOfficialTaskAdaptor) ParseTaskResult(respBody []byte) (*relayco
 		taskResult.Status = model.TaskStatusFailure
 		taskResult.Progress = taskcommon.ProgressComplete
 		taskResult.Reason = errorReason
+		taskResult.ErrorCode = errorCode
 		return taskResult, nil
 	}
 	switch status {
@@ -271,10 +275,12 @@ func (a *SeedanceOfficialTaskAdaptor) ParseTaskResult(respBody []byte) (*relayco
 		taskResult.Status = model.TaskStatusFailure
 		taskResult.Progress = taskcommon.ProgressComplete
 		taskResult.Reason = firstNonEmptyString(errorReason, response.Status)
+		taskResult.ErrorCode = errorCode
 	default:
 		taskResult.Status = model.TaskStatusFailure
 		taskResult.Progress = taskcommon.ProgressComplete
 		taskResult.Reason = firstNonEmptyString(errorReason, fmt.Sprintf("unknown status: %s", response.Status))
+		taskResult.ErrorCode = errorCode
 	}
 	return taskResult, nil
 }

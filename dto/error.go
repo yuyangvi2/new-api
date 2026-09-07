@@ -44,6 +44,7 @@ type GeneralErrorResponse struct {
 }
 
 func (e *GeneralErrorResponse) UnmarshalJSON(data []byte) error {
+	*e = GeneralErrorResponse{}
 	var fields map[string]json.RawMessage
 	if err := common.Unmarshal(data, &fields); err != nil {
 		return err
@@ -93,7 +94,13 @@ func (e GeneralErrorResponse) TryToOpenAIError() *types.OpenAIError {
 	var openAIError types.OpenAIError
 	if len(e.Error) > 0 {
 		err := common.Unmarshal(e.Error, &openAIError)
-		if err == nil && openAIError.Message != "" {
+		if err == nil {
+			if openAIError.Message == "" {
+				openAIError.Message = upstreamErrorCodeText(openAIError.Code)
+			}
+			if openAIError.Message == "" {
+				return nil
+			}
 			openAIError.Message = enrichUpstreamErrorMessage(openAIError.Message, e.Error)
 			if len(openAIError.Metadata) == 0 {
 				openAIError.Metadata = upstreamErrorMetadata(e.Error)
@@ -102,14 +109,29 @@ func (e GeneralErrorResponse) TryToOpenAIError() *types.OpenAIError {
 		}
 	}
 	if e.Message != "" {
+		code := e.Code
+		if upstreamErrorCodeText(code) == "" {
+			code = types.ErrorCodeBadResponseStatusCode
+		}
 		return &types.OpenAIError{
 			Message: e.Message,
 			Type:    e.Type,
 			Param:   e.Param,
-			Code:    e.Code,
+			Code:    code,
 		}
 	}
 	return nil
+}
+
+func upstreamErrorCodeText(code any) string {
+	switch value := code.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	case float64, json.Number:
+		return strings.TrimSpace(fmt.Sprint(value))
+	default:
+		return ""
+	}
 }
 
 func (e GeneralErrorResponse) ToMessage() string {

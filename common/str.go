@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -14,14 +15,16 @@ import (
 )
 
 var (
-	maskURLPattern         = regexp.MustCompile(`(http|https)://[^\s/$.?#].[^\s]*`)
-	maskDomainPattern      = regexp.MustCompile(`\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b`)
-	maskIPPattern          = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
-	maskEmailPattern       = regexp.MustCompile(`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b`)
-	maskBearerTokenPattern = regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}`)
-	maskBasicAuthPattern   = regexp.MustCompile(`(?i)\bBasic\s+[A-Za-z0-9+/=]{8,}`)
-	maskCookiePattern      = regexp.MustCompile(`(?i)\b(Set-Cookie|Cookie)\s*[:=]\s*[^\r\n]+`)
-	maskSecretKeyPattern   = regexp.MustCompile(`\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,}|AKID[A-Za-z0-9]{12,})\b`)
+	maskURLPattern                = regexp.MustCompile(`(http|https)://[^\s/$.?#].[^\s]*`)
+	maskDomainPattern             = regexp.MustCompile(`\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b`)
+	maskIPPattern                 = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
+	maskEmailPattern              = regexp.MustCompile(`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b`)
+	maskBearerTokenPattern        = regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}`)
+	maskBasicAuthPattern          = regexp.MustCompile(`(?i)\bBasic\s+[A-Za-z0-9+/=]{8,}`)
+	maskCookiePattern             = regexp.MustCompile(`(?i)\b(Set-Cookie|Cookie)\s*[:=]\s*[^\r\n]+`)
+	maskSecretKeyPattern          = regexp.MustCompile(`\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,}|AKID[A-Za-z0-9]{12,})\b`)
+	maskNamedSecretPattern        = regexp.MustCompile(`(?i)(["']?\b(?:api[_-]?key|x-api-key|access[_-]?token|refresh[_-]?token|password|passwd|client[_-]?secret|secret[_-]?key|token)\b["']?\s*[:=]\s*["']?)([^"',;\s}\]]+)`)
+	maskAuthorizationValuePattern = regexp.MustCompile(`(?i)\b(?:Authorization|Proxy-Authorization)\s*[:=]\s*[^\s,;]+`)
 	// maskApiKeyPattern matches patterns like 'api_key:xxx' or "api_key:xxx" to mask the API key value
 	maskApiKeyPattern = regexp.MustCompile(`(['"]?)api_key:([^\s'"]+)(['"]?)`)
 )
@@ -207,6 +210,18 @@ func MaskSensitiveInfo(str string) string {
 	str = maskBasicAuthPattern.ReplaceAllString(str, "Basic ***")
 	str = maskSecretKeyPattern.ReplaceAllString(str, "***")
 	str = maskCookiePattern.ReplaceAllString(str, "${1}: ***")
+	str = maskNamedSecretPattern.ReplaceAllString(str, "${1}***")
+	str = maskAuthorizationValuePattern.ReplaceAllStringFunc(str, func(match string) string {
+		separator := strings.IndexAny(match, ":=")
+		if separator < 0 {
+			return "Authorization: ***"
+		}
+		value := strings.TrimSpace(match[separator+1:])
+		if strings.EqualFold(value, "Bearer") || strings.EqualFold(value, "Basic") {
+			return match
+		}
+		return match[:separator+1] + " ***"
+	})
 
 	// Mask URLs
 	str = maskURLPattern.ReplaceAllStringFunc(str, func(urlStr string) string {
@@ -215,13 +230,16 @@ func MaskSensitiveInfo(str string) string {
 			return urlStr
 		}
 
-		host := u.Host
+		host := u.Hostname()
 		if host == "" {
 			return urlStr
 		}
 
 		// Mask host with unified logic
 		maskedHost := maskHostForURL(host)
+		if net.ParseIP(host) != nil {
+			maskedHost = "***"
+		}
 
 		result := u.Scheme + "://" + maskedHost
 
@@ -273,4 +291,48 @@ func MaskSensitiveInfo(str string) string {
 	str = maskApiKeyPattern.ReplaceAllString(str, "${1}api_key:***${3}")
 
 	return str
+}
+
+// MaskSensitiveJSON recursively masks secret-bearing fields and sensitive
+// strings while preserving the original JSON shape for diagnostics.
+func MaskSensitiveJSON(data []byte) ([]byte, error) {
+	var value any
+	if err := Unmarshal(data, &value); err != nil {
+		return nil, err
+	}
+	return Marshal(maskSensitiveJSONValue(value))
+}
+
+func maskSensitiveJSONValue(value any) any {
+	switch typed := value.(type) {
+	case string:
+		return MaskSensitiveInfo(typed)
+	case []any:
+		for index := range typed {
+			typed[index] = maskSensitiveJSONValue(typed[index])
+		}
+		return typed
+	case map[string]any:
+		for key, fieldValue := range typed {
+			if isSensitiveJSONField(key) {
+				typed[key] = "***"
+				continue
+			}
+			typed[key] = maskSensitiveJSONValue(fieldValue)
+		}
+		return typed
+	default:
+		return value
+	}
+}
+
+func isSensitiveJSONField(key string) bool {
+	normalized := strings.NewReplacer("-", "", "_", "", " ", "").Replace(strings.ToLower(strings.TrimSpace(key)))
+	switch normalized {
+	case "apikey", "xapikey", "accesstoken", "refreshtoken", "authorization", "proxyauthorization",
+		"password", "passwd", "clientsecret", "secretkey", "cookie", "setcookie":
+		return true
+	default:
+		return false
+	}
 }

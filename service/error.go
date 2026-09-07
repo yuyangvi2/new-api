@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -141,16 +142,7 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 
 func sanitizeUpstreamOpenAIError(upstreamError types.OpenAIError, statusCode int) types.OpenAIError {
 	descriptor := strings.ToLower(fmt.Sprintf("%s %s %v", upstreamError.Message, upstreamError.Type, upstreamError.Code))
-	isPolicyError := strings.Contains(descriptor, "terms of use violation") ||
-		strings.Contains(descriptor, "safety system") ||
-		strings.Contains(descriptor, "content policy") ||
-		strings.Contains(descriptor, "prompt blocked") ||
-		strings.Contains(descriptor, "copyright") ||
-		strings.Contains(descriptor, "infringement") ||
-		strings.Contains(descriptor, "intellectual property") ||
-		strings.Contains(descriptor, "moderation")
-
-	if !isPolicyError && (statusCode == http.StatusUnauthorized ||
+	if statusCode == http.StatusUnauthorized ||
 		strings.Contains(descriptor, "invalid bearer") ||
 		strings.Contains(descriptor, "invalid api key") ||
 		strings.Contains(descriptor, "invalid_api_key") ||
@@ -158,7 +150,7 @@ func sanitizeUpstreamOpenAIError(upstreamError types.OpenAIError, statusCode int
 		strings.Contains(descriptor, "missing api key") ||
 		strings.Contains(descriptor, "expired api key") ||
 		strings.Contains(descriptor, "authentication failed") ||
-		strings.Contains(descriptor, "not authorized to make this call")) {
+		strings.Contains(descriptor, "not authorized to make this call") {
 		upstreamError.Message = "Upstream authentication failed, please contact administrator"
 		upstreamError.Type = "upstream_error"
 		upstreamError.Param = ""
@@ -182,10 +174,11 @@ func sanitizeUpstreamOpenAIError(upstreamError types.OpenAIError, statusCode int
 
 	upstreamError.Message = common.MaskSensitiveInfo(strings.TrimSpace(upstreamError.Message))
 	upstreamError.Param = common.MaskSensitiveInfo(upstreamError.Param)
+	upstreamError.Type = sanitizeUpstreamErrorIdentifier(upstreamError.Type, "upstream_error")
+	upstreamError.Code = sanitizeUpstreamErrorCode(upstreamError.Code, types.ErrorCodeBadResponseStatusCode)
 	if len(upstreamError.Metadata) > 0 {
-		maskedMetadata := common.MaskSensitiveInfo(string(upstreamError.Metadata))
-		var metadataValue any
-		if common.Unmarshal([]byte(maskedMetadata), &metadataValue) == nil {
+		maskedMetadata, err := common.MaskSensitiveJSON(upstreamError.Metadata)
+		if err == nil {
 			upstreamError.Metadata = json.RawMessage(maskedMetadata)
 		} else {
 			upstreamError.Metadata = nil
@@ -199,15 +192,96 @@ func sanitizeUpstreamOpenAIError(upstreamError types.OpenAIError, statusCode int
 // while credentials and provider-account state are rewritten by the same
 // policy used for synchronous relay errors.
 func SanitizeUpstreamTaskError(message string) types.OpenAIError {
+	return SanitizeUpstreamTaskErrorWithCode(message, "upstream_task_failed")
+}
+
+func SanitizeUpstreamTaskErrorWithCode(message string, code any) types.OpenAIError {
 	message = strings.TrimSpace(message)
 	if message == "" || strings.EqualFold(message, "unknown error") {
 		message = "Upstream task failed without error details"
 	}
+	if upstreamErrorCodeText(code) == "" {
+		code = "upstream_task_failed"
+	}
 	return sanitizeUpstreamOpenAIError(types.OpenAIError{
 		Message: message,
 		Type:    "upstream_error",
-		Code:    "upstream_task_failed",
+		Code:    code,
 	}, 0)
+}
+
+// SanitizeTaskRelayError applies upstream error disclosure policy to business
+// failures returned in a successful HTTP response.
+func SanitizeTaskRelayError(taskErr *dto.TaskError) *dto.TaskError {
+	if taskErr == nil {
+		return nil
+	}
+
+	internalResponseError := false
+	switch taskErr.Code {
+	case "read_response_body_failed", "unmarshal_response_body_failed", "unmarshal_response_failed", "invalid_response":
+		internalResponseError = true
+	}
+
+	var safeError types.OpenAIError
+	if internalResponseError {
+		safeError = types.OpenAIError{
+			Message: "Upstream returned an invalid response",
+			Type:    "upstream_error",
+			Code:    "upstream_invalid_response",
+		}
+	} else {
+		safeError = sanitizeUpstreamOpenAIError(types.OpenAIError{
+			Message: taskErr.Message,
+			Type:    "upstream_error",
+			Code:    taskErr.Code,
+		}, taskErr.StatusCode)
+	}
+
+	taskErr.Message = safeError.Message
+	taskErr.Code = fmt.Sprint(safeError.Code)
+	taskErr.Data = nil
+	taskErr.Error = errors.New(safeError.Message)
+	return taskErr
+}
+
+func sanitizeUpstreamErrorIdentifier(value string, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	masked := common.MaskSensitiveInfo(value)
+	if masked != value || len(value) > 128 || strings.ContainsAny(value, "\r\n") {
+		return fallback
+	}
+	return value
+}
+
+func sanitizeUpstreamErrorCode(code any, fallback any) any {
+	switch value := code.(type) {
+	case nil:
+		return fallback
+	case string:
+		if strings.TrimSpace(value) == "" {
+			return fallback
+		}
+		return sanitizeUpstreamErrorIdentifier(value, fmt.Sprint(fallback))
+	case json.Number, float64, float32, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return value
+	default:
+		return fallback
+	}
+}
+
+func upstreamErrorCodeText(code any) string {
+	switch value := code.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	case json.Number, float64, float32, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return strings.TrimSpace(fmt.Sprint(value))
+	default:
+		return ""
+	}
 }
 
 func ResetStatusCode(newApiErr *types.NewAPIError, statusCodeMappingStr string) {
