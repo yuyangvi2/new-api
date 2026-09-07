@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -94,6 +93,7 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 	var errResponse dto.GeneralErrorResponse
 	responseBodyText := string(responseBody)
 	responseBodyPreview := common.LocalLogPreview(responseBodyText)
+	safeResponseBodyPreview := common.MaskSensitiveInfo(responseBodyPreview)
 	buildErrWithBody := func(message string) error {
 		if message == "" {
 			return fmt.Errorf("bad response status code %d, body: %s", resp.StatusCode, responseBodyText)
@@ -106,7 +106,7 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 		if showBodyWhenFail {
 			newApiErr.Err = buildErrWithBody("")
 		} else {
-			logger.LogError(ctx, fmt.Sprintf("bad response status code %d, body: %s", resp.StatusCode, responseBodyPreview))
+			logger.LogError(ctx, fmt.Sprintf("bad response status code %d, body: %s", resp.StatusCode, safeResponseBodyPreview))
 			newApiErr.Err = fmt.Errorf("bad response status code %d", resp.StatusCode)
 		}
 		return
@@ -124,10 +124,15 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 	}
 	message := strings.TrimSpace(errResponse.ToMessage())
 	if message == "" {
-		logger.LogError(ctx, fmt.Sprintf("upstream returned status %d without error details, body: %s", resp.StatusCode, responseBodyPreview))
+		logger.LogError(ctx, fmt.Sprintf("upstream returned status %d without error details, body: %s", resp.StatusCode, safeResponseBodyPreview))
 		message = "Upstream returned an error without details"
 	}
-	newApiErr = types.NewOpenAIError(errors.New(message), types.ErrorCodeBadResponseStatusCode, resp.StatusCode)
+	safeError := sanitizeUpstreamOpenAIError(types.OpenAIError{
+		Message: message,
+		Type:    string(types.ErrorCodeBadResponseStatusCode),
+		Code:    types.ErrorCodeBadResponseStatusCode,
+	}, resp.StatusCode)
+	newApiErr = types.WithOpenAIError(safeError, resp.StatusCode)
 	if showBodyWhenFail {
 		newApiErr.Err = buildErrWithBody(newApiErr.Error())
 	}
