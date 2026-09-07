@@ -22,9 +22,9 @@ var (
 	maskBearerTokenPattern        = regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}`)
 	maskBasicAuthPattern          = regexp.MustCompile(`(?i)\bBasic\s+[A-Za-z0-9+/=]{8,}`)
 	maskCookiePattern             = regexp.MustCompile(`(?i)\b(Set-Cookie|Cookie)\s*[:=]\s*[^\r\n]+`)
-	maskSecretKeyPattern          = regexp.MustCompile(`\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,}|AKID[A-Za-z0-9]{12,})\b`)
+	maskSecretKeyPattern          = regexp.MustCompile(`\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,}|(?:AKID|AKIA|ASIA)[A-Za-z0-9]{12,})\b`)
 	maskNamedSecretPattern        = regexp.MustCompile(`(?i)(["']?\b(?:api[_-]?key|x-api-key|access[_-]?token|refresh[_-]?token|password|passwd|client[_-]?secret|secret[_-]?key|token)\b["']?\s*[:=]\s*["']?)([^"',;\s}\]]+)`)
-	maskAuthorizationValuePattern = regexp.MustCompile(`(?i)\b(?:Authorization|Proxy-Authorization)\s*[:=]\s*[^\s,;]+`)
+	maskAuthorizationValuePattern = regexp.MustCompile(`(?i)\b(?:Authorization|Proxy-Authorization)\s*[:=]\s*(?:(?:Bearer|Basic|Token|ApiKey|Key)\s+[^\s,;]+|[^\s,;]+)`)
 	// maskApiKeyPattern matches patterns like 'api_key:xxx' or "api_key:xxx" to mask the API key value
 	maskApiKeyPattern = regexp.MustCompile(`(['"]?)api_key:([^\s'"]+)(['"]?)`)
 )
@@ -216,11 +216,15 @@ func MaskSensitiveInfo(str string) string {
 		if separator < 0 {
 			return "Authorization: ***"
 		}
-		value := strings.TrimSpace(match[separator+1:])
-		if strings.EqualFold(value, "Bearer") || strings.EqualFold(value, "Basic") {
-			return match
+		prefix := match[:separator+1]
+		parts := strings.Fields(strings.TrimSpace(match[separator+1:]))
+		if len(parts) > 1 {
+			switch strings.ToLower(parts[0]) {
+			case "bearer", "basic", "token", "apikey", "key":
+				return prefix + " " + parts[0] + " ***"
+			}
 		}
-		return match[:separator+1] + " ***"
+		return prefix + " ***"
 	})
 
 	// Mask URLs

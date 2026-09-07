@@ -117,11 +117,47 @@ func (e GeneralErrorResponse) TryToOpenAIError() *types.OpenAIError {
 		if upstreamErrorCodeText(code) == "" {
 			code = types.ErrorCodeBadResponseStatusCode
 		}
+		message := e.Message
+		metadata := make(map[string]any)
+		details := make([]string, 0, 2)
+		if e.Detail != "" {
+			metadata["detail"] = e.Detail
+			details = append(details, "detail="+e.Detail)
+		} else if len(e.DetailData) > 0 {
+			var detailValue any
+			if common.Unmarshal(e.DetailData, &detailValue) == nil {
+				if safeValue, ok := safeUpstreamErrorDetailValue(detailValue, 0); ok {
+					metadata["detail"] = safeValue
+					if detailText := upstreamErrorDetailString(safeValue); detailText != "" {
+						details = append(details, "detail="+detailText)
+					}
+				}
+			}
+		}
+		if len(e.Metadata) > 0 {
+			var metadataValue any
+			if common.Unmarshal(e.Metadata, &metadataValue) == nil {
+				if safeValue, ok := safeUpstreamErrorDetailValue(metadataValue, 0); ok {
+					metadata["metadata"] = safeValue
+					if metadataText := upstreamErrorDetailString(safeValue); metadataText != "" {
+						details = append(details, "metadata="+metadataText)
+					}
+				}
+			}
+		}
+		if detailText := strings.Join(details, "; "); detailText != "" && !strings.Contains(message, detailText) {
+			message = fmt.Sprintf("%s: %s", message, detailText)
+		}
+		var metadataJSON json.RawMessage
+		if len(metadata) > 0 {
+			metadataJSON, _ = common.Marshal(metadata)
+		}
 		return &types.OpenAIError{
-			Message: e.Message,
-			Type:    e.Type,
-			Param:   e.Param,
-			Code:    code,
+			Message:  message,
+			Type:     e.Type,
+			Param:    e.Param,
+			Code:     code,
+			Metadata: metadataJSON,
 		}
 	}
 	return nil

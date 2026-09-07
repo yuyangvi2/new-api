@@ -643,8 +643,17 @@ func sanitizeTaskFailure(taskResult *relaycommon.TaskInfo, responseBody []byte) 
 	}
 
 	upstreamError, _ := parseTaskPollingErrorDetails(responseBody)
-	if reason == "" || strings.EqualFold(reason, "task failed") || strings.EqualFold(reason, "generation failed") {
-		reason = upstreamError.Message
+	genericReason := reason == "" ||
+		strings.EqualFold(reason, "failed") ||
+		strings.EqualFold(reason, "failure") ||
+		strings.EqualFold(reason, "task failed") ||
+		strings.EqualFold(reason, "generation failed")
+	if genericReason {
+		if upstreamError.Message == "upstream returned unrecognized message" {
+			reason = ""
+		} else {
+			reason = upstreamError.Message
+		}
 	}
 	if errorCode == "" && isUsableTaskErrorCode(upstreamError.Code) {
 		errorCode = upstreamErrorCodeText(upstreamError.Code)

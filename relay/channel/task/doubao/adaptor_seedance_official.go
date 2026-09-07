@@ -350,7 +350,7 @@ func (a *SeedanceOfficialTaskAdaptor) ConvertToSeedanceVideo(originTask *model.T
 		if strings.TrimSpace(rawMessage) == "" && response.Error != nil {
 			rawMessage = firstNonEmptyString(response.Error.Message, response.Error.Code)
 		}
-		safeError := service.SanitizeUpstreamTaskError(rawMessage)
+		safeError := service.SanitizeUpstreamTaskErrorWithCode(rawMessage, originTask.PrivateData.ErrorCode)
 		response.Error = &SeedanceOfficialResponseError{
 			Code:    fmt.Sprint(safeError.Code),
 			Message: safeError.Message,
