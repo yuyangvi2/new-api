@@ -147,6 +147,49 @@ func TestRelayErrorHandlerKeepsTopLevelErrorWhenUnrelatedFieldsHaveDifferentType
 	require.EqualValues(t, 400, openAIError.Code)
 }
 
+func TestRelayErrorHandlerPreservesDottedDiagnosticsWithoutExposingSecrets(t *testing.T) {
+	body := `{
+		"error":{
+			"message":"Invalid value for reasoning.effort in image.png; credential sk-proj-abcdefghijklmnop; endpoint https://internal.example.com/v1",
+			"type":"validation.failed",
+			"param":"reasoning.effort",
+			"code":"invalid.reasoning_effort",
+			"metadata":{
+				"field":"tools.0.function.name",
+				"api_key":"plain-secret",
+				"endpoint":"https://internal.example.com/v1"
+			}
+		}
+	}`
+	resp := &http.Response{
+		StatusCode: http.StatusBadRequest,
+		Body:       io.NopCloser(strings.NewReader(body)),
+	}
+
+	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+
+	require.NotNil(t, newAPIError)
+	openAIError := newAPIError.ToOpenAIError()
+	require.Contains(t, openAIError.Message, "reasoning.effort")
+	require.Contains(t, openAIError.Message, "image.png")
+	require.NotContains(t, openAIError.Message, "sk-proj-")
+	require.NotContains(t, openAIError.Message, "internal.example.com")
+	require.Equal(t, "validation.failed", openAIError.Type)
+	require.Equal(t, "reasoning.effort", openAIError.Param)
+	require.Equal(t, "invalid.reasoning_effort", openAIError.Code)
+	require.Contains(t, string(openAIError.Metadata), "tools.0.function.name")
+	require.NotContains(t, string(openAIError.Metadata), "plain-secret")
+	require.NotContains(t, string(openAIError.Metadata), "internal.example.com")
+
+	claudeError := newAPIError.ToClaudeError()
+	require.Contains(t, claudeError.Message, "reasoning.effort")
+	require.Contains(t, claudeError.Message, "image.png")
+
+	geminiError := newAPIError.ToGeminiError()
+	require.Contains(t, geminiError.Message, "reasoning.effort")
+	require.Contains(t, geminiError.Message, "image.png")
+}
+
 func TestRelayErrorHandlerUsesNonEmptyFallbackWhenUpstreamOmitsMessage(t *testing.T) {
 	resp := &http.Response{
 		StatusCode: http.StatusBadRequest,
@@ -271,6 +314,16 @@ func TestSanitizeUpstreamTaskErrorPreservesSafeCode(t *testing.T) {
 
 	require.Equal(t, "Width is invalid", safeError.Message)
 	require.Equal(t, "InvalidParameter", safeError.Code)
+}
+
+func TestSanitizeUpstreamTaskErrorPreservesDottedDiagnostics(t *testing.T) {
+	safeError := SanitizeUpstreamTaskErrorWithCode(
+		"Invalid value for tools.0.function.name in schema.json",
+		"validation.failed",
+	)
+
+	require.Equal(t, "Invalid value for tools.0.function.name in schema.json", safeError.Message)
+	require.Equal(t, "validation.failed", safeError.Code)
 }
 
 func TestRelayErrorHandlerKeepsPolicyViolationReason(t *testing.T) {
