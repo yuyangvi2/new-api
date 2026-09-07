@@ -757,5 +757,5 @@ func sanitizeOpenAIVideoTaskResponse(task *model.Task, data []byte) ([]byte, err
 			return nil, err
 		}
 	}
-	return data, nil
+	return common.MaskSensitiveJSON(data)
 }

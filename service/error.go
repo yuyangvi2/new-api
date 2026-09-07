@@ -231,8 +231,12 @@ func SanitizeTaskRelayError(taskErr *dto.TaskError) *dto.TaskError {
 			Code:    "upstream_invalid_response",
 		}
 	} else {
+		message := strings.TrimSpace(taskErr.Message)
+		if message == "" {
+			message = "Upstream task request failed without error details"
+		}
 		safeError = sanitizeUpstreamOpenAIError(types.OpenAIError{
-			Message: taskErr.Message,
+			Message: message,
 			Type:    "upstream_error",
 			Code:    taskErr.Code,
 		}, taskErr.StatusCode)

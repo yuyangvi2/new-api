@@ -560,16 +560,7 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 		if task.FinishTime == 0 {
 			task.FinishTime = now
 		}
-		errorCode := strings.TrimSpace(taskResult.ErrorCode)
-		if errorCode == "" && taskResult.Code != 0 {
-			errorCode = strconv.Itoa(taskResult.Code)
-		}
-		if errorCode == "" {
-			if upstreamError, _ := parseTaskPollingErrorDetails(responseBody); isUsableTaskErrorCode(upstreamError.Code) {
-				errorCode = upstreamErrorCodeText(upstreamError.Code)
-			}
-		}
-		safeError := SanitizeUpstreamTaskErrorWithCode(taskResult.Reason, errorCode)
+		safeError := sanitizeTaskFailure(taskResult, responseBody)
 		task.FailReason = safeError.Message
 		task.PrivateData.ErrorCode = fmt.Sprint(safeError.Code)
 		logger.LogInfo(ctx, fmt.Sprintf("Task %s failed: %s", task.TaskID, task.FailReason))
@@ -642,6 +633,23 @@ func parseTaskPollingErrorDetails(responseBody []byte) (types.OpenAIError, bool)
 func isUsableTaskErrorCode(code any) bool {
 	codeText := upstreamErrorCodeText(code)
 	return codeText != "" && codeText != "0" && codeText != string(types.ErrorCodeBadResponseStatusCode) && codeText != "upstream_task_failed"
+}
+
+func sanitizeTaskFailure(taskResult *relaycommon.TaskInfo, responseBody []byte) types.OpenAIError {
+	reason := strings.TrimSpace(taskResult.Reason)
+	errorCode := strings.TrimSpace(taskResult.ErrorCode)
+	if errorCode == "" && taskResult.Code != 0 {
+		errorCode = strconv.Itoa(taskResult.Code)
+	}
+
+	upstreamError, _ := parseTaskPollingErrorDetails(responseBody)
+	if reason == "" || strings.EqualFold(reason, "task failed") || strings.EqualFold(reason, "generation failed") {
+		reason = upstreamError.Message
+	}
+	if errorCode == "" && isUsableTaskErrorCode(upstreamError.Code) {
+		errorCode = upstreamErrorCodeText(upstreamError.Code)
+	}
+	return SanitizeUpstreamTaskErrorWithCode(reason, errorCode)
 }
 
 func redactVideoResponseBody(body []byte) []byte {

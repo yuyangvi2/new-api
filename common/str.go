@@ -296,41 +296,62 @@ func MaskSensitiveInfo(str string) string {
 // MaskSensitiveJSON recursively masks secret-bearing fields and sensitive
 // strings while preserving the original JSON shape for diagnostics.
 func MaskSensitiveJSON(data []byte) ([]byte, error) {
-	var value any
-	if err := Unmarshal(data, &value); err != nil {
-		return nil, err
-	}
-	return Marshal(maskSensitiveJSONValue(value))
-}
-
-func maskSensitiveJSONValue(value any) any {
-	switch typed := value.(type) {
-	case string:
-		return MaskSensitiveInfo(typed)
-	case []any:
-		for index := range typed {
-			typed[index] = maskSensitiveJSONValue(typed[index])
+	switch GetJsonType(data) {
+	case "object":
+		var fields map[string]json.RawMessage
+		if err := Unmarshal(data, &fields); err != nil {
+			return nil, err
 		}
-		return typed
-	case map[string]any:
-		for key, fieldValue := range typed {
+		for key, fieldValue := range fields {
 			if isSensitiveJSONField(key) {
-				typed[key] = "***"
+				masked, err := Marshal("***")
+				if err != nil {
+					return nil, err
+				}
+				fields[key] = masked
 				continue
 			}
-			typed[key] = maskSensitiveJSONValue(fieldValue)
+			masked, err := MaskSensitiveJSON(fieldValue)
+			if err != nil {
+				return nil, err
+			}
+			fields[key] = masked
 		}
-		return typed
+		return Marshal(fields)
+	case "array":
+		var items []json.RawMessage
+		if err := Unmarshal(data, &items); err != nil {
+			return nil, err
+		}
+		for index, item := range items {
+			masked, err := MaskSensitiveJSON(item)
+			if err != nil {
+				return nil, err
+			}
+			items[index] = masked
+		}
+		return Marshal(items)
+	case "string":
+		var value string
+		if err := Unmarshal(data, &value); err != nil {
+			return nil, err
+		}
+		return Marshal(MaskSensitiveInfo(value))
 	default:
-		return value
+		var raw json.RawMessage
+		if err := Unmarshal(data, &raw); err != nil {
+			return nil, err
+		}
+		return append([]byte(nil), raw...), nil
 	}
 }
 
 func isSensitiveJSONField(key string) bool {
 	normalized := strings.NewReplacer("-", "", "_", "", " ", "").Replace(strings.ToLower(strings.TrimSpace(key)))
 	switch normalized {
-	case "apikey", "xapikey", "accesstoken", "refreshtoken", "authorization", "proxyauthorization",
-		"password", "passwd", "clientsecret", "secretkey", "cookie", "setcookie":
+	case "key", "apikey", "xapikey", "accesstoken", "refreshtoken", "authorization", "proxyauthorization",
+		"password", "passwd", "secret", "clientsecret", "secretkey", "credential", "credentials",
+		"cookie", "setcookie", "session", "sessionid":
 		return true
 	default:
 		return false

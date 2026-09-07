@@ -23,17 +23,18 @@ type OpenAIErrorWithStatusCode struct {
 }
 
 type GeneralErrorResponse struct {
-	Error    json.RawMessage `json:"error"`
-	Message  string          `json:"message"`
-	Msg      string          `json:"msg"`
-	Err      string          `json:"err"`
-	ErrorMsg string          `json:"error_msg"`
-	Metadata json.RawMessage `json:"metadata,omitempty"`
-	Detail   string          `json:"detail,omitempty"`
-	Type     string          `json:"type,omitempty"`
-	Param    string          `json:"param,omitempty"`
-	Code     any             `json:"code,omitempty"`
-	Header   struct {
+	Error      json.RawMessage `json:"error"`
+	Message    string          `json:"message"`
+	Msg        string          `json:"msg"`
+	Err        string          `json:"err"`
+	ErrorMsg   string          `json:"error_msg"`
+	Metadata   json.RawMessage `json:"metadata,omitempty"`
+	Detail     string          `json:"detail,omitempty"`
+	DetailData json.RawMessage `json:"-"`
+	Type       string          `json:"type,omitempty"`
+	Param      string          `json:"param,omitempty"`
+	Code       any             `json:"code,omitempty"`
+	Header     struct {
 		Message string `json:"message"`
 	} `json:"header"`
 	Response struct {
@@ -57,6 +58,9 @@ func (e *GeneralErrorResponse) UnmarshalJSON(data []byte) error {
 	e.ErrorMsg = jsonString(fields["error_msg"])
 	e.Metadata = fields["metadata"]
 	e.Detail = jsonString(fields["detail"])
+	if e.Detail == "" && len(fields["detail"]) > 0 {
+		e.DetailData = fields["detail"]
+	}
 	e.Type = jsonString(fields["type"])
 	e.Param = jsonString(fields["param"])
 	if rawCode := fields["code"]; len(rawCode) > 0 {
@@ -150,7 +154,9 @@ func (e GeneralErrorResponse) ToMessage() string {
 				return msg
 			}
 		default:
-			return string(e.Error)
+			if message := safeRawUpstreamErrorDetail(e.Error); message != "" {
+				return message
+			}
 		}
 	}
 	if e.Message != "" {
@@ -168,6 +174,9 @@ func (e GeneralErrorResponse) ToMessage() string {
 	if e.Detail != "" {
 		return e.Detail
 	}
+	if len(e.DetailData) > 0 {
+		return safeRawUpstreamErrorDetail(e.DetailData)
+	}
 	if e.Header.Message != "" {
 		return e.Header.Message
 	}
@@ -175,6 +184,14 @@ func (e GeneralErrorResponse) ToMessage() string {
 		return e.Response.Error.Message
 	}
 	return ""
+}
+
+func safeRawUpstreamErrorDetail(raw json.RawMessage) string {
+	var value any
+	if err := common.Unmarshal(raw, &value); err != nil {
+		return ""
+	}
+	return upstreamErrorDetailString(value)
 }
 
 func enrichUpstreamErrorMessage(message string, rawError json.RawMessage) string {
