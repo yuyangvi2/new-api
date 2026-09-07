@@ -26,7 +26,12 @@ const (
 	maxVerificationResponseSize = 64 * 1024
 )
 
-var botProtectionHTTPClient = &http.Client{Timeout: 5 * time.Second}
+var botProtectionHTTPClient = &http.Client{
+	Timeout: 5 * time.Second,
+	CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	},
+}
 
 type botProtectionConfig struct {
 	provider       string

@@ -162,6 +162,12 @@ func UpdateOption(c *gin.Context) {
 	default:
 		option.Value = fmt.Sprintf("%v", option.Value)
 	}
+	optionValue, err := normalizeAndValidateCapOptionUpdate(option.Key, option.Value.(string))
+	if err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+	option.Value = optionValue
 	switch option.Key {
 	case "QuotaForInviter", "QuotaForInvitee":
 		if isPositiveOptionValue(option.Value.(string)) && !operation_setting.IsPaymentComplianceConfirmed() {
@@ -230,16 +236,6 @@ func UpdateOption(c *gin.Context) {
 				"message": "无法启用 Turnstile 校验，请先填入 Turnstile 校验相关配置信息！",
 			})
 
-			return
-		}
-	case "CapRegisterCheckEnabled":
-		if option.Value == "true" && !capSceneConfigured(common.CapRegisterSiteKey, common.CapRegisterSecretKey) {
-			common.ApiErrorMsg(c, "无法启用注册 Cap 验证，请先填写完整的 Cap 端点、注册 Site Key 和 Secret Key")
-			return
-		}
-	case "CapLoginCheckEnabled":
-		if option.Value == "true" && !capSceneConfigured(common.CapLoginSiteKey, common.CapLoginSecretKey) {
-			common.ApiErrorMsg(c, "无法启用登录 Cap 验证，请先填写完整的 Cap 端点、登录 Site Key 和 Secret Key")
 			return
 		}
 	case "TelegramOAuthEnabled":
@@ -382,11 +378,95 @@ func UpdateOption(c *gin.Context) {
 	})
 }
 
-func capSceneConfigured(siteKey string, secretKey string) bool {
-	publicURL, publicErr := url.Parse(common.CapPublicEndpoint)
-	verifyURL, verifyErr := url.Parse(common.CapVerifyEndpoint)
-	return publicErr == nil && verifyErr == nil &&
-		(publicURL.Scheme == "http" || publicURL.Scheme == "https") && publicURL.Host != "" &&
-		(verifyURL.Scheme == "http" || verifyURL.Scheme == "https") && verifyURL.Host != "" &&
-		strings.TrimSpace(siteKey) != "" && strings.TrimSpace(secretKey) != ""
+func normalizeAndValidateCapOptionUpdate(key string, value string) (string, error) {
+	registerEnabled := common.CapRegisterCheckEnabled
+	loginEnabled := common.CapLoginCheckEnabled
+	publicEndpoint := common.CapPublicEndpoint
+	verifyEndpoint := common.CapVerifyEndpoint
+	registerSiteKey := common.CapRegisterSiteKey
+	registerSecretKey := common.CapRegisterSecretKey
+	loginSiteKey := common.CapLoginSiteKey
+	loginSecretKey := common.CapLoginSecretKey
+
+	trimmedValue := strings.TrimSpace(value)
+	switch key {
+	case "CapRegisterCheckEnabled":
+		registerEnabled = trimmedValue == "true"
+	case "CapLoginCheckEnabled":
+		loginEnabled = trimmedValue == "true"
+	case "CapPublicEndpoint":
+		publicEndpoint = strings.TrimRight(trimmedValue, "/")
+	case "CapVerifyEndpoint":
+		verifyEndpoint = strings.TrimRight(trimmedValue, "/")
+	case "CapRegisterSiteKey":
+		registerSiteKey = trimmedValue
+	case "CapRegisterSecretKey":
+		if trimmedValue == "" {
+			trimmedValue = registerSecretKey
+		}
+		registerSecretKey = trimmedValue
+	case "CapLoginSiteKey":
+		loginSiteKey = trimmedValue
+	case "CapLoginSecretKey":
+		if trimmedValue == "" {
+			trimmedValue = loginSecretKey
+		}
+		loginSecretKey = trimmedValue
+	default:
+		return value, nil
+	}
+
+	if publicEndpoint != "" {
+		if err := validateCapEndpoint(publicEndpoint); err != nil {
+			return "", fmt.Errorf("Cap public endpoint is invalid: %w", err)
+		}
+	}
+	if verifyEndpoint != "" {
+		if err := validateCapEndpoint(verifyEndpoint); err != nil {
+			return "", fmt.Errorf("Cap verification endpoint is invalid: %w", err)
+		}
+	}
+	if registerEnabled {
+		if err := validateCapSceneConfiguration(publicEndpoint, verifyEndpoint, registerSiteKey, registerSecretKey); err != nil {
+			return "", fmt.Errorf("registration Cap configuration is incomplete: %w", err)
+		}
+	}
+	if loginEnabled {
+		if err := validateCapSceneConfiguration(publicEndpoint, verifyEndpoint, loginSiteKey, loginSecretKey); err != nil {
+			return "", fmt.Errorf("login Cap configuration is incomplete: %w", err)
+		}
+	}
+
+	switch key {
+	case "CapPublicEndpoint":
+		return publicEndpoint, nil
+	case "CapVerifyEndpoint":
+		return verifyEndpoint, nil
+	default:
+		return trimmedValue, nil
+	}
+}
+
+func validateCapSceneConfiguration(publicEndpoint string, verifyEndpoint string, siteKey string, secretKey string) error {
+	if publicEndpoint == "" || verifyEndpoint == "" {
+		return fmt.Errorf("both public and verification endpoints are required")
+	}
+	if strings.TrimSpace(siteKey) == "" || strings.TrimSpace(secretKey) == "" {
+		return fmt.Errorf("both Site Key and Secret Key are required")
+	}
+	return nil
+}
+
+func validateCapEndpoint(endpoint string) error {
+	parsed, err := url.Parse(endpoint)
+	if err != nil {
+		return err
+	}
+	if (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return fmt.Errorf("must be an absolute HTTP(S) URL")
+	}
+	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return fmt.Errorf("must not contain credentials, a query, or a fragment")
+	}
+	return nil
 }
