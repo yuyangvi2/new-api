@@ -49,5 +49,6 @@ func TestTaskModel2UserDtoSanitizesSensitiveFailureReason(t *testing.T) {
 	assert.Equal(t, "Upstream authentication failed, please contact administrator", gjson.GetBytes(data, "fail_reason").String())
 	assert.Equal(t, "Upstream authentication failed, please contact administrator", gjson.GetBytes(data, "error.message").String())
 	assert.Equal(t, "upstream_authentication_failed", gjson.GetBytes(data, "error.code").String())
+	assert.False(t, gjson.GetBytes(data, "result_url").Exists())
 	assert.NotContains(t, string(data), "sk-proj-")
 }
