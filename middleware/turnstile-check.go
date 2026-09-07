@@ -41,7 +41,8 @@ type botProtectionConfig struct {
 }
 
 type botProtectionResponse struct {
-	Success bool `json:"success"`
+	Success bool   `json:"success"`
+	Error   string `json:"error"`
 }
 
 func BotProtectionCheck(scene BotProtectionScene) gin.HandlerFunc {
@@ -193,9 +194,6 @@ func verifyBotProtection(c *gin.Context, config botProtectionConfig, token strin
 		return false, err
 	}
 	defer response.Body.Close()
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return false, fmt.Errorf("verification endpoint returned HTTP %d", response.StatusCode)
-	}
 
 	body, err := io.ReadAll(io.LimitReader(response.Body, maxVerificationResponseSize+1))
 	if err != nil {
@@ -205,8 +203,18 @@ func verifyBotProtection(c *gin.Context, config botProtectionConfig, token strin
 		return false, errors.New("verification response exceeds size limit")
 	}
 	var result botProtectionResponse
-	if err = common.Unmarshal(body, &result); err != nil {
-		return false, err
+	decodeErr := common.Unmarshal(body, &result)
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		if config.provider == "cap" && decodeErr == nil && !result.Success {
+			if response.StatusCode == http.StatusBadRequest || response.StatusCode == http.StatusNotFound ||
+				(response.StatusCode == http.StatusForbidden && result.Error == "Token expired") {
+				return false, nil
+			}
+		}
+		return false, fmt.Errorf("verification endpoint returned HTTP %d", response.StatusCode)
+	}
+	if decodeErr != nil {
+		return false, decodeErr
 	}
 	return result.Success, nil
 }
