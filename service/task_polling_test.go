@@ -64,7 +64,7 @@ func TestParseTaskPollingErrorRecognizesNumericRateLimitCode(t *testing.T) {
 func TestParseTaskPollingErrorDetailsPreservesCodeWithoutMessage(t *testing.T) {
 	t.Parallel()
 
-	upstreamError, retry := parseTaskPollingErrorDetails([]byte(`{"error":{"code":"content_policy_violation"}}`))
+	upstreamError, retry := ParseTaskPollingErrorDetails([]byte(`{"error":{"code":"content_policy_violation"}}`))
 
 	assert.False(t, retry)
 	assert.Equal(t, "content_policy_violation", upstreamError.Message)

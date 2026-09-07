@@ -505,7 +505,7 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 
 	now := time.Now().Unix()
 	if taskResult.Status == "" {
-		upstreamError, retry := parseTaskPollingErrorDetails(responseBody)
+		upstreamError, retry := ParseTaskPollingErrorDetails(responseBody)
 		if retry {
 			return nil
 		}
@@ -607,11 +607,11 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 }
 
 func parseTaskPollingError(responseBody []byte) (string, bool) {
-	upstreamError, retry := parseTaskPollingErrorDetails(responseBody)
+	upstreamError, retry := ParseTaskPollingErrorDetails(responseBody)
 	return upstreamError.Message, retry
 }
 
-func parseTaskPollingErrorDetails(responseBody []byte) (types.OpenAIError, bool) {
+func ParseTaskPollingErrorDetails(responseBody []byte) (types.OpenAIError, bool) {
 	var errorResult dto.GeneralErrorResponse
 	if err := common.Unmarshal(responseBody, &errorResult); err != nil {
 		return SanitizeUpstreamTaskError("upstream returned unrecognized message"), false
@@ -642,7 +642,7 @@ func SanitizeTaskFailure(taskResult *relaycommon.TaskInfo, responseBody []byte) 
 		errorCode = strconv.Itoa(taskResult.Code)
 	}
 
-	upstreamError, _ := parseTaskPollingErrorDetails(responseBody)
+	upstreamError, _ := ParseTaskPollingErrorDetails(responseBody)
 	genericReason := reason == "" ||
 		strings.EqualFold(reason, "failed") ||
 		strings.EqualFold(reason, "failure") ||

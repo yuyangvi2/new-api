@@ -537,6 +537,10 @@ func tryRealtimeFetch(c *gin.Context, task *model.Task, isOpenAIVideoAPI bool) [
 	if err != nil || ti == nil {
 		return nil
 	}
+	ti, retry := normalizeRealtimeTaskResult(ti, body)
+	if retry {
+		return nil
+	}
 
 	snap := task.Snapshot()
 
@@ -622,6 +626,19 @@ func buildRealtimeTaskResponse(task *model.Task, body []byte) ([]byte, error) {
 		Code: "success",
 		Data: out,
 	})
+}
+
+func normalizeRealtimeTaskResult(taskResult *relaycommon.TaskInfo, body []byte) (*relaycommon.TaskInfo, bool) {
+	if taskResult.Status != "" {
+		return taskResult, false
+	}
+	upstreamError, retry := service.ParseTaskPollingErrorDetails(body)
+	if retry {
+		return nil, true
+	}
+	failedResult := relaycommon.FailTaskInfo(upstreamError.Message)
+	failedResult.ErrorCode = fmt.Sprint(upstreamError.Code)
+	return failedResult, false
 }
 
 // detectVideoFormat 从 Gemini/Vertex 原始响应中探测视频格式
