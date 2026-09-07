@@ -457,6 +457,47 @@ func TestSeedanceOfficialConvertToSeedanceVideoFailureOmitsEmptySuccessFields(t 
 	assert.False(t, gjson.GetBytes(data, "ResponseMetadata").Exists())
 }
 
+func TestSeedanceOfficialConvertToSeedanceVideoUsesSanitizedStoredFailure(t *testing.T) {
+	task := &model.Task{
+		TaskID:     "task_public",
+		Status:     model.TaskStatusFailure,
+		FailReason: "Unsupported media format.",
+		Data: []byte(`{
+			"id":"upstream_task",
+			"status":"failed",
+			"error":{"code":"AccessDenied","message":"Invalid bearer sk-proj-abcdefghijklmnop"}
+		}`),
+	}
+
+	data, err := (&SeedanceOfficialTaskAdaptor{}).ConvertToSeedanceVideo(task)
+
+	require.NoError(t, err)
+	assert.Equal(t, "Unsupported media format.", gjson.GetBytes(data, "error.message").String())
+	assert.NotContains(t, string(data), "sk-proj-")
+}
+
+func TestSeedanceOfficialConvertToOpenAIVideoExposesTaskFailure(t *testing.T) {
+	reason := "The request failed because the output video may be related to copyright restrictions. Request id: req_123"
+	task := &model.Task{
+		TaskID:     "task_public",
+		Status:     model.TaskStatusFailure,
+		FailReason: reason,
+		Progress:   "100%",
+		CreatedAt:  100,
+		UpdatedAt:  200,
+		Properties: model.Properties{OriginModelName: "doubao-seedance-2-0-fast"},
+		Data:       []byte(`{"id":"upstream_task","status":"failed"}`),
+	}
+
+	data, err := (&SeedanceOfficialTaskAdaptor{}).ConvertToOpenAIVideo(task)
+
+	require.NoError(t, err)
+	assert.Equal(t, "task_public", gjson.GetBytes(data, "id").String())
+	assert.Equal(t, "failed", gjson.GetBytes(data, "status").String())
+	assert.Equal(t, reason, gjson.GetBytes(data, "error.message").String())
+	assert.Equal(t, "upstream_task_failed", gjson.GetBytes(data, "error.code").String())
+}
+
 func TestSeedanceOfficialEstimateBillingDistinguishesVideoInput(t *testing.T) {
 	originalQuotaPerUnit := common.QuotaPerUnit
 	originalExchangeRate := operation_setting.USDExchangeRate

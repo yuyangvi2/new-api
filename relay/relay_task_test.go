@@ -8,6 +8,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 func TestTaskModel2PollDtoDoesNotExposeFailReasonAsResultURL(t *testing.T) {
@@ -29,4 +30,24 @@ func TestTaskModel2PollDtoDoesNotExposeFailReasonAsResultURL(t *testing.T) {
 	data, err := common.Marshal(dto)
 	require.NoError(t, err)
 	assert.NotContains(t, string(data), "debug_result")
+	assert.Equal(t, "copyright restriction", gjson.GetBytes(data, "error.message").String())
+	assert.Equal(t, "upstream_task_failed", gjson.GetBytes(data, "error.code").String())
+}
+
+func TestTaskModel2UserDtoSanitizesSensitiveFailureReason(t *testing.T) {
+	task := &model.Task{
+		TaskID:     "task_public",
+		Status:     model.TaskStatusFailure,
+		FailReason: "Invalid API key sk-proj-abcdefghijklmnop for upstream account",
+		Progress:   "100%",
+	}
+
+	userDTO := TaskModel2UserDto(task)
+	data, err := common.Marshal(userDTO)
+
+	require.NoError(t, err)
+	assert.Equal(t, "Upstream authentication failed, please contact administrator", gjson.GetBytes(data, "fail_reason").String())
+	assert.Equal(t, "Upstream authentication failed, please contact administrator", gjson.GetBytes(data, "error.message").String())
+	assert.Equal(t, "upstream_authentication_failed", gjson.GetBytes(data, "error.code").String())
+	assert.NotContains(t, string(data), "sk-proj-")
 }

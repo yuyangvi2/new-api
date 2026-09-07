@@ -204,6 +204,51 @@ func TestRelayErrorHandlerKeepsPolicyViolationReason(t *testing.T) {
 	require.Equal(t, message, newAPIError.Error())
 }
 
+func TestSanitizeUpstreamTaskErrorPreservesActionableReasons(t *testing.T) {
+	t.Parallel()
+
+	testCases := []string{
+		"The request failed because the output video may be related to copyright restrictions. Request id: req_123",
+		"Width must be between 300px and 6000px.",
+		"The parameter duration is not valid for this model.",
+		"Rate limit exceeded, retry after 10 seconds.",
+		"This model is not available in the requested region.",
+	}
+
+	for _, message := range testCases {
+		message := message
+		t.Run(message, func(t *testing.T) {
+			t.Parallel()
+
+			safeError := SanitizeUpstreamTaskError(message)
+
+			require.Equal(t, message, safeError.Message)
+			require.Equal(t, "upstream_task_failed", safeError.Code)
+		})
+	}
+}
+
+func TestSanitizeUpstreamTaskErrorHidesProviderSecrets(t *testing.T) {
+	t.Parallel()
+
+	safeError := SanitizeUpstreamTaskError("Invalid API key sk-proj-abcdefghijklmnop for upstream account")
+
+	require.Equal(t, "Upstream authentication failed, please contact administrator", safeError.Message)
+	require.Equal(t, "upstream_authentication_failed", safeError.Code)
+	require.NotContains(t, safeError.Message, "sk-proj-")
+}
+
+func TestSanitizeUpstreamTaskErrorReplacesMissingDetails(t *testing.T) {
+	t.Parallel()
+
+	for _, message := range []string{"", "Unknown error"} {
+		safeError := SanitizeUpstreamTaskError(message)
+
+		require.Equal(t, "Upstream task failed without error details", safeError.Message)
+		require.Equal(t, "upstream_task_failed", safeError.Code)
+	}
+}
+
 func TestRelayErrorHandlerMasksSensitiveFallbackMessageBeforeLogging(t *testing.T) {
 	resp := &http.Response{
 		StatusCode: http.StatusBadRequest,
