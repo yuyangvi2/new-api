@@ -17,6 +17,7 @@
         "@visactor/vchart": "~1.8.8",
         "@visactor/vchart-semi-theme": "~1.8.8",
         "axios": "catalog:",
+        "cap-widget": "0.1.57",
         "clsx": "catalog:",
         "date-fns": "2.30.0",
         "dayjs": "catalog:",
@@ -90,6 +91,7 @@
         "ai": "^7.0.14",
         "auto-skeleton-react": "^1.0.5",
         "axios": "catalog:",
+        "cap-widget": "0.1.57",
         "class-variance-authority": "^0.7.1",
         "clsx": "catalog:",
         "cmdk": "^1.1.1",
@@ -1350,6 +1352,8 @@
     "camelcase-css": ["camelcase-css@2.0.1", "", {}, "sha512-QOSvevhslijgYwRx6Rv7zKdMF8lbRmx+uQGx2+vDc+KI/eBnsy9kit5aj23AgGu3pa4t9AgwbnXWqS+iOY+2aA=="],
 
     "caniuse-lite": ["caniuse-lite@1.0.30001793", "", {}, "sha512-iwSsYWaCOoh26cV8NwNRViHlrfUvYsHDfRVcbtmw0Kg6PJIZZXwMkj1442FYLBGkeUf1juAsU3DTfxW579mrPA=="],
+
+    "cap-widget": ["cap-widget@0.1.57", "", {}, "sha512-SyIK5XgYIFSDgH683M9KpfBmDSDB0ZfPZQBxL6MggNrjjnbIQYpbsNpj0S7PC/wXp7oJgAuBD2vtJnN9jJghBg=="],
 
     "ccount": ["ccount@2.0.1", "", {}, "sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg=="],
 

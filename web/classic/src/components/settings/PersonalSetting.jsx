@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   API,
@@ -47,6 +47,7 @@ import AccountDeleteModal from './personal/modals/AccountDeleteModal';
 import ChangePasswordModal from './personal/modals/ChangePasswordModal';
 import SecureVerificationModal from '../common/modals/SecureVerificationModal';
 import { useSecureVerification } from '../../hooks/common/useSecureVerification';
+import { resolveBotProtectionConfig } from '../common/bot-protection';
 
 const PersonalSetting = () => {
   const [userState, userDispatch] = useContext(UserContext);
@@ -70,6 +71,8 @@ const PersonalSetting = () => {
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaWidgetKey, setCaptchaWidgetKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [disableButton, setDisableButton] = useState(false);
   const [countdown, setCountdown] = useState(30);
@@ -96,6 +99,10 @@ const PersonalSetting = () => {
     acceptUnsetModelRatioModel: false,
     recordIpLog: false,
   });
+  const emailBotProtectionConfig = useMemo(
+    () => resolveBotProtectionConfig(status, 'register'),
+    [status],
+  );
 
   const {
     isModalVisible: isPasskeyVerificationModalVisible,
@@ -447,22 +454,30 @@ const PersonalSetting = () => {
       showError(t('请输入邮箱！'));
       return;
     }
-    setDisableButton(true);
-    if (turnstileEnabled && turnstileToken === '') {
-      showInfo(t('请稍后几秒重试，Turnstile 正在检查用户环境！'));
+    if (emailBotProtectionConfig.enabled && captchaToken === '') {
+      showInfo(t('验证失败，请重试'));
       return;
     }
     setLoading(true);
-    const res = await API.get(
-      `/api/verification?email=${inputs.email}&turnstile=${turnstileToken}`,
-    );
-    const { success, message } = res.data;
-    if (success) {
-      showSuccess(t('验证码发送成功，请检查邮箱！'));
-    } else {
-      showError(message);
+    try {
+      const res = await API.get('/api/verification', {
+        params: { email: inputs.email },
+        headers: { 'X-Captcha-Token': captchaToken },
+      });
+      const { success, message } = res.data;
+      if (success) {
+        showSuccess(t('验证码发送成功，请检查邮箱！'));
+        setDisableButton(true);
+      } else {
+        showError(message);
+      }
+    } catch (_error) {
+      showError(t('验证码发送失败，请重试'));
+    } finally {
+      setLoading(false);
+      setCaptchaToken('');
+      setCaptchaWidgetKey((value) => value + 1);
     }
-    setLoading(false);
   };
 
   const bindEmail = async () => {
@@ -610,9 +625,9 @@ const PersonalSetting = () => {
         disableButton={disableButton}
         loading={loading}
         countdown={countdown}
-        turnstileEnabled={turnstileEnabled}
-        turnstileSiteKey={turnstileSiteKey}
-        setTurnstileToken={setTurnstileToken}
+        botProtectionConfig={emailBotProtectionConfig}
+        captchaWidgetKey={captchaWidgetKey}
+        setCaptchaToken={setCaptchaToken}
       />
 
       <WeChatBindModal

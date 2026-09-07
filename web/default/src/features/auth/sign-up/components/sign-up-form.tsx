@@ -18,15 +18,15 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import type { z } from 'zod'
 
+import { BotProtection } from '@/components/bot-protection'
 import { Dialog } from '@/components/dialog'
 import { PasswordInput } from '@/components/password-input'
-import { Turnstile } from '@/components/turnstile'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -43,8 +43,8 @@ import { LegalConsent } from '@/features/auth/components/legal-consent'
 import { OAuthProviders } from '@/features/auth/components/oauth-providers'
 import { registerFormSchema } from '@/features/auth/constants'
 import { useAuthRedirect } from '@/features/auth/hooks/use-auth-redirect'
+import { useBotProtection } from '@/features/auth/hooks/use-bot-protection'
 import { useEmailVerification } from '@/features/auth/hooks/use-email-verification'
-import { useTurnstile } from '@/features/auth/hooks/use-turnstile'
 import {
   getAffiliateCode,
   saveAffiliateCode,
@@ -67,12 +67,13 @@ export function SignUpForm({
 
   const { status } = useStatus()
   const {
-    isTurnstileEnabled,
-    turnstileSiteKey,
-    turnstileToken,
-    setTurnstileToken,
-    validateTurnstile,
-  } = useTurnstile()
+    config: botProtectionConfig,
+    token: captchaToken,
+    setToken: setCaptchaToken,
+    validate: validateCaptcha,
+    reset: resetCaptcha,
+    widgetKey: captchaWidgetKey,
+  } = useBotProtection('register')
   const { redirectToLogin, handleLoginSuccess } = useAuthRedirect()
   const {
     isSending: isSendingCode,
@@ -80,8 +81,9 @@ export function SignUpForm({
     isActive,
     sendCode,
   } = useEmailVerification({
-    turnstileToken,
-    validateTurnstile,
+    captchaToken,
+    validateCaptcha,
+    onAttemptComplete: resetCaptcha,
   })
 
   const form = useForm<z.infer<typeof registerFormSchema>>({
@@ -104,7 +106,15 @@ export function SignUpForm({
     status?.data?.oauth_register_enabled ??
     true
   const hasWeChatLogin = Boolean(status?.wechat_login)
-  const turnstileReady = !isTurnstileEnabled || Boolean(turnstileToken)
+  const captchaReady = !botProtectionConfig.enabled || Boolean(captchaToken)
+  let verificationButtonContent: ReactNode = t('Send code')
+  if (isActive) {
+    verificationButtonContent = t('Resend ({{seconds}}s)', {
+      seconds: secondsLeft,
+    })
+  } else if (isSendingCode) {
+    verificationButtonContent = <Loader2 className='h-4 w-4 animate-spin' />
+  }
 
   const wechatQrCodeUrl = useMemo(() => {
     return (
@@ -153,7 +163,7 @@ export function SignUpForm({
       }
     }
 
-    if (!validateTurnstile()) return
+    if (!validateCaptcha()) return
 
     setIsLoading(true)
     try {
@@ -163,7 +173,7 @@ export function SignUpForm({
         email: data.email || undefined,
         verification_code: verificationCode || undefined,
         aff_code: getAffiliateCode(),
-        turnstile: turnstileToken,
+        captchaToken,
       })
 
       if (res?.success) {
@@ -172,10 +182,11 @@ export function SignUpForm({
       } else {
         toast.error(res?.message || t('Failed to create account'))
       }
-    } catch (_error) {
+    } catch {
       // Errors are handled by global interceptor
     } finally {
       setIsLoading(false)
+      resetCaptcha()
     }
   }
 
@@ -216,7 +227,7 @@ export function SignUpForm({
       } else {
         toast.error(res?.message || t('Login failed'))
       }
-    } catch (_error) {
+    } catch {
       toast.error(t('Login failed'))
     } finally {
       setIsWeChatSubmitting(false)
@@ -319,28 +330,24 @@ export function SignUpForm({
                   isSendingCode ||
                   isActive ||
                   !emailValue ||
-                  !turnstileReady
+                  !captchaReady
                 }
                 onClick={handleSendVerificationCode}
               >
-                {isActive ? (
-                  t('Resend ({{seconds}}s)', { seconds: secondsLeft })
-                ) : isSendingCode ? (
-                  <Loader2 className='h-4 w-4 animate-spin' />
-                ) : (
-                  t('Send code')
-                )}
+                {verificationButtonContent}
               </Button>
             </div>
           </>
         )}
 
-        {/* Turnstile */}
-        {isTurnstileEnabled && (
+        {/* Bot protection */}
+        {botProtectionConfig.enabled && (
           <div className='mt-2'>
-            <Turnstile
-              siteKey={turnstileSiteKey}
-              onVerify={setTurnstileToken}
+            <BotProtection
+              key={captchaWidgetKey}
+              config={botProtectionConfig}
+              onVerify={setCaptchaToken}
+              onExpire={() => setCaptchaToken('')}
             />
           </div>
         )}
@@ -359,7 +366,7 @@ export function SignUpForm({
           disabled={
             isLoading ||
             (requiresLegalConsent && !agreedToLegal) ||
-            !turnstileReady
+            !captchaReady
           }
         >
           {isLoading ? <Loader2 className='h-4 w-4 animate-spin' /> : null}

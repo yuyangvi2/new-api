@@ -158,6 +158,14 @@ export type AuthSettings = {
   TurnstileCheckEnabled: boolean
   TurnstileSiteKey: string
   TurnstileSecretKey: string
+  CapRegisterCheckEnabled: boolean
+  CapLoginCheckEnabled: boolean
+  CapPublicEndpoint: string
+  CapVerifyEndpoint: string
+  CapRegisterSiteKey: string
+  CapRegisterSecretKey: string
+  CapLoginSiteKey: string
+  CapLoginSecretKey: string
   'passkey.enabled': boolean
   'passkey.rp_display_name': string
   'passkey.rp_id': string

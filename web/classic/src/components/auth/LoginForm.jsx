@@ -40,7 +40,6 @@ import {
   buildAssertionResult,
   isPasskeySupported,
 } from '../../helpers';
-import Turnstile from 'react-turnstile';
 import {
   Button,
   Card,
@@ -66,6 +65,8 @@ import LinuxDoIcon from '../common/logo/LinuxDoIcon';
 import TwoFAVerification from './TwoFAVerification';
 import { useTranslation } from 'react-i18next';
 import { SiDiscord } from 'react-icons/si';
+import BotProtection from '../common/BotProtection';
+import { resolveBotProtectionConfig } from '../common/bot-protection';
 
 const LoginForm = () => {
   let navigate = useNavigate();
@@ -85,9 +86,8 @@ const LoginForm = () => {
   const [submitted, setSubmitted] = useState(false);
   const [userState, userDispatch] = useContext(UserContext);
   const [statusState] = useContext(StatusContext);
-  const [turnstileEnabled, setTurnstileEnabled] = useState(false);
-  const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
-  const [turnstileToken, setTurnstileToken] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaWidgetKey, setCaptchaWidgetKey] = useState(0);
   const [showWeChatLoginModal, setShowWeChatLoginModal] = useState(false);
   const [showEmailLogin, setShowEmailLogin] = useState(false);
   const [wechatLoading, setWechatLoading] = useState(false);
@@ -133,22 +133,22 @@ const LoginForm = () => {
   }, [statusState?.status]);
   const hasCustomOAuthProviders =
     (status.custom_oauth_providers || []).length > 0;
+  const botProtectionConfig = useMemo(
+    () => resolveBotProtectionConfig(status, 'login'),
+    [status],
+  );
+  const captchaReady = !botProtectionConfig.enabled || Boolean(captchaToken);
   const hasOAuthLoginOptions = Boolean(
     status.github_oauth ||
-      status.discord_oauth ||
-      status.oidc_enabled ||
-      status.wechat_login ||
-      status.linuxdo_oauth ||
-      status.telegram_oauth ||
-      hasCustomOAuthProviders,
+    status.discord_oauth ||
+    status.oidc_enabled ||
+    status.wechat_login ||
+    status.linuxdo_oauth ||
+    status.telegram_oauth ||
+    hasCustomOAuthProviders,
   );
 
   useEffect(() => {
-    if (status?.turnstile_check) {
-      setTurnstileEnabled(true);
-      setTurnstileSiteKey(status.turnstile_site_key);
-    }
-
     // 从 status 获取用户协议和隐私政策的启用状态
     setHasUserAgreement(status?.user_agreement_enabled || false);
     setHasPrivacyPolicy(status?.privacy_policy_enabled || false);
@@ -183,10 +183,6 @@ const LoginForm = () => {
   };
 
   const onSubmitWeChatVerificationCode = async () => {
-    if (turnstileEnabled && turnstileToken === '') {
-      showInfo('请稍后几秒重试，Turnstile 正在检查用户环境！');
-      return;
-    }
     setWechatCodeSubmitLoading(true);
     try {
       const res = await API.get(
@@ -215,13 +211,18 @@ const LoginForm = () => {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
   }
 
+  const resetCaptcha = () => {
+    setCaptchaToken('');
+    setCaptchaWidgetKey((value) => value + 1);
+  };
+
   async function handleSubmit(e) {
     if ((hasUserAgreement || hasPrivacyPolicy) && !agreedToTerms) {
       showInfo(t('请先阅读并同意用户协议和隐私政策'));
       return;
     }
-    if (turnstileEnabled && turnstileToken === '') {
-      showInfo('请稍后几秒重试，Turnstile 正在检查用户环境！');
+    if (botProtectionConfig.enabled && captchaToken === '') {
+      showInfo(t('验证失败，请重试'));
       return;
     }
     setSubmitted(true);
@@ -229,11 +230,12 @@ const LoginForm = () => {
     try {
       if (username && password) {
         const res = await API.post(
-          `/api/user/login?turnstile=${turnstileToken}`,
+          '/api/user/login',
           {
             username,
             password,
           },
+          { headers: { 'X-Captcha-Token': captchaToken } },
         );
         const { success, message, data } = res.data;
         if (success) {
@@ -266,6 +268,7 @@ const LoginForm = () => {
       showError('登录失败，请重试');
     } finally {
       setLoginLoading(false);
+      resetCaptcha();
     }
   }
 
@@ -811,7 +814,9 @@ const LoginForm = () => {
                     onClick={handleSubmit}
                     loading={loginLoading}
                     disabled={
-                      (hasUserAgreement || hasPrivacyPolicy) && !agreedToTerms
+                      ((hasUserAgreement || hasPrivacyPolicy) &&
+                        !agreedToTerms) ||
+                      !captchaReady
                     }
                   >
                     {t('继续')}
@@ -958,23 +963,23 @@ const LoginForm = () => {
         style={{ top: '50%', left: '-120px' }}
       />
       <div className='w-full max-w-sm mt-[60px]'>
-        {showEmailLogin ||
-        !hasOAuthLoginOptions
+        {showEmailLogin || !hasOAuthLoginOptions
           ? renderEmailLoginForm()
           : renderOAuthOptions()}
         {renderWeChatLoginModal()}
         {render2FAModal()}
 
-        {turnstileEnabled && (
-          <div className='flex justify-center mt-6'>
-            <Turnstile
-              sitekey={turnstileSiteKey}
-              onVerify={(token) => {
-                setTurnstileToken(token);
-              }}
-            />
-          </div>
-        )}
+        {botProtectionConfig.enabled &&
+          (showEmailLogin || !hasOAuthLoginOptions) && (
+            <div className='flex justify-center mt-6'>
+              <BotProtection
+                key={captchaWidgetKey}
+                config={botProtectionConfig}
+                onVerify={setCaptchaToken}
+                onExpire={() => setCaptchaToken('')}
+              />
+            </div>
+          )}
       </div>
     </div>
   );

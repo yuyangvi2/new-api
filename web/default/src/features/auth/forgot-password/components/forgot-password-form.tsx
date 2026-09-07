@@ -24,7 +24,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import type { z } from 'zod'
 
-import { Turnstile } from '@/components/turnstile'
+import { BotProtection } from '@/components/bot-protection'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -40,7 +40,7 @@ import {
   forgotPasswordFormSchema,
   PASSWORD_RESET_COUNTDOWN,
 } from '@/features/auth/constants'
-import { useTurnstile } from '@/features/auth/hooks/use-turnstile'
+import { useBotProtection } from '@/features/auth/hooks/use-bot-protection'
 import { useCountdown } from '@/hooks/use-countdown'
 import { cn } from '@/lib/utils'
 
@@ -52,12 +52,13 @@ export function ForgotPasswordForm({
   const [isLoading, setIsLoading] = useState(false)
 
   const {
-    isTurnstileEnabled,
-    turnstileSiteKey,
-    turnstileToken,
-    setTurnstileToken,
-    validateTurnstile,
-  } = useTurnstile()
+    config: botProtectionConfig,
+    token: captchaToken,
+    setToken: setCaptchaToken,
+    validate: validateCaptcha,
+    reset: resetCaptcha,
+    widgetKey: captchaWidgetKey,
+  } = useBotProtection('login')
   const {
     secondsLeft,
     isActive,
@@ -68,14 +69,14 @@ export function ForgotPasswordForm({
     resolver: zodResolver(forgotPasswordFormSchema),
     defaultValues: { email: '' },
   })
-  const turnstileReady = !isTurnstileEnabled || Boolean(turnstileToken)
+  const captchaReady = !botProtectionConfig.enabled || Boolean(captchaToken)
 
   async function onSubmit(data: z.infer<typeof forgotPasswordFormSchema>) {
-    if (!validateTurnstile()) return
+    if (!validateCaptcha()) return
 
     setIsLoading(true)
     try {
-      const res = await sendPasswordResetEmail(data.email, turnstileToken)
+      const res = await sendPasswordResetEmail(data.email, captchaToken)
       if (res?.success) {
         form.reset()
         startCountdown()
@@ -83,10 +84,11 @@ export function ForgotPasswordForm({
       } else {
         toast.error(res?.message || t('Failed to send reset email'))
       }
-    } catch (_error) {
+    } catch {
       // Errors are handled by global interceptor
     } finally {
       setIsLoading(false)
+      resetCaptcha()
     }
   }
 
@@ -114,7 +116,7 @@ export function ForgotPasswordForm({
         <Button
           type='submit'
           className='mt-2'
-          disabled={isLoading || isActive || !turnstileReady}
+          disabled={isLoading || isActive || !captchaReady}
         >
           {isActive
             ? t('Resend ({{seconds}}s)', { seconds: secondsLeft })
@@ -122,11 +124,13 @@ export function ForgotPasswordForm({
           {isLoading ? <Loader2 className='animate-spin' /> : <ArrowRight />}
         </Button>
 
-        {isTurnstileEnabled && (
+        {botProtectionConfig.enabled && (
           <div className='mt-2'>
-            <Turnstile
-              siteKey={turnstileSiteKey}
-              onVerify={setTurnstileToken}
+            <BotProtection
+              key={captchaWidgetKey}
+              config={botProtectionConfig}
+              onVerify={setCaptchaToken}
+              onExpire={() => setCaptchaToken('')}
             />
           </div>
         )}

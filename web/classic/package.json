@@ -12,6 +12,7 @@
     "@visactor/vchart": "~1.8.8",
     "@visactor/vchart-semi-theme": "~1.8.8",
     "axios": "catalog:",
+    "cap-widget": "0.1.57",
     "clsx": "catalog:",
     "date-fns": "2.30.0",
     "dayjs": "catalog:",

@@ -109,6 +109,14 @@ const AUTH_SECTIONS = [
           TurnstileCheckEnabled: settings.TurnstileCheckEnabled,
           TurnstileSiteKey: settings.TurnstileSiteKey,
           TurnstileSecretKey: settings.TurnstileSecretKey,
+          CapRegisterCheckEnabled: settings.CapRegisterCheckEnabled,
+          CapLoginCheckEnabled: settings.CapLoginCheckEnabled,
+          CapPublicEndpoint: settings.CapPublicEndpoint,
+          CapVerifyEndpoint: settings.CapVerifyEndpoint,
+          CapRegisterSiteKey: settings.CapRegisterSiteKey,
+          CapRegisterSecretKey: settings.CapRegisterSecretKey,
+          CapLoginSiteKey: settings.CapLoginSiteKey,
+          CapLoginSecretKey: settings.CapLoginSecretKey,
         }}
       />
     ),

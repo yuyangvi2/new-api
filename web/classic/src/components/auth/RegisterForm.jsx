@@ -32,7 +32,6 @@ import {
   onDiscordOAuthClicked,
   onCustomOAuthClicked,
 } from '../../helpers';
-import Turnstile from 'react-turnstile';
 import {
   Button,
   Card,
@@ -64,6 +63,8 @@ import { UserContext } from '../../context/User';
 import { StatusContext } from '../../context/Status';
 import { useTranslation } from 'react-i18next';
 import { SiDiscord } from 'react-icons/si';
+import BotProtection from '../common/BotProtection';
+import { resolveBotProtectionConfig } from '../common/bot-protection';
 
 const RegisterForm = () => {
   let navigate = useNavigate();
@@ -84,9 +85,8 @@ const RegisterForm = () => {
   const { username, password, password2 } = inputs;
   const [userState, userDispatch] = useContext(UserContext);
   const [statusState] = useContext(StatusContext);
-  const [turnstileEnabled, setTurnstileEnabled] = useState(false);
-  const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
-  const [turnstileToken, setTurnstileToken] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaWidgetKey, setCaptchaWidgetKey] = useState(0);
   const [showWeChatLoginModal, setShowWeChatLoginModal] = useState(false);
   const [showEmailRegister, setShowEmailRegister] = useState(false);
   const [wechatLoading, setWechatLoading] = useState(false);
@@ -131,25 +131,25 @@ const RegisterForm = () => {
   }, [statusState?.status]);
   const hasCustomOAuthProviders =
     (status.custom_oauth_providers || []).length > 0;
+  const botProtectionConfig = useMemo(
+    () => resolveBotProtectionConfig(status, 'register'),
+    [status],
+  );
+  const captchaReady = !botProtectionConfig.enabled || Boolean(captchaToken);
   const hasOAuthRegisterOptions = Boolean(
     status.github_oauth ||
-      status.discord_oauth ||
-      status.oidc_enabled ||
-      status.wechat_login ||
-      status.linuxdo_oauth ||
-      status.telegram_oauth ||
-      hasCustomOAuthProviders,
+    status.discord_oauth ||
+    status.oidc_enabled ||
+    status.wechat_login ||
+    status.linuxdo_oauth ||
+    status.telegram_oauth ||
+    hasCustomOAuthProviders,
   );
 
   const [showEmailVerification, setShowEmailVerification] = useState(false);
 
   useEffect(() => {
     setShowEmailVerification(!!status?.email_verification);
-    if (status?.turnstile_check) {
-      setTurnstileEnabled(true);
-      setTurnstileSiteKey(status.turnstile_site_key);
-    }
-
     // 从 status 获取用户协议和隐私政策的启用状态
     setHasUserAgreement(status?.user_agreement_enabled || false);
     setHasPrivacyPolicy(status?.privacy_policy_enabled || false);
@@ -183,10 +183,6 @@ const RegisterForm = () => {
   };
 
   const onSubmitWeChatVerificationCode = async () => {
-    if (turnstileEnabled && turnstileToken === '') {
-      showInfo('请稍后几秒重试，Turnstile 正在检查用户环境！');
-      return;
-    }
     setWechatCodeSubmitLoading(true);
     try {
       const res = await API.get(
@@ -215,6 +211,11 @@ const RegisterForm = () => {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
   }
 
+  const resetCaptcha = () => {
+    setCaptchaToken('');
+    setCaptchaWidgetKey((value) => value + 1);
+  };
+
   async function handleSubmit(e) {
     if (password.length < 8) {
       showInfo('密码长度不得小于 8 位！');
@@ -225,8 +226,8 @@ const RegisterForm = () => {
       return;
     }
     if (username && password) {
-      if (turnstileEnabled && turnstileToken === '') {
-        showInfo('请稍后几秒重试，Turnstile 正在检查用户环境！');
+      if (botProtectionConfig.enabled && captchaToken === '') {
+        showInfo(t('验证失败，请重试'));
         return;
       }
       setRegisterLoading(true);
@@ -235,10 +236,9 @@ const RegisterForm = () => {
           affCode = localStorage.getItem('aff');
         }
         inputs.aff_code = affCode;
-        const res = await API.post(
-          `/api/user/register?turnstile=${turnstileToken}`,
-          inputs,
-        );
+        const res = await API.post('/api/user/register', inputs, {
+          headers: { 'X-Captcha-Token': captchaToken },
+        });
         const { success, message } = res.data;
         if (success) {
           navigate('/login');
@@ -250,20 +250,22 @@ const RegisterForm = () => {
         showError('注册失败，请重试');
       } finally {
         setRegisterLoading(false);
+        resetCaptcha();
       }
     }
   }
 
   const sendVerificationCode = async () => {
     if (inputs.email === '') return;
-    if (turnstileEnabled && turnstileToken === '') {
-      showInfo('请稍后几秒重试，Turnstile 正在检查用户环境！');
+    if (botProtectionConfig.enabled && captchaToken === '') {
+      showInfo(t('验证失败，请重试'));
       return;
     }
     setVerificationCodeLoading(true);
     try {
       const res = await API.get(
-        `/api/verification?email=${encodeURIComponent(inputs.email)}&turnstile=${turnstileToken}`,
+        `/api/verification?email=${encodeURIComponent(inputs.email)}`,
+        { headers: { 'X-Captcha-Token': captchaToken } },
       );
       const { success, message } = res.data;
       if (success) {
@@ -276,6 +278,7 @@ const RegisterForm = () => {
       showError('发送验证码失败，请重试');
     } finally {
       setVerificationCodeLoading(false);
+      resetCaptcha();
     }
   };
 
@@ -616,7 +619,11 @@ const RegisterForm = () => {
                         <Button
                           onClick={sendVerificationCode}
                           loading={verificationCodeLoading}
-                          disabled={disableButton || verificationCodeLoading}
+                          disabled={
+                            disableButton ||
+                            verificationCodeLoading ||
+                            !captchaReady
+                          }
                         >
                           {disableButton
                             ? `${t('重新发送')} (${countdown})`
@@ -684,7 +691,9 @@ const RegisterForm = () => {
                     onClick={handleSubmit}
                     loading={registerLoading}
                     disabled={
-                      (hasUserAgreement || hasPrivacyPolicy) && !agreedToTerms
+                      ((hasUserAgreement || hasPrivacyPolicy) &&
+                        !agreedToTerms) ||
+                      !captchaReady
                     }
                   >
                     {t('注册')}
@@ -781,22 +790,22 @@ const RegisterForm = () => {
         style={{ top: '50%', left: '-120px' }}
       />
       <div className='w-full max-w-sm mt-[60px]'>
-        {showEmailRegister ||
-        !hasOAuthRegisterOptions
+        {showEmailRegister || !hasOAuthRegisterOptions
           ? renderEmailRegisterForm()
           : renderOAuthOptions()}
         {renderWeChatLoginModal()}
 
-        {turnstileEnabled && (
-          <div className='flex justify-center mt-6'>
-            <Turnstile
-              sitekey={turnstileSiteKey}
-              onVerify={(token) => {
-                setTurnstileToken(token);
-              }}
-            />
-          </div>
-        )}
+        {botProtectionConfig.enabled &&
+          (showEmailRegister || !hasOAuthRegisterOptions) && (
+            <div className='flex justify-center mt-6'>
+              <BotProtection
+                key={captchaWidgetKey}
+                config={botProtectionConfig}
+                onVerify={setCaptchaToken}
+                onExpire={() => setCaptchaToken('')}
+              />
+            </div>
+          )}
       </div>
     </div>
   );

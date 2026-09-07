@@ -47,6 +47,14 @@ const botProtectionSchema = z.object({
   TurnstileCheckEnabled: z.boolean(),
   TurnstileSiteKey: z.string().optional(),
   TurnstileSecretKey: z.string().optional(),
+  CapPublicEndpoint: z.string().url().or(z.literal('')),
+  CapVerifyEndpoint: z.string().url().or(z.literal('')),
+  CapRegisterSiteKey: z.string().optional(),
+  CapRegisterSecretKey: z.string().optional(),
+  CapLoginSiteKey: z.string().optional(),
+  CapLoginSecretKey: z.string().optional(),
+  CapRegisterCheckEnabled: z.boolean(),
+  CapLoginCheckEnabled: z.boolean(),
 })
 
 type BotProtectionFormValues = z.infer<typeof botProtectionSchema>
@@ -75,6 +83,18 @@ export function BotProtectionSection({
       ([key, value]) =>
         value !== defaultValues[key as keyof BotProtectionFormValues]
     )
+    const enableKeys = new Set([
+      'CapRegisterCheckEnabled',
+      'CapLoginCheckEnabled',
+      'TurnstileCheckEnabled',
+    ])
+    const updatePriority = ([key, value]: [string, unknown]) => {
+      if (!enableKeys.has(key)) return 1
+      return value === false ? 0 : 2
+    }
+    updates.sort((left, right) => {
+      return updatePriority(left) - updatePriority(right)
+    })
 
     for (const [key, value] of updates) {
       await updateOption.mutateAsync({ key, value: value ?? '' })
@@ -111,6 +131,179 @@ export function BotProtectionSection({
               </SettingsSwitchItem>
             )}
           />
+
+          <div className='border-border mt-6 border-t pt-6'>
+            <div className='mb-4'>
+              <h3 className='text-sm font-medium'>{t('Self-hosted Cap')}</h3>
+              <p className='text-muted-foreground mt-1 text-sm'>
+                {t(
+                  'Cap takes priority over Turnstile for each enabled authentication scene.'
+                )}
+              </p>
+            </div>
+
+            <FormField
+              control={form.control}
+              name='CapPublicEndpoint'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Cap public endpoint')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder='https://example.com/cap'
+                      autoComplete='off'
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t('Browser-accessible endpoint used by the Cap widget.')}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='CapVerifyEndpoint'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {t('Cap internal verification endpoint')}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder='http://cap:3000'
+                      autoComplete='off'
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Server-only endpoint; it is never exposed by the status API.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className='grid gap-4 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='CapRegisterSiteKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Registration Site Key')}</FormLabel>
+                    <FormControl>
+                      <Input autoComplete='off' {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name='CapRegisterSecretKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Registration Secret Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='password'
+                        placeholder={t(
+                          'Leave blank to keep the existing secret'
+                        )}
+                        autoComplete='new-password'
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name='CapRegisterCheckEnabled'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>{t('Enable Cap for registration')}</FormLabel>
+                    <FormDescription>
+                      {t(
+                        'Protect account registration and verification emails.'
+                      )}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
+
+            <div className='grid gap-4 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='CapLoginSiteKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Login Site Key')}</FormLabel>
+                    <FormControl>
+                      <Input autoComplete='off' {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name='CapLoginSecretKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Login Secret Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='password'
+                        placeholder={t(
+                          'Leave blank to keep the existing secret'
+                        )}
+                        autoComplete='new-password'
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name='CapLoginCheckEnabled'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>{t('Enable Cap for password login')}</FormLabel>
+                    <FormDescription>
+                      {t('Protect password login and password reset emails.')}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
+          </div>
 
           <FormField
             control={form.control}

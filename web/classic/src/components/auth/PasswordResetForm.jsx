@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   API,
   getLogo,
@@ -26,11 +26,12 @@ import {
   showSuccess,
   getSystemName,
 } from '../../helpers';
-import Turnstile from 'react-turnstile';
 import { Button, Card, Form, Typography } from '@douyinfe/semi-ui';
 import { IconMail } from '@douyinfe/semi-icons';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import BotProtection from '../common/BotProtection';
+import { resolveBotProtectionConfig } from '../common/bot-protection';
 
 const { Text, Title } = Typography;
 
@@ -42,25 +43,27 @@ const PasswordResetForm = () => {
   const { email } = inputs;
 
   const [loading, setLoading] = useState(false);
-  const [turnstileEnabled, setTurnstileEnabled] = useState(false);
-  const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
-  const [turnstileToken, setTurnstileToken] = useState('');
+  const [status] = useState(() => {
+    const savedStatus = localStorage.getItem('status');
+    if (!savedStatus) return {};
+    try {
+      return JSON.parse(savedStatus) || {};
+    } catch (_error) {
+      return {};
+    }
+  });
+  const botProtectionConfig = useMemo(
+    () => resolveBotProtectionConfig(status, 'login'),
+    [status],
+  );
+  const captchaReady = !botProtectionConfig.enabled || Boolean(captchaToken);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaWidgetKey, setCaptchaWidgetKey] = useState(0);
   const [disableButton, setDisableButton] = useState(false);
   const [countdown, setCountdown] = useState(30);
 
   const logo = getLogo();
   const systemName = getSystemName();
-
-  useEffect(() => {
-    let status = localStorage.getItem('status');
-    if (status) {
-      status = JSON.parse(status);
-      if (status.turnstile_check) {
-        setTurnstileEnabled(true);
-        setTurnstileSiteKey(status.turnstile_site_key);
-      }
-    }
-  }, []);
 
   useEffect(() => {
     let countdownInterval = null;
@@ -79,28 +82,40 @@ const PasswordResetForm = () => {
     setInputs((inputs) => ({ ...inputs, email: value }));
   }
 
+  const resetCaptcha = () => {
+    setCaptchaToken('');
+    setCaptchaWidgetKey((value) => value + 1);
+  };
+
   async function handleSubmit(e) {
     if (!email) {
       showError(t('请输入邮箱地址'));
       return;
     }
-    if (turnstileEnabled && turnstileToken === '') {
-      showInfo(t('请稍后几秒重试，Turnstile 正在检查用户环境！'));
+    if (botProtectionConfig.enabled && captchaToken === '') {
+      showInfo(t('验证失败，请重试'));
       return;
     }
-    setDisableButton(true);
     setLoading(true);
-    const res = await API.get(
-      `/api/reset_password?email=${email}&turnstile=${turnstileToken}`,
-    );
-    const { success, message } = res.data;
-    if (success) {
-      showSuccess(t('重置邮件发送成功，请检查邮箱！'));
-      setInputs({ ...inputs, email: '' });
-    } else {
-      showError(message);
+    try {
+      const res = await API.get('/api/reset_password', {
+        params: { email },
+        headers: { 'X-Captcha-Token': captchaToken },
+      });
+      const { success, message } = res.data;
+      if (success) {
+        showSuccess(t('重置邮件发送成功，请检查邮箱！'));
+        setInputs({ ...inputs, email: '' });
+        setDisableButton(true);
+      } else {
+        showError(message);
+      }
+    } catch (_error) {
+      showError(t('重置邮件发送失败，请重试'));
+    } finally {
+      setLoading(false);
+      resetCaptcha();
     }
-    setLoading(false);
   }
 
   return (
@@ -150,7 +165,7 @@ const PasswordResetForm = () => {
                       htmlType='submit'
                       onClick={handleSubmit}
                       loading={loading}
-                      disabled={disableButton}
+                      disabled={disableButton || !captchaReady}
                     >
                       {disableButton
                         ? `${t('重试')} (${countdown})`
@@ -173,13 +188,13 @@ const PasswordResetForm = () => {
               </div>
             </Card>
 
-            {turnstileEnabled && (
+            {botProtectionConfig.enabled && (
               <div className='flex justify-center mt-6'>
-                <Turnstile
-                  sitekey={turnstileSiteKey}
-                  onVerify={(token) => {
-                    setTurnstileToken(token);
-                  }}
+                <BotProtection
+                  key={captchaWidgetKey}
+                  config={botProtectionConfig}
+                  onVerify={setCaptchaToken}
+                  onExpire={() => setCaptchaToken('')}
                 />
               </div>
             )}

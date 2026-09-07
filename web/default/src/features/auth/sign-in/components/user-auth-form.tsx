@@ -25,9 +25,9 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import type { z } from 'zod'
 
+import { BotProtection } from '@/components/bot-protection'
 import { Dialog } from '@/components/dialog'
 import { PasswordInput } from '@/components/password-input'
-import { Turnstile } from '@/components/turnstile'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -44,7 +44,7 @@ import { LegalConsent } from '@/features/auth/components/legal-consent'
 import { OAuthProviders } from '@/features/auth/components/oauth-providers'
 import { loginFormSchema } from '@/features/auth/constants'
 import { useAuthRedirect } from '@/features/auth/hooks/use-auth-redirect'
-import { useTurnstile } from '@/features/auth/hooks/use-turnstile'
+import { useBotProtection } from '@/features/auth/hooks/use-bot-protection'
 import { beginPasskeyLogin, finishPasskeyLogin } from '@/features/auth/passkey'
 import type { AuthFormProps } from '@/features/auth/types'
 import { useStatus } from '@/hooks/use-status'
@@ -80,12 +80,13 @@ export function UserAuthForm({
       status?.data?.password_login_enabled ??
       true) !== false
   const {
-    isTurnstileEnabled,
-    turnstileSiteKey,
-    turnstileToken,
-    setTurnstileToken,
-    validateTurnstile,
-  } = useTurnstile()
+    config: botProtectionConfig,
+    token: captchaToken,
+    setToken: setCaptchaToken,
+    validate: validateCaptcha,
+    reset: resetCaptcha,
+    widgetKey: captchaWidgetKey,
+  } = useBotProtection('login')
   const { handleLoginSuccess, redirectTo2FA } = useAuthRedirect()
 
   const hasUserAgreement = Boolean(status?.user_agreement_enabled)
@@ -149,14 +150,14 @@ export function UserAuthForm({
       return
     }
 
-    if (!validateTurnstile()) return
+    if (!validateCaptcha()) return
 
     setIsLoading(true)
     try {
       const res = await login({
         username: data.username,
         password: data.password,
-        turnstile: turnstileToken,
+        captchaToken,
       })
 
       if (res.success) {
@@ -171,6 +172,7 @@ export function UserAuthForm({
       // Errors are handled by global interceptor
     } finally {
       setIsLoading(false)
+      resetCaptcha()
     }
   }
 
@@ -378,12 +380,14 @@ export function UserAuthForm({
               className='mt-0'
             />
 
-            {/* Turnstile */}
-            {isTurnstileEnabled && (
+            {/* Bot protection */}
+            {botProtectionConfig.enabled && (
               <div className='mt-1'>
-                <Turnstile
-                  siteKey={turnstileSiteKey}
-                  onVerify={setTurnstileToken}
+                <BotProtection
+                  key={captchaWidgetKey}
+                  config={botProtectionConfig}
+                  onVerify={setCaptchaToken}
+                  onExpire={() => setCaptchaToken('')}
                 />
               </div>
             )}

@@ -17,14 +17,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { BotProtection } from '@/components/bot-protection'
 import { Dialog } from '@/components/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useBotProtection } from '@/features/auth/hooks/use-bot-protection'
 import { useCountdown } from '@/hooks/use-countdown'
 
 import { sendEmailVerification, bindEmail } from '../../api'
@@ -52,6 +54,14 @@ export function EmailBindDialog({
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const {
+    config: botProtectionConfig,
+    token: captchaToken,
+    setToken: setCaptchaToken,
+    validate: validateCaptcha,
+    reset: resetCaptcha,
+    widgetKey: captchaWidgetKey,
+  } = useBotProtection('register')
+  const {
     secondsLeft,
     isActive,
     start: startCountdown,
@@ -65,10 +75,11 @@ export function EmailBindDialog({
       toast.error(t('Please enter a valid email address'))
       return
     }
+    if (!validateCaptcha()) return
 
     try {
       setSendingCode(true)
-      const response = await sendEmailVerification(email)
+      const response = await sendEmailVerification(email, captchaToken)
 
       if (response.success) {
         toast.success(t('Verification code sent! Please check your email.'))
@@ -76,10 +87,11 @@ export function EmailBindDialog({
       } else {
         toast.error(response.message || t('Failed to send verification code'))
       }
-    } catch (_error) {
+    } catch {
       toast.error(t('Failed to send verification code'))
     } finally {
       setSendingCode(false)
+      resetCaptcha()
     }
   }
 
@@ -104,7 +116,7 @@ export function EmailBindDialog({
       } else {
         toast.error(response.message || t('Failed to bind email'))
       }
-    } catch (_error) {
+    } catch {
       toast.error(t('Failed to bind email'))
     } finally {
       setLoading(false)
@@ -119,8 +131,16 @@ export function EmailBindDialog({
         setEmail('')
         setCode('')
         resetCountdown()
+        resetCaptcha()
       }
     }
+  }
+
+  let sendButtonContent: ReactNode = t('Send')
+  if (isActive) {
+    sendButtonContent = `${secondsLeft}s`
+  } else if (sendingCode) {
+    sendButtonContent = t('Sending...')
   }
 
   return (
@@ -189,14 +209,19 @@ export function EmailBindDialog({
               onClick={handleSendCode}
               disabled={sendingCode || isActive || !email}
             >
-              {isActive
-                ? `${secondsLeft}s`
-                : sendingCode
-                  ? t('Sending...')
-                  : t('Send')}
+              {sendButtonContent}
             </Button>
           </div>
         </div>
+
+        {botProtectionConfig.enabled && (
+          <BotProtection
+            key={captchaWidgetKey}
+            config={botProtectionConfig}
+            onVerify={setCaptchaToken}
+            onExpire={() => setCaptchaToken('')}
+          />
+        )}
       </div>
     </Dialog>
   )

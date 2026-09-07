@@ -50,6 +50,9 @@ export type {
   SystemStatus,
   OAuthProvider,
   AuthFormProps,
+  BotProtectionConfig,
+  BotProtectionProvider,
+  BotProtectionScene,
 } from './types'
 
 // ============================================================================
@@ -105,6 +108,7 @@ export {
 // ============================================================================
 
 export { useTurnstile } from './hooks/use-turnstile'
+export { useBotProtection } from './hooks/use-bot-protection'
 export { useOAuthLogin } from './hooks/use-oauth-login'
 export { useAuthRedirect } from './hooks/use-auth-redirect'
 export { useEmailVerification } from './hooks/use-email-verification'
