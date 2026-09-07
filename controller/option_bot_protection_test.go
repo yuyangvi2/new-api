@@ -93,6 +93,7 @@ func TestNormalizeAndValidateCapOptionUpdateValidatesBeforeEnablingScene(t *test
 }
 
 func TestCapSiteKeysRemainVisibleWhileSecretsStayHidden(t *testing.T) {
+	assert.False(t, isSensitiveOptionKey("TurnstileSiteKey"))
 	assert.False(t, isSensitiveOptionKey("CapRegisterSiteKey"))
 	assert.False(t, isSensitiveOptionKey("CapLoginSiteKey"))
 	assert.True(t, isSensitiveOptionKey("CapRegisterSecretKey"))

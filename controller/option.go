@@ -113,6 +113,9 @@ func isSensitiveOptionKey(key string) bool {
 	if normalized == "" {
 		return false
 	}
+	if normalized == "turnstilesitekey" || normalized == "capregistersitekey" || normalized == "caploginsitekey" {
+		return false
+	}
 	parts := strings.FieldsFunc(normalized, func(r rune) bool {
 		return r == '_' || r == ':' || r == '/'
 	})
