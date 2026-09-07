@@ -172,6 +172,9 @@ func sanitizeUpstreamOpenAIError(upstreamError types.OpenAIError, statusCode int
 		return upstreamError
 	}
 
+	if upstreamErrorCodeText(upstreamError.Code) == "" {
+		upstreamError.Code = types.ErrorCodeBadResponseStatusCode
+	}
 	return types.SanitizeOpenAIErrorForClient(upstreamError)
 }
 

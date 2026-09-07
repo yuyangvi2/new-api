@@ -56,7 +56,7 @@ func sanitizeErrorIdentifier(value string, fallback string) string {
 func sanitizeErrorCode(code any) any {
 	switch value := code.(type) {
 	case nil:
-		return ErrorCodeBadResponseStatusCode
+		return nil
 	case ErrorCode:
 		safeValue := sanitizeErrorIdentifier(string(value), "")
 		if safeValue == "" {
