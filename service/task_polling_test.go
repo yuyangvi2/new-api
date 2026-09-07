@@ -61,6 +61,33 @@ func TestParseTaskPollingErrorRecognizesNumericRateLimitCode(t *testing.T) {
 	assert.Empty(t, reason)
 }
 
+func TestParseTaskPollingErrorDetailsPreservesCodeWithoutMessage(t *testing.T) {
+	t.Parallel()
+
+	upstreamError, retry := parseTaskPollingErrorDetails([]byte(`{"error":{"code":"content_policy_violation"}}`))
+
+	assert.False(t, retry)
+	assert.Equal(t, "content_policy_violation", upstreamError.Message)
+	assert.Equal(t, "content_policy_violation", upstreamError.Code)
+}
+
+func TestSanitizeFailedVideoResponseBodyMasksSecrets(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{
+		"status":"failed",
+		"error":{"message":"Width is invalid","code":"InvalidParameter"},
+		"metadata":{"api_key":"plain-secret","authorization":"custom-secret"}
+	}`)
+
+	redacted := sanitizeFailedVideoResponseBody(body)
+
+	assert.Contains(t, string(redacted), "Width is invalid")
+	assert.Contains(t, string(redacted), "InvalidParameter")
+	assert.NotContains(t, string(redacted), "plain-secret")
+	assert.NotContains(t, string(redacted), "custom-secret")
+}
+
 type taskPollingFetchAdaptor struct {
 	mu           sync.Mutex
 	taskIDs      []string

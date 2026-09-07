@@ -22,3 +22,36 @@ func TestMaskSensitiveInfoMasksCredentialsAndEmail(t *testing.T) {
 	assert.NotContains(t, masked, "private-session")
 	assert.Contains(t, masked, "Bearer ***")
 }
+
+func TestMaskSensitiveInfoMasksNamedSecretsAndIPURLs(t *testing.T) {
+	input := `x-api-key=plain-secret access_token:"access-secret" password='password-secret' ` +
+		`Authorization: custom-secret http://10.20.30.40:8080/private`
+
+	masked := MaskSensitiveInfo(input)
+
+	assert.NotContains(t, masked, "plain-secret")
+	assert.NotContains(t, masked, "access-secret")
+	assert.NotContains(t, masked, "password-secret")
+	assert.NotContains(t, masked, "custom-secret")
+	assert.NotContains(t, masked, "10.20.30.40")
+	assert.NotContains(t, masked, ".40")
+}
+
+func TestMaskSensitiveJSONRedactsSecretFieldsRecursively(t *testing.T) {
+	input := []byte(`{
+		"message":"Width must be between 300px and 6000px.",
+		"code":"InvalidParameter",
+		"metadata":{
+			"api_key":"plain-secret",
+			"nested":{"authorization":"custom-secret"}
+		}
+	}`)
+
+	masked, err := MaskSensitiveJSON(input)
+
+	assert.NoError(t, err)
+	assert.Contains(t, string(masked), "Width must be between 300px and 6000px.")
+	assert.Contains(t, string(masked), "InvalidParameter")
+	assert.NotContains(t, string(masked), "plain-secret")
+	assert.NotContains(t, string(masked), "custom-secret")
+}

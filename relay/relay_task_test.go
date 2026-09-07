@@ -76,3 +76,47 @@ func TestSanitizeOpenAIVideoTaskResponseOverridesUnsafeAdapterError(t *testing.T
 	assert.NotContains(t, string(data), "sk-proj-")
 	assert.NotContains(t, string(data), "internal.example.com")
 }
+
+func TestTaskModel2UserDtoPreservesSafeUpstreamErrorCode(t *testing.T) {
+	task := &model.Task{
+		TaskID:     "task_public",
+		Status:     model.TaskStatusFailure,
+		FailReason: "Width is invalid",
+		PrivateData: model.TaskPrivateData{
+			ErrorCode: "InvalidParameter",
+		},
+	}
+
+	userDTO := TaskModel2UserDto(task)
+
+	require.NotNil(t, userDTO.Error)
+	assert.Equal(t, "InvalidParameter", userDTO.Error.Code)
+}
+
+func TestSanitizeOpenAIVideoTaskResponsePreservesExtensions(t *testing.T) {
+	task := &model.Task{
+		TaskID:     "task_public",
+		Status:     model.TaskStatusFailure,
+		FailReason: "Request rejected by content policy",
+	}
+	rawResponse := []byte(`{
+		"id":"task_public",
+		"request_id":"task_public",
+		"object":"video",
+		"status":"failed",
+		"usage":{"total_tokens":12},
+		"video":{"url":"https://internal.example.com/private-result"},
+		"metadata":{"url":"https://internal.example.com/private-result","trace_id":"trace_public"},
+		"error":{"code":"unsafe","message":"Authorization: custom-secret"}
+	}`)
+
+	data, err := sanitizeOpenAIVideoTaskResponse(task, rawResponse)
+
+	require.NoError(t, err)
+	assert.Equal(t, "task_public", gjson.GetBytes(data, "request_id").String())
+	assert.Equal(t, int64(12), gjson.GetBytes(data, "usage.total_tokens").Int())
+	assert.Equal(t, "trace_public", gjson.GetBytes(data, "metadata.trace_id").String())
+	assert.False(t, gjson.GetBytes(data, "metadata.url").Exists())
+	assert.False(t, gjson.GetBytes(data, "video.url").Exists())
+	assert.NotContains(t, string(data), "custom-secret")
+}

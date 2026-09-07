@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -187,6 +188,77 @@ func TestRelayErrorHandlerHidesProviderAccountBalance(t *testing.T) {
 
 	require.NotNil(t, newAPIError)
 	require.Equal(t, "Upstream service temporarily unavailable, please contact administrator", newAPIError.Error())
+}
+
+func TestRelayErrorHandlerSanitizesUpstreamTypeAndCode(t *testing.T) {
+	resp := &http.Response{
+		StatusCode: http.StatusBadRequest,
+		Body: io.NopCloser(strings.NewReader(`{
+			"message":"Invalid request",
+			"type":"Authorization: custom-secret",
+			"code":{"x-api-key":"plain-secret"}
+		}`)),
+	}
+
+	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+
+	require.NotNil(t, newAPIError)
+	serialized, err := common.Marshal(newAPIError.ToOpenAIError())
+	require.NoError(t, err)
+	require.NotContains(t, string(serialized), "custom-secret")
+	require.NotContains(t, string(serialized), "plain-secret")
+}
+
+func TestRelayErrorHandlerAuthenticationTakesPrecedenceOverPolicyWords(t *testing.T) {
+	resp := &http.Response{
+		StatusCode: http.StatusUnauthorized,
+		Body: io.NopCloser(strings.NewReader(`{
+			"message":"Moderation service authentication failed for upstream account",
+			"type":"authentication_error",
+			"code":"unauthorized"
+		}`)),
+	}
+
+	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+
+	require.NotNil(t, newAPIError)
+	require.Equal(t, "Upstream authentication failed, please contact administrator", newAPIError.Error())
+	require.Equal(t, "upstream_authentication_failed", newAPIError.ToOpenAIError().Code)
+}
+
+func TestRelayErrorHandlerDefaultsMissingTopLevelCode(t *testing.T) {
+	resp := &http.Response{
+		StatusCode: http.StatusBadRequest,
+		Body:       io.NopCloser(strings.NewReader(`{"message":"Unsupported image format"}`)),
+	}
+
+	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+
+	require.NotNil(t, newAPIError)
+	require.Equal(t, types.ErrorCodeBadResponseStatusCode, newAPIError.ToOpenAIError().Code)
+}
+
+func TestSanitizeTaskRelayErrorProtectsHTTP200BusinessFailure(t *testing.T) {
+	taskErr := &dto.TaskError{
+		Code:       "invalid_api_key",
+		Message:    "Invalid API key x-api-key=plain-secret for moderation service",
+		Data:       map[string]any{"authorization": "custom-secret"},
+		StatusCode: http.StatusBadRequest,
+	}
+
+	safeError := SanitizeTaskRelayError(taskErr)
+
+	require.Equal(t, "Upstream authentication failed, please contact administrator", safeError.Message)
+	require.Equal(t, "upstream_authentication_failed", safeError.Code)
+	require.Nil(t, safeError.Data)
+	require.NotContains(t, safeError.Error.Error(), "plain-secret")
+}
+
+func TestSanitizeUpstreamTaskErrorPreservesSafeCode(t *testing.T) {
+	safeError := SanitizeUpstreamTaskErrorWithCode("Width is invalid", "InvalidParameter")
+
+	require.Equal(t, "Width is invalid", safeError.Message)
+	require.Equal(t, "InvalidParameter", safeError.Code)
 }
 
 func TestRelayErrorHandlerKeepsPolicyViolationReason(t *testing.T) {
