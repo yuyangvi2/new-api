@@ -55,3 +55,13 @@ func TestMaskSensitiveJSONRedactsSecretFieldsRecursively(t *testing.T) {
 	assert.NotContains(t, string(masked), "plain-secret")
 	assert.NotContains(t, string(masked), "custom-secret")
 }
+
+func TestMaskSensitiveJSONPreservesLargeIntegerPrecision(t *testing.T) {
+	input := []byte(`{"request_id":18446744073709551615,"api_key":"plain-secret"}`)
+
+	masked, err := MaskSensitiveJSON(input)
+
+	assert.NoError(t, err)
+	assert.Contains(t, string(masked), `18446744073709551615`)
+	assert.NotContains(t, string(masked), "plain-secret")
+}

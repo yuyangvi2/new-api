@@ -254,6 +254,18 @@ func TestSanitizeTaskRelayErrorProtectsHTTP200BusinessFailure(t *testing.T) {
 	require.NotContains(t, safeError.Error.Error(), "plain-secret")
 }
 
+func TestSanitizeTaskRelayErrorSuppliesFallbackMessage(t *testing.T) {
+	taskErr := &dto.TaskError{
+		Code:       "task_failed",
+		StatusCode: http.StatusBadRequest,
+	}
+
+	safeError := SanitizeTaskRelayError(taskErr)
+
+	require.NotEmpty(t, safeError.Message)
+	require.NotEmpty(t, safeError.Error.Error())
+}
+
 func TestSanitizeUpstreamTaskErrorPreservesSafeCode(t *testing.T) {
 	safeError := SanitizeUpstreamTaskErrorWithCode("Width is invalid", "InvalidParameter")
 

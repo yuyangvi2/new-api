@@ -81,3 +81,22 @@ func TestGeneralErrorResponseDetailsExcludeEchoedRequestContent(t *testing.T) {
 	assert.NotContains(t, openAIError.Message, "private system prompt")
 	assert.NotContains(t, string(openAIError.Metadata), "private system prompt")
 }
+
+func TestGeneralErrorResponsePreservesSafeTopLevelDetailArray(t *testing.T) {
+	body := []byte(`{
+		"detail":[{
+			"loc":["body","width"],
+			"msg":"Input should be less than or equal to 6000",
+			"type":"less_than_equal",
+			"input":999999
+		}]
+	}`)
+	var response GeneralErrorResponse
+	require.NoError(t, common.Unmarshal(body, &response))
+
+	message := response.ToMessage()
+
+	assert.Contains(t, message, "Input should be less than or equal to 6000")
+	assert.Contains(t, message, "width")
+	assert.NotContains(t, message, "999999")
+}

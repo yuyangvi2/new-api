@@ -88,6 +88,18 @@ func TestSanitizeFailedVideoResponseBodyMasksSecrets(t *testing.T) {
 	assert.NotContains(t, string(redacted), "custom-secret")
 }
 
+func TestSanitizeTaskFailureUsesResponseMessageWhenAdaptorOmitsReason(t *testing.T) {
+	t.Parallel()
+
+	taskResult := &relaycommon.TaskInfo{Status: model.TaskStatusFailure}
+	body := []byte(`{"error":{"code":"content_policy_violation","message":"The generated video may violate copyright."}}`)
+
+	safeError := sanitizeTaskFailure(taskResult, body)
+
+	assert.Equal(t, "The generated video may violate copyright.", safeError.Message)
+	assert.Equal(t, "content_policy_violation", safeError.Code)
+}
+
 type taskPollingFetchAdaptor struct {
 	mu           sync.Mutex
 	taskIDs      []string

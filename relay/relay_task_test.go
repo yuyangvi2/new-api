@@ -107,6 +107,7 @@ func TestSanitizeOpenAIVideoTaskResponsePreservesExtensions(t *testing.T) {
 		"usage":{"total_tokens":12},
 		"video":{"url":"https://internal.example.com/private-result"},
 		"metadata":{"url":"https://internal.example.com/private-result","trace_id":"trace_public"},
+		"debug":{"api_key":"extension-secret"},
 		"error":{"code":"unsafe","message":"Authorization: custom-secret"}
 	}`)
 
@@ -119,4 +120,5 @@ func TestSanitizeOpenAIVideoTaskResponsePreservesExtensions(t *testing.T) {
 	assert.False(t, gjson.GetBytes(data, "metadata.url").Exists())
 	assert.False(t, gjson.GetBytes(data, "video.url").Exists())
 	assert.NotContains(t, string(data), "custom-secret")
+	assert.NotContains(t, string(data), "extension-secret")
 }
