@@ -56,6 +56,23 @@ func TestMaskSensitiveInfoMasksCommonCloudAccessKeyPrefixes(t *testing.T) {
 	assert.NotContains(t, masked, "ASIAABCDEFGHIJKLMNOP")
 }
 
+func TestMaskSensitiveErrorTextPreservesDiagnosticsAndMasksSecrets(t *testing.T) {
+	input := "Invalid reasoning.effort in tools.0.function.name for schema.json; " +
+		"Authorization: Bearer token.payload.signature; key sk-proj-abcdefghijklmnop; " +
+		"endpoint https://internal.example.com/v1; host 10.20.30.40; user user@example.com"
+
+	masked := MaskSensitiveErrorText(input)
+
+	assert.Contains(t, masked, "reasoning.effort")
+	assert.Contains(t, masked, "tools.0.function.name")
+	assert.Contains(t, masked, "schema.json")
+	assert.NotContains(t, masked, "token.payload.signature")
+	assert.NotContains(t, masked, "sk-proj-abcdefghijklmnop")
+	assert.NotContains(t, masked, "internal.example.com")
+	assert.NotContains(t, masked, "10.20.30.40")
+	assert.NotContains(t, masked, "user@example.com")
+}
+
 func TestMaskSensitiveJSONRedactsSecretFieldsRecursively(t *testing.T) {
 	input := []byte(`{
 		"message":"Width must be between 300px and 6000px.",
@@ -83,4 +100,24 @@ func TestMaskSensitiveJSONPreservesLargeIntegerPrecision(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, string(masked), `18446744073709551615`)
 	assert.NotContains(t, string(masked), "plain-secret")
+}
+
+func TestMaskSensitiveErrorJSONPreservesDottedDiagnostics(t *testing.T) {
+	input := []byte(`{
+		"message":"Invalid reasoning.effort in schema.json",
+		"metadata":{
+			"field":"tools.0.function.name",
+			"api_key":"plain-secret",
+			"endpoint":"https://internal.example.com/v1"
+		}
+	}`)
+
+	masked, err := MaskSensitiveErrorJSON(input)
+
+	assert.NoError(t, err)
+	assert.Contains(t, string(masked), "reasoning.effort")
+	assert.Contains(t, string(masked), "schema.json")
+	assert.Contains(t, string(masked), "tools.0.function.name")
+	assert.NotContains(t, string(masked), "plain-secret")
+	assert.NotContains(t, string(masked), "internal.example.com")
 }
