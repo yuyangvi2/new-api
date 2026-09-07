@@ -122,6 +122,42 @@ func TestRelayErrorHandlerKeepsOpenAIErrorMessage(t *testing.T) {
 	require.Equal(t, message, newAPIError.Error())
 }
 
+func TestRelayErrorHandlerKeepsTopLevelErrorWhenUnrelatedFieldsHaveDifferentTypes(t *testing.T) {
+	body := `{
+		"object":"error",
+		"message":"Model only supports text input; received unsupported content type 'image_url'.",
+		"type":"BadRequestError",
+		"param":"messages[0].content",
+		"code":400,
+		"detail":{"internal":"must not break message parsing"}
+	}`
+	resp := &http.Response{
+		StatusCode: http.StatusBadRequest,
+		Body:       io.NopCloser(strings.NewReader(body)),
+	}
+
+	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+
+	require.NotNil(t, newAPIError)
+	require.Equal(t, "Model only supports text input; received unsupported content type 'image_url'.", newAPIError.Error())
+	openAIError := newAPIError.ToOpenAIError()
+	require.Equal(t, "BadRequestError", openAIError.Type)
+	require.Equal(t, "messages[0].content", openAIError.Param)
+	require.EqualValues(t, 400, openAIError.Code)
+}
+
+func TestRelayErrorHandlerUsesNonEmptyFallbackWhenUpstreamOmitsMessage(t *testing.T) {
+	resp := &http.Response{
+		StatusCode: http.StatusBadRequest,
+		Body:       io.NopCloser(strings.NewReader(`{"error":{},"code":400}`)),
+	}
+
+	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+
+	require.NotNil(t, newAPIError)
+	require.Equal(t, "Upstream returned an error without details", newAPIError.Error())
+}
+
 func TestRelayErrorHandlerKeepsInvalidJSONBodyInDebugLog(t *testing.T) {
 	withDebugEnabled(t, true)
 

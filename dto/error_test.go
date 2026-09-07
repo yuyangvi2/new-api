@@ -55,3 +55,29 @@ func TestGeneralErrorResponseToMessagePreservesObjectDetails(t *testing.T) {
 	assert.Contains(t, message, "Invalid request")
 	assert.Contains(t, message, "top_p is not supported")
 }
+
+func TestGeneralErrorResponseDetailsExcludeEchoedRequestContent(t *testing.T) {
+	body := []byte(`{
+		"error": {
+			"type": "invalid_request_error",
+			"message": "Invalid request",
+			"param": "messages[1].content",
+			"details": [
+				{
+					"loc": ["body", "messages", 1, "content"],
+					"msg": "Input should be a valid string",
+					"input": "private system prompt that must not be returned"
+				}
+			]
+		}
+	}`)
+	var response GeneralErrorResponse
+	require.NoError(t, common.Unmarshal(body, &response))
+
+	openAIError := response.TryToOpenAIError()
+
+	require.NotNil(t, openAIError)
+	assert.Contains(t, openAIError.Message, "Input should be a valid string")
+	assert.NotContains(t, openAIError.Message, "private system prompt")
+	assert.NotContains(t, string(openAIError.Metadata), "private system prompt")
+}
