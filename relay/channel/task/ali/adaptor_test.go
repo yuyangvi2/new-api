@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -202,4 +203,25 @@ func TestDoResponseUsesOfficialSubmitFormatForOfficialPath(t *testing.T) {
 	assert.Equal(t, "public-task", body.Output.TaskID)
 	assert.Equal(t, "PENDING", body.Output.TaskStatus)
 	assert.Equal(t, "req-1", body.RequestID)
+}
+
+func TestConvertToAliVideoSanitizesStoredFailure(t *testing.T) {
+	task := &model.Task{
+		TaskID:     "public-task",
+		Status:     model.TaskStatusFailure,
+		FailReason: "Invalid API key sk-proj-abcdefghijklmnop",
+		PrivateData: model.TaskPrivateData{
+			ErrorCode: "AccessDenied",
+		},
+		Data: []byte(`{
+			"output":{"task_id":"upstream-task","task_status":"FAILED","code":"AccessDenied","message":"Invalid API key sk-proj-abcdefghijklmnop"}
+		}`),
+	}
+
+	data, err := (&TaskAdaptor{}).ConvertToAliVideo(task)
+
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "Upstream authentication failed")
+	assert.Contains(t, string(data), "upstream_authentication_failed")
+	assert.NotContains(t, string(data), "sk-proj-")
 }

@@ -122,3 +122,22 @@ func TestSanitizeOpenAIVideoTaskResponsePreservesExtensions(t *testing.T) {
 	assert.NotContains(t, string(data), "custom-secret")
 	assert.NotContains(t, string(data), "extension-secret")
 }
+
+func TestBuildRealtimeTaskResponseExposesSafeFailureDetails(t *testing.T) {
+	task := &model.Task{
+		TaskID:     "task_public",
+		Status:     model.TaskStatusFailure,
+		FailReason: "The generated video may violate copyright restrictions.",
+		PrivateData: model.TaskPrivateData{
+			ErrorCode: "content_policy_violation",
+		},
+	}
+
+	data, err := buildRealtimeTaskResponse(task, []byte(`{"error":{"message":"raw"}}`))
+
+	require.NoError(t, err)
+	assert.Equal(t, "failed", gjson.GetBytes(data, "data.status").String())
+	assert.Equal(t, "The generated video may violate copyright restrictions.", gjson.GetBytes(data, "data.error.message").String())
+	assert.Equal(t, "content_policy_violation", gjson.GetBytes(data, "data.error.code").String())
+	assert.False(t, gjson.GetBytes(data, "data.url").Exists())
+}

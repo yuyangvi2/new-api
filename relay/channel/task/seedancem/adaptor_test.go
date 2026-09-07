@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -441,4 +442,28 @@ func TestDoResponseUsesOfficialSubmitFormatForOfficialPath(t *testing.T) {
 	var body map[string]any
 	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &body))
 	assert.Equal(t, map[string]any{"id": "public-task"}, body)
+}
+
+func TestConvertToSeedanceMVideoSanitizesStoredFailure(t *testing.T) {
+	task := &model.Task{
+		TaskID:     "public-task",
+		Status:     model.TaskStatusFailure,
+		FailReason: "Invalid API key sk-proj-abcdefghijklmnop",
+		PrivateData: model.TaskPrivateData{
+			ErrorCode: "AccessDenied",
+		},
+		Data: []byte(`{
+			"id":"upstream-task",
+			"status":"failed",
+			"error":{"code":"AccessDenied","message":"Invalid API key sk-proj-abcdefghijklmnop"}
+		}`),
+	}
+
+	data, err := (&TaskAdaptor{}).ConvertToSeedanceMVideo(task)
+
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "Upstream authentication failed")
+	assert.Contains(t, string(data), "upstream_authentication_failed")
+	assert.NotContains(t, string(data), "sk-proj-")
+	assert.Empty(t, gjson.GetBytes(data, "content.video_url").String())
 }
