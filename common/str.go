@@ -205,6 +205,17 @@ func maskHostForPlainDomain(domain string) string {
 // www.openai.com -> ***.***.com
 // api.openai.com -> ***.***.com
 func MaskSensitiveInfo(str string) string {
+	return maskSensitiveText(str, true)
+}
+
+// MaskSensitiveErrorText masks credentials and network locations in text that
+// is returned to API clients while preserving dotted diagnostic identifiers,
+// such as reasoning.effort, validation.failed, and schema.json.
+func MaskSensitiveErrorText(str string) string {
+	return maskSensitiveText(str, false)
+}
+
+func maskSensitiveText(str string, maskPlainDomains bool) string {
 	str = maskEmailPattern.ReplaceAllString(str, "***@***")
 	str = maskBearerTokenPattern.ReplaceAllString(str, "Bearer ***")
 	str = maskBasicAuthPattern.ReplaceAllString(str, "Basic ***")
@@ -283,10 +294,14 @@ func MaskSensitiveInfo(str string) string {
 		return result
 	})
 
-	// Mask domain names without protocol (like openai.com, www.openai.com)
-	str = maskDomainPattern.ReplaceAllStringFunc(str, func(domain string) string {
-		return maskHostForPlainDomain(domain)
-	})
+	if maskPlainDomains {
+		// Mask domain names without protocol (like openai.com, www.openai.com).
+		// Client-facing errors skip this step because parameter paths, error
+		// identifiers, and filenames have the same dotted syntax.
+		str = maskDomainPattern.ReplaceAllStringFunc(str, func(domain string) string {
+			return maskHostForPlainDomain(domain)
+		})
+	}
 
 	// Mask IP addresses
 	str = maskIPPattern.ReplaceAllString(str, "***.***.***.***")
@@ -300,6 +315,16 @@ func MaskSensitiveInfo(str string) string {
 // MaskSensitiveJSON recursively masks secret-bearing fields and sensitive
 // strings while preserving the original JSON shape for diagnostics.
 func MaskSensitiveJSON(data []byte) ([]byte, error) {
+	return maskSensitiveJSON(data, true)
+}
+
+// MaskSensitiveErrorJSON applies client-facing error masking recursively while
+// preserving dotted diagnostic identifiers in string values.
+func MaskSensitiveErrorJSON(data []byte) ([]byte, error) {
+	return maskSensitiveJSON(data, false)
+}
+
+func maskSensitiveJSON(data []byte, maskPlainDomains bool) ([]byte, error) {
 	switch GetJsonType(data) {
 	case "object":
 		var fields map[string]json.RawMessage
@@ -307,7 +332,7 @@ func MaskSensitiveJSON(data []byte) ([]byte, error) {
 			return nil, err
 		}
 		for key, fieldValue := range fields {
-			if isSensitiveJSONField(key) {
+			if isSensitiveJSONField(key, fieldValue) {
 				masked, err := Marshal("***")
 				if err != nil {
 					return nil, err
@@ -315,7 +340,7 @@ func MaskSensitiveJSON(data []byte) ([]byte, error) {
 				fields[key] = masked
 				continue
 			}
-			masked, err := MaskSensitiveJSON(fieldValue)
+			masked, err := maskSensitiveJSON(fieldValue, maskPlainDomains)
 			if err != nil {
 				return nil, err
 			}
@@ -328,7 +353,7 @@ func MaskSensitiveJSON(data []byte) ([]byte, error) {
 			return nil, err
 		}
 		for index, item := range items {
-			masked, err := MaskSensitiveJSON(item)
+			masked, err := maskSensitiveJSON(item, maskPlainDomains)
 			if err != nil {
 				return nil, err
 			}
@@ -340,7 +365,7 @@ func MaskSensitiveJSON(data []byte) ([]byte, error) {
 		if err := Unmarshal(data, &value); err != nil {
 			return nil, err
 		}
-		return Marshal(MaskSensitiveInfo(value))
+		return Marshal(maskSensitiveText(value, maskPlainDomains))
 	default:
 		var raw json.RawMessage
 		if err := Unmarshal(data, &raw); err != nil {
@@ -350,12 +375,15 @@ func MaskSensitiveJSON(data []byte) ([]byte, error) {
 	}
 }
 
-func isSensitiveJSONField(key string) bool {
+func isSensitiveJSONField(key string, value json.RawMessage) bool {
 	normalized := strings.NewReplacer("-", "", "_", "", " ", "").Replace(strings.ToLower(strings.TrimSpace(key)))
 	switch normalized {
-	case "key", "apikey", "xapikey", "accesstoken", "refreshtoken", "authorization", "proxyauthorization",
+	case "token":
+		return GetJsonType(value) == "string"
+	case "key", "apikey", "xapikey", "authtoken", "accesstoken", "refreshtoken", "idtoken", "bearertoken",
+		"authorization", "proxyauthorization",
 		"password", "passwd", "secret", "clientsecret", "secretkey", "credential", "credentials",
-		"cookie", "setcookie", "session", "sessionid":
+		"privatekey", "cookie", "setcookie", "session", "sessionid":
 		return true
 	default:
 		return false

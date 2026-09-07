@@ -172,12 +172,12 @@ func sanitizeUpstreamOpenAIError(upstreamError types.OpenAIError, statusCode int
 		return upstreamError
 	}
 
-	upstreamError.Message = common.MaskSensitiveInfo(strings.TrimSpace(upstreamError.Message))
-	upstreamError.Param = common.MaskSensitiveInfo(upstreamError.Param)
+	upstreamError.Message = common.MaskSensitiveErrorText(strings.TrimSpace(upstreamError.Message))
+	upstreamError.Param = sanitizeUpstreamErrorParameter(upstreamError.Param)
 	upstreamError.Type = sanitizeUpstreamErrorIdentifier(upstreamError.Type, "upstream_error")
 	upstreamError.Code = sanitizeUpstreamErrorCode(upstreamError.Code, types.ErrorCodeBadResponseStatusCode)
 	if len(upstreamError.Metadata) > 0 {
-		maskedMetadata, err := common.MaskSensitiveJSON(upstreamError.Metadata)
+		maskedMetadata, err := common.MaskSensitiveErrorJSON(upstreamError.Metadata)
 		if err == nil {
 			upstreamError.Metadata = json.RawMessage(maskedMetadata)
 		} else {
@@ -254,11 +254,19 @@ func sanitizeUpstreamErrorIdentifier(value string, fallback string) string {
 	if value == "" {
 		return fallback
 	}
-	masked := common.MaskSensitiveInfo(value)
+	masked := common.MaskSensitiveErrorText(value)
 	if masked != value || len(value) > 128 || strings.ContainsAny(value, "\r\n") {
 		return fallback
 	}
 	return value
+}
+
+func sanitizeUpstreamErrorParameter(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) > 256 || strings.ContainsAny(value, "\r\n") {
+		return ""
+	}
+	return common.MaskSensitiveErrorText(value)
 }
 
 func sanitizeUpstreamErrorCode(code any, fallback any) any {
@@ -354,7 +362,7 @@ func TaskErrorWrapper(err error, code string, statusCode int) *dto.TaskError {
 	if strings.Contains(lowerText, "post") || strings.Contains(lowerText, "dial") || strings.Contains(lowerText, "http") {
 		common.SysLog(fmt.Sprintf("error: %s", text))
 		//text = "请求上游地址失败"
-		text = common.MaskSensitiveInfo(text)
+		text = common.MaskSensitiveErrorText(text)
 	}
 	//避免暴露内部错误
 	taskError := &dto.TaskError{

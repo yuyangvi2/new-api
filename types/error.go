@@ -209,7 +209,7 @@ func (e *NewAPIError) ToOpenAIError() OpenAIError {
 		}
 	}
 	if e.errorCode != ErrorCodeCountTokenFailed {
-		result.Message = common.MaskSensitiveInfo(result.Message)
+		result.Message = common.MaskSensitiveErrorText(result.Message)
 	}
 	if result.Message == "" {
 		result.Message = string(e.errorType)
@@ -241,7 +241,7 @@ func (e *NewAPIError) ToClaudeError() ClaudeError {
 		}
 	}
 	if e.errorCode != ErrorCodeCountTokenFailed {
-		result.Message = common.MaskSensitiveInfo(result.Message)
+		result.Message = common.MaskSensitiveErrorText(result.Message)
 	}
 	if result.Message == "" {
 		result.Message = string(e.errorType)
@@ -259,7 +259,7 @@ func (e *NewAPIError) ToGeminiError() GeminiError {
 	}
 	message := e.Error()
 	if e.errorCode != ErrorCodeCountTokenFailed {
-		message = common.MaskSensitiveInfo(message)
+		message = common.MaskSensitiveErrorText(message)
 	}
 	if message == "" {
 		message = string(e.errorType)

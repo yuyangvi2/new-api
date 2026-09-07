@@ -252,6 +252,25 @@ func TestRelayErrorHandlerSanitizesUpstreamTypeAndCode(t *testing.T) {
 	require.NotContains(t, string(serialized), "plain-secret")
 }
 
+func TestRelayErrorHandlerDropsUnsafeParamFormatting(t *testing.T) {
+	resp := &http.Response{
+		StatusCode: http.StatusBadRequest,
+		Body: io.NopCloser(strings.NewReader(`{
+			"error":{
+				"message":"Invalid parameter",
+				"type":"invalid_request_error",
+				"param":"reasoning.effort\r\nX-Internal: secret",
+				"code":"invalid_parameter"
+			}
+		}`)),
+	}
+
+	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+
+	require.NotNil(t, newAPIError)
+	require.Empty(t, newAPIError.ToOpenAIError().Param)
+}
+
 func TestRelayErrorHandlerAuthenticationTakesPrecedenceOverPolicyWords(t *testing.T) {
 	resp := &http.Response{
 		StatusCode: http.StatusUnauthorized,

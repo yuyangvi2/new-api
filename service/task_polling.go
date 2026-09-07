@@ -688,12 +688,12 @@ func redactVideoResponseBody(body []byte) []byte {
 }
 
 func sanitizeFailedVideoResponseBody(body []byte) []byte {
-	masked, err := common.MaskSensitiveJSON(body)
+	masked, err := common.MaskSensitiveErrorJSON(body)
 	if err == nil {
 		return masked
 	}
 	fallback, marshalErr := common.Marshal(map[string]string{
-		"error": common.MaskSensitiveInfo(common.LocalLogPreview(string(body))),
+		"error": common.MaskSensitiveErrorText(common.LocalLogPreview(string(body))),
 	})
 	if marshalErr != nil {
 		return nil

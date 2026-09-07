@@ -576,7 +576,7 @@ func tryRealtimeFetch(c *gin.Context, task *model.Task, isOpenAIVideoAPI bool) [
 	}
 	if channelModel.Type == constant.ChannelTypeXai {
 		if task.Status == model.TaskStatusFailure {
-			maskedBody, maskErr := common.MaskSensitiveJSON(body)
+			maskedBody, maskErr := common.MaskSensitiveErrorJSON(body)
 			if maskErr == nil {
 				task.Data = maskedBody
 			}
@@ -792,5 +792,5 @@ func sanitizeOpenAIVideoTaskResponse(task *model.Task, data []byte) ([]byte, err
 			return nil, err
 		}
 	}
-	return common.MaskSensitiveJSON(data)
+	return common.MaskSensitiveErrorJSON(data)
 }

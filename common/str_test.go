@@ -108,7 +108,9 @@ func TestMaskSensitiveErrorJSONPreservesDottedDiagnostics(t *testing.T) {
 		"metadata":{
 			"field":"tools.0.function.name",
 			"api_key":"plain-secret",
-			"endpoint":"https://internal.example.com/v1"
+			"token":"private-token",
+			"endpoint":"https://internal.example.com/v1",
+			"usage":{"token":42}
 		}
 	}`)
 
@@ -119,5 +121,7 @@ func TestMaskSensitiveErrorJSONPreservesDottedDiagnostics(t *testing.T) {
 	assert.Contains(t, string(masked), "schema.json")
 	assert.Contains(t, string(masked), "tools.0.function.name")
 	assert.NotContains(t, string(masked), "plain-secret")
+	assert.NotContains(t, string(masked), "private-token")
 	assert.NotContains(t, string(masked), "internal.example.com")
+	assert.Contains(t, string(masked), `"token":42`)
 }
