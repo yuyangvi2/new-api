@@ -30,36 +30,38 @@ func (t *TaskResponse[T]) IsSuccess() bool {
 }
 
 type TaskDto struct {
-	ID         int64           `json:"id"`
-	CreatedAt  int64           `json:"created_at"`
-	UpdatedAt  int64           `json:"updated_at"`
-	TaskID     string          `json:"task_id"`
-	Platform   string          `json:"platform"`
-	UserId     int             `json:"user_id"`
-	Group      string          `json:"group"`
-	ChannelId  int             `json:"channel_id"`
-	Quota      int             `json:"quota"`
-	Action     string          `json:"action"`
-	Status     string          `json:"status"`
-	FailReason string          `json:"fail_reason"`
-	ResultURL  string          `json:"result_url,omitempty"` // 任务结果 URL（视频地址等）
-	SubmitTime int64           `json:"submit_time"`
-	StartTime  int64           `json:"start_time"`
-	FinishTime int64           `json:"finish_time"`
-	Progress   string          `json:"progress"`
-	Properties any             `json:"properties"`
-	Username   string          `json:"username,omitempty"`
-	Data       json.RawMessage `json:"data,omitempty"` // 仅管理员接口填充；用户接口为空
+	ID         int64             `json:"id"`
+	CreatedAt  int64             `json:"created_at"`
+	UpdatedAt  int64             `json:"updated_at"`
+	TaskID     string            `json:"task_id"`
+	Platform   string            `json:"platform"`
+	UserId     int               `json:"user_id"`
+	Group      string            `json:"group"`
+	ChannelId  int               `json:"channel_id"`
+	Quota      int               `json:"quota"`
+	Action     string            `json:"action"`
+	Status     string            `json:"status"`
+	FailReason string            `json:"fail_reason"`
+	Error      *OpenAIVideoError `json:"error,omitempty"`
+	ResultURL  string            `json:"result_url,omitempty"` // 任务结果 URL（视频地址等）
+	SubmitTime int64             `json:"submit_time"`
+	StartTime  int64             `json:"start_time"`
+	FinishTime int64             `json:"finish_time"`
+	Progress   string            `json:"progress"`
+	Properties any               `json:"properties"`
+	Username   string            `json:"username,omitempty"`
+	Data       json.RawMessage   `json:"data,omitempty"` // 仅管理员接口填充；用户接口为空
 }
 
 // TaskPollDto 是面向用户的精简轮询响应，只包含前端渲染所需字段。
 // 不暴露内部信息（channel_id、quota、上游原始数据等）。
 type TaskPollDto struct {
-	TaskID     string `json:"task_id"`
-	Status     string `json:"status"`
-	FailReason string `json:"fail_reason,omitempty"`
-	ResultURL  string `json:"result_url,omitempty"`
-	Progress   string `json:"progress,omitempty"`
+	TaskID     string            `json:"task_id"`
+	Status     string            `json:"status"`
+	FailReason string            `json:"fail_reason,omitempty"`
+	Error      *OpenAIVideoError `json:"error,omitempty"`
+	ResultURL  string            `json:"result_url,omitempty"`
+	Progress   string            `json:"progress,omitempty"`
 }
 
 type FetchReq struct {

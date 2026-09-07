@@ -144,12 +144,19 @@ func sanitizeUpstreamOpenAIError(upstreamError types.OpenAIError, statusCode int
 	isPolicyError := strings.Contains(descriptor, "terms of use violation") ||
 		strings.Contains(descriptor, "safety system") ||
 		strings.Contains(descriptor, "content policy") ||
-		strings.Contains(descriptor, "prompt blocked")
+		strings.Contains(descriptor, "prompt blocked") ||
+		strings.Contains(descriptor, "copyright") ||
+		strings.Contains(descriptor, "infringement") ||
+		strings.Contains(descriptor, "intellectual property") ||
+		strings.Contains(descriptor, "moderation")
 
 	if !isPolicyError && (statusCode == http.StatusUnauthorized ||
 		strings.Contains(descriptor, "invalid bearer") ||
 		strings.Contains(descriptor, "invalid api key") ||
 		strings.Contains(descriptor, "invalid_api_key") ||
+		strings.Contains(descriptor, "api key is not configured") ||
+		strings.Contains(descriptor, "missing api key") ||
+		strings.Contains(descriptor, "expired api key") ||
 		strings.Contains(descriptor, "authentication failed") ||
 		strings.Contains(descriptor, "not authorized to make this call")) {
 		upstreamError.Message = "Upstream authentication failed, please contact administrator"
@@ -185,6 +192,22 @@ func sanitizeUpstreamOpenAIError(upstreamError types.OpenAIError, statusCode int
 		}
 	}
 	return upstreamError
+}
+
+// SanitizeUpstreamTaskError converts an asynchronous upstream failure into a
+// user-facing error. Actionable provider messages are preserved by default,
+// while credentials and provider-account state are rewritten by the same
+// policy used for synchronous relay errors.
+func SanitizeUpstreamTaskError(message string) types.OpenAIError {
+	message = strings.TrimSpace(message)
+	if message == "" || strings.EqualFold(message, "unknown error") {
+		message = "Upstream task failed without error details"
+	}
+	return sanitizeUpstreamOpenAIError(types.OpenAIError{
+		Message: message,
+		Type:    "upstream_error",
+		Code:    "upstream_task_failed",
+	}, 0)
 }
 
 func ResetStatusCode(newApiErr *types.NewAPIError, statusCodeMappingStr string) {

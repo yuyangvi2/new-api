@@ -373,10 +373,11 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(originTask *model.Task) ([]byte, erro
 	openAIVideo.CompletedAt = originTask.UpdatedAt
 	openAIVideo.Model = originTask.Properties.OriginModelName
 
-	if dResp.Status == "failed" {
+	if originTask.Status == model.TaskStatusFailure {
+		safeError := service.SanitizeUpstreamTaskError(originTask.FailReason)
 		openAIVideo.Error = &dto.OpenAIVideoError{
-			Message: dResp.Error.Message,
-			Code:    dResp.Error.Code,
+			Message: safeError.Message,
+			Code:    fmt.Sprint(safeError.Code),
 		}
 	}
 

@@ -339,10 +339,42 @@ func (a *SeedanceOfficialTaskAdaptor) ConvertToSeedanceVideo(originTask *model.T
 	if response.UpdatedAt == 0 {
 		response.UpdatedAt = originTask.UpdatedAt
 	}
-	if originTask.Status == model.TaskStatusFailure && response.Error == nil && strings.TrimSpace(originTask.FailReason) != "" {
-		response.Error = &SeedanceOfficialResponseError{Message: originTask.FailReason}
+	if originTask.Status == model.TaskStatusFailure {
+		rawMessage := originTask.FailReason
+		if strings.TrimSpace(rawMessage) == "" && response.Error != nil {
+			rawMessage = firstNonEmptyString(response.Error.Message, response.Error.Code)
+		}
+		safeError := service.SanitizeUpstreamTaskError(rawMessage)
+		response.Error = &SeedanceOfficialResponseError{
+			Code:    fmt.Sprint(safeError.Code),
+			Message: safeError.Message,
+		}
+		response.ResponseMetadata = nil
 	}
 	return common.Marshal(response)
+}
+
+func (a *SeedanceOfficialTaskAdaptor) ConvertToOpenAIVideo(originTask *model.Task) ([]byte, error) {
+	openAIVideo := dto.NewOpenAIVideo()
+	openAIVideo.ID = originTask.TaskID
+	openAIVideo.TaskID = originTask.TaskID
+	openAIVideo.Model = TaskModelName(originTask)
+	openAIVideo.Status = originTask.Status.ToVideoStatus()
+	openAIVideo.SetProgressStr(originTask.Progress)
+	openAIVideo.CreatedAt = originTask.CreatedAt
+	openAIVideo.CompletedAt = originTask.UpdatedAt
+
+	if originTask.Status == model.TaskStatusFailure {
+		safeError := service.SanitizeUpstreamTaskError(originTask.FailReason)
+		openAIVideo.Error = &dto.OpenAIVideoError{
+			Code:    fmt.Sprint(safeError.Code),
+			Message: safeError.Message,
+		}
+	} else if resultURL := originTask.GetResultURL(); resultURL != "" {
+		openAIVideo.SetMetadata("url", resultURL)
+	}
+
+	return common.Marshal(openAIVideo)
 }
 
 type (

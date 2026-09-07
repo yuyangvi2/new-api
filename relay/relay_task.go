@@ -227,8 +227,7 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 		return nil, service.TaskErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
 	if resp != nil && resp.StatusCode != http.StatusOK {
-		responseBody, _ := io.ReadAll(resp.Body)
-		return nil, service.TaskErrorWrapper(fmt.Errorf("%s", string(responseBody)), "fail_to_fetch_task", resp.StatusCode)
+		return nil, service.TaskErrorFromAPIError(service.RelayErrorHandler(c, resp, false))
 	}
 
 	// 10. 返回 OtherRatios 给下游（header 必须在 DoResponse 写 body 之前设置）
@@ -411,7 +410,10 @@ func videoFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *d
 				taskResp = service.TaskErrorWrapper(err, "convert_to_openai_video_failed", http.StatusInternalServerError)
 				return
 			}
-			respBody = openAIVideoData
+			respBody, err = sanitizeOpenAIVideoTaskResponse(originTask, openAIVideoData)
+			if err != nil {
+				taskResp = service.TaskErrorWrapper(err, "sanitize_openai_video_failed", http.StatusInternalServerError)
+			}
 			return
 		}
 		taskResp = service.TaskErrorWrapperLocal(fmt.Errorf("not_implemented:%s", originTask.Platform), "not_implemented", http.StatusNotImplemented)
@@ -669,6 +671,11 @@ func TaskModel2Dto(task *model.Task) *dto.TaskDto {
 
 // TaskModel2UserDto 将 Task 转为用户可见 DTO，不包含上游原始数据、渠道 ID 等内部信息。
 func TaskModel2UserDto(task *model.Task) *dto.TaskDto {
+	failReason, taskError := taskFailureForClient(task)
+	resultURL := task.GetResultURL()
+	if task.Status == model.TaskStatusFailure && task.PrivateData.ResultURL == "" {
+		resultURL = ""
+	}
 	return &dto.TaskDto{
 		ID:         task.ID,
 		CreatedAt:  task.CreatedAt,
@@ -680,8 +687,9 @@ func TaskModel2UserDto(task *model.Task) *dto.TaskDto {
 		Quota:      task.Quota,
 		Action:     task.Action,
 		Status:     string(task.Status),
-		FailReason: task.FailReason,
-		ResultURL:  task.GetResultURL(),
+		FailReason: failReason,
+		Error:      taskError,
+		ResultURL:  resultURL,
 		SubmitTime: task.SubmitTime,
 		StartTime:  task.StartTime,
 		FinishTime: task.FinishTime,
@@ -692,6 +700,7 @@ func TaskModel2UserDto(task *model.Task) *dto.TaskDto {
 
 // TaskModel2PollDto 将 Task 转为轮询精简 DTO，只包含前端渲染所需的最少字段。
 func TaskModel2PollDto(task *model.Task) *dto.TaskPollDto {
+	failReason, taskError := taskFailureForClient(task)
 	resultURL := task.GetResultURL()
 	if task.Status == model.TaskStatusFailure && task.PrivateData.ResultURL == "" {
 		resultURL = ""
@@ -699,8 +708,43 @@ func TaskModel2PollDto(task *model.Task) *dto.TaskPollDto {
 	return &dto.TaskPollDto{
 		TaskID:     task.TaskID,
 		Status:     string(task.Status),
-		FailReason: task.FailReason,
+		FailReason: failReason,
+		Error:      taskError,
 		ResultURL:  resultURL,
 		Progress:   task.Progress,
 	}
+}
+
+func taskFailureForClient(task *model.Task) (string, *dto.OpenAIVideoError) {
+	if task == nil {
+		return "", nil
+	}
+	if task.Status != model.TaskStatusFailure {
+		return task.FailReason, nil
+	}
+	safeError := service.SanitizeUpstreamTaskError(task.FailReason)
+	return safeError.Message, &dto.OpenAIVideoError{
+		Message: safeError.Message,
+		Code:    fmt.Sprint(safeError.Code),
+	}
+}
+
+func sanitizeOpenAIVideoTaskResponse(task *model.Task, data []byte) ([]byte, error) {
+	if task == nil || task.Status != model.TaskStatusFailure {
+		return data, nil
+	}
+	var response dto.OpenAIVideo
+	if err := common.Unmarshal(data, &response); err != nil {
+		return nil, err
+	}
+	safeError := service.SanitizeUpstreamTaskError(task.FailReason)
+	response.Error = &dto.OpenAIVideoError{
+		Message: safeError.Message,
+		Code:    fmt.Sprint(safeError.Code),
+	}
+	delete(response.Metadata, "url")
+	if len(response.Metadata) == 0 {
+		response.Metadata = nil
+	}
+	return common.Marshal(response)
 }

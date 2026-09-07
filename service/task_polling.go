@@ -504,25 +504,15 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 
 	now := time.Now().Unix()
 	if taskResult.Status == "" {
-		//taskResult = relaycommon.FailTaskInfo("upstream returned empty status")
-		errorResult := &dto.GeneralErrorResponse{}
-		if err = common.Unmarshal(responseBody, &errorResult); err == nil {
-			openaiError := errorResult.TryToOpenAIError()
-			if openaiError != nil {
-				// 返回规范的 OpenAI 错误格式，提取错误信息，判断错误是否为任务失败
-				if openaiError.Code == "429" {
-					// 429 错误通常表示请求过多或速率限制，暂时不认为是任务失败，保持原状态等待下一轮轮询
-					return nil
-				}
-
-				// 其他错误认为是任务失败，记录错误信息并更新任务状态
-				taskResult = relaycommon.FailTaskInfo("upstream returned error")
-			} else {
-				// unknown error format, log original response
-				logger.LogError(ctx, fmt.Sprintf("Task %s returned empty status with unrecognized error format, response: %s", taskId, string(responseBody)))
-				taskResult = relaycommon.FailTaskInfo("upstream returned unrecognized message")
-			}
+		reason, retry := parseTaskPollingError(responseBody)
+		if retry {
+			return nil
 		}
+		if reason == "upstream returned unrecognized message" {
+			safePreview := common.MaskSensitiveInfo(common.LocalLogPreview(string(responseBody)))
+			logger.LogError(ctx, fmt.Sprintf("Task %s returned empty status with unrecognized error format, response: %s", taskId, safePreview))
+		}
+		taskResult = relaycommon.FailTaskInfo(reason)
 	}
 
 	shouldRefund := false
@@ -557,13 +547,13 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 		}
 		shouldSettle = true
 	case model.TaskStatusFailure:
-		logger.LogJson(ctx, fmt.Sprintf("Task %s failed", taskId), task)
 		task.Status = model.TaskStatusFailure
 		task.Progress = taskcommon.ProgressComplete
 		if task.FinishTime == 0 {
 			task.FinishTime = now
 		}
-		task.FailReason = taskResult.Reason
+		safeError := SanitizeUpstreamTaskError(taskResult.Reason)
+		task.FailReason = safeError.Message
 		logger.LogInfo(ctx, fmt.Sprintf("Task %s failed: %s", task.TaskID, task.FailReason))
 		taskResult.Progress = taskcommon.ProgressComplete
 		if quota != 0 {
@@ -605,6 +595,25 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 	}
 
 	return nil
+}
+
+func parseTaskPollingError(responseBody []byte) (string, bool) {
+	var errorResult dto.GeneralErrorResponse
+	if err := common.Unmarshal(responseBody, &errorResult); err != nil {
+		return "upstream returned unrecognized message", false
+	}
+	if openAIError := errorResult.TryToOpenAIError(); openAIError != nil {
+		code := strings.TrimSpace(fmt.Sprint(openAIError.Code))
+		descriptor := strings.ToLower(fmt.Sprintf("%s %s", code, openAIError.Type))
+		if code == "429" || strings.Contains(descriptor, "rate_limit") {
+			return "", true
+		}
+		return openAIError.Message, false
+	}
+	if message := strings.TrimSpace(errorResult.ToMessage()); message != "" {
+		return message, false
+	}
+	return "upstream returned unrecognized message", false
 }
 
 func redactVideoResponseBody(body []byte) []byte {
