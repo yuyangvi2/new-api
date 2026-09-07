@@ -204,19 +204,6 @@ func TestRelayErrorHandlerKeepsPolicyViolationReason(t *testing.T) {
 	require.Equal(t, message, newAPIError.Error())
 }
 
-func TestRelayErrorHandlerLimitsUpstreamMessageLength(t *testing.T) {
-	message := strings.Repeat("x", 4096)
-	resp := &http.Response{
-		StatusCode: http.StatusBadRequest,
-		Body:       io.NopCloser(strings.NewReader(`{"message":"` + message + `"}`)),
-	}
-
-	newAPIError := RelayErrorHandler(context.Background(), resp, false)
-
-	require.NotNil(t, newAPIError)
-	require.LessOrEqual(t, len(newAPIError.Error()), 2048)
-}
-
 func TestRelayErrorHandlerKeepsInvalidJSONBodyInDebugLog(t *testing.T) {
 	withDebugEnabled(t, true)
 

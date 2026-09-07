@@ -115,7 +115,8 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 	// General format error (OpenAI, Anthropic, Gemini, etc.). This also
 	// preserves providers that put message/type/param/code at the top level.
 	if oaiError := errResponse.TryToOpenAIError(); oaiError != nil {
-		newApiErr = types.WithOpenAIError(*oaiError, resp.StatusCode)
+		safeError := sanitizeUpstreamOpenAIError(*oaiError, resp.StatusCode)
+		newApiErr = types.WithOpenAIError(safeError, resp.StatusCode)
 		if showBodyWhenFail {
 			newApiErr.Err = buildErrWithBody(newApiErr.Error())
 		}
@@ -131,6 +132,54 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 		newApiErr.Err = buildErrWithBody(newApiErr.Error())
 	}
 	return
+}
+
+func sanitizeUpstreamOpenAIError(upstreamError types.OpenAIError, statusCode int) types.OpenAIError {
+	descriptor := strings.ToLower(fmt.Sprintf("%s %s %v", upstreamError.Message, upstreamError.Type, upstreamError.Code))
+	isPolicyError := strings.Contains(descriptor, "terms of use violation") ||
+		strings.Contains(descriptor, "safety system") ||
+		strings.Contains(descriptor, "content policy") ||
+		strings.Contains(descriptor, "prompt blocked")
+
+	if !isPolicyError && (statusCode == http.StatusUnauthorized ||
+		strings.Contains(descriptor, "invalid bearer") ||
+		strings.Contains(descriptor, "invalid api key") ||
+		strings.Contains(descriptor, "invalid_api_key") ||
+		strings.Contains(descriptor, "authentication failed") ||
+		strings.Contains(descriptor, "not authorized to make this call")) {
+		upstreamError.Message = "Upstream authentication failed, please contact administrator"
+		upstreamError.Type = "upstream_error"
+		upstreamError.Param = ""
+		upstreamError.Code = "upstream_authentication_failed"
+		upstreamError.Metadata = nil
+		return upstreamError
+	}
+
+	if strings.Contains(descriptor, "insufficient account balance") ||
+		strings.Contains(descriptor, "insufficient balance") ||
+		strings.Contains(descriptor, "no available accounts") ||
+		strings.Contains(descriptor, "no healthy upstream account") ||
+		strings.Contains(descriptor, "all available accounts exhausted") {
+		upstreamError.Message = "Upstream service temporarily unavailable, please contact administrator"
+		upstreamError.Type = "upstream_error"
+		upstreamError.Param = ""
+		upstreamError.Code = "upstream_account_unavailable"
+		upstreamError.Metadata = nil
+		return upstreamError
+	}
+
+	upstreamError.Message = common.MaskSensitiveInfo(strings.TrimSpace(upstreamError.Message))
+	upstreamError.Param = common.MaskSensitiveInfo(upstreamError.Param)
+	if len(upstreamError.Metadata) > 0 {
+		maskedMetadata := common.MaskSensitiveInfo(string(upstreamError.Metadata))
+		var metadataValue any
+		if common.Unmarshal([]byte(maskedMetadata), &metadataValue) == nil {
+			upstreamError.Metadata = json.RawMessage(maskedMetadata)
+		} else {
+			upstreamError.Metadata = nil
+		}
+	}
+	return upstreamError
 }
 
 func ResetStatusCode(newApiErr *types.NewAPIError, statusCodeMappingStr string) {
