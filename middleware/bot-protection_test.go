@@ -183,6 +183,42 @@ func TestBotProtectionCheckTreatsCapNotFoundAsInvalidToken(t *testing.T) {
 	assert.Contains(t, recorder.Body.String(), "verification failed")
 }
 
+func TestBotProtectionCheckTreatsExpiredCapTokenAsInvalidToken(t *testing.T) {
+	snapshot := snapshotBotProtectionSettings()
+	t.Cleanup(snapshot.restore)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"success":false,"error":"Token expired"}`))
+	}))
+	t.Cleanup(server.Close)
+	configureCapForTests(server.URL)
+
+	recorder := performBotProtectionRequest(BotProtectionSceneLogin, "expired-token")
+
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), "verification failed")
+}
+
+func TestBotProtectionCheckTreatsRejectedCapSecretAsUnavailable(t *testing.T) {
+	snapshot := snapshotBotProtectionSettings()
+	t.Cleanup(snapshot.restore)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"success":false,"error":"Invalid site key or secret"}`))
+	}))
+	t.Cleanup(server.Close)
+	configureCapForTests(server.URL)
+
+	recorder := performBotProtectionRequest(BotProtectionSceneLogin, "token")
+
+	assert.Equal(t, http.StatusServiceUnavailable, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), "temporarily unavailable")
+}
+
 func TestBotProtectionCheckFailsClosedWhenCapUnavailable(t *testing.T) {
 	snapshot := snapshotBotProtectionSettings()
 	t.Cleanup(snapshot.restore)
