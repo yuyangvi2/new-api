@@ -19,6 +19,8 @@ var (
 	maskIPPattern          = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
 	maskEmailPattern       = regexp.MustCompile(`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b`)
 	maskBearerTokenPattern = regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}`)
+	maskBasicAuthPattern   = regexp.MustCompile(`(?i)\bBasic\s+[A-Za-z0-9+/=]{8,}`)
+	maskCookiePattern      = regexp.MustCompile(`(?i)\b(Set-Cookie|Cookie)\s*[:=]\s*[^\r\n]+`)
 	maskSecretKeyPattern   = regexp.MustCompile(`\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,}|AKID[A-Za-z0-9]{12,})\b`)
 	// maskApiKeyPattern matches patterns like 'api_key:xxx' or "api_key:xxx" to mask the API key value
 	maskApiKeyPattern = regexp.MustCompile(`(['"]?)api_key:([^\s'"]+)(['"]?)`)
@@ -202,7 +204,9 @@ func maskHostForPlainDomain(domain string) string {
 func MaskSensitiveInfo(str string) string {
 	str = maskEmailPattern.ReplaceAllString(str, "***@***")
 	str = maskBearerTokenPattern.ReplaceAllString(str, "Bearer ***")
+	str = maskBasicAuthPattern.ReplaceAllString(str, "Basic ***")
 	str = maskSecretKeyPattern.ReplaceAllString(str, "***")
+	str = maskCookiePattern.ReplaceAllString(str, "${1}: ***")
 
 	// Mask URLs
 	str = maskURLPattern.ReplaceAllStringFunc(str, func(urlStr string) string {
