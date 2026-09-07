@@ -94,7 +94,7 @@ func TestSanitizeTaskFailureUsesResponseMessageWhenAdaptorOmitsReason(t *testing
 	taskResult := &relaycommon.TaskInfo{Status: model.TaskStatusFailure}
 	body := []byte(`{"error":{"code":"content_policy_violation","message":"The generated video may violate copyright."}}`)
 
-	safeError := sanitizeTaskFailure(taskResult, body)
+	safeError := SanitizeTaskFailure(taskResult, body)
 
 	assert.Equal(t, "The generated video may violate copyright.", safeError.Message)
 	assert.Equal(t, "content_policy_violation", safeError.Code)
@@ -109,7 +109,7 @@ func TestSanitizeTaskFailureReplacesGenericAdaptorReason(t *testing.T) {
 	}
 	body := []byte(`{"error":{"code":"content_policy_violation","message":"The generated video may violate copyright."}}`)
 
-	safeError := sanitizeTaskFailure(taskResult, body)
+	safeError := SanitizeTaskFailure(taskResult, body)
 
 	assert.Equal(t, "The generated video may violate copyright.", safeError.Message)
 	assert.Equal(t, "content_policy_violation", safeError.Code)

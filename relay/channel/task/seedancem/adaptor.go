@@ -462,12 +462,18 @@ func (a *TaskAdaptor) ConvertToSeedanceMVideo(originTask *model.Task) ([]byte, e
 	r.Status = seedanceMOfficialStatus(originTask.Status)
 	r.CreatedAt = originTask.CreatedAt
 	r.UpdatedAt = originTask.UpdatedAt
-	if r.Content.VideoURL == "" {
+	if originTask.Status != model.TaskStatusFailure && r.Content.VideoURL == "" {
 		r.Content.VideoURL = originTask.GetResultURL()
 	}
 	if originTask.Status == model.TaskStatusFailure {
-		r.Error.Code = firstNonEmpty(r.Error.Code, "task_failed")
-		r.Error.Message = firstNonEmpty(r.Error.Message, originTask.FailReason)
+		safeError := service.SanitizeUpstreamTaskErrorWithCode(originTask.FailReason, originTask.PrivateData.ErrorCode)
+		r.Content.VideoURL = ""
+		r.Content.LastFrameURL = ""
+		r.Error.Code = fmt.Sprint(safeError.Code)
+		r.Error.Message = safeError.Message
+		r.Code = ""
+		r.Message = ""
+		r.ResponseMetadata.Error = nil
 	}
 	return common.Marshal(r)
 }

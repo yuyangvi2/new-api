@@ -648,12 +648,16 @@ func (a *TaskAdaptor) ConvertToAliVideo(task *model.Task) ([]byte, error) {
 	}
 	aliResp.Output.TaskID = task.TaskID
 	aliResp.Output.TaskStatus = aliOfficialStatus(task.Status)
-	if aliResp.Output.VideoURL == "" {
+	if task.Status != model.TaskStatusFailure && aliResp.Output.VideoURL == "" {
 		aliResp.Output.VideoURL = task.GetResultURL()
 	}
 	if task.Status == model.TaskStatusFailure {
-		aliResp.Output.Code = firstNonEmpty(aliResp.Output.Code, aliResp.Code, "task_failed")
-		aliResp.Output.Message = firstNonEmpty(aliResp.Output.Message, aliResp.Message, task.FailReason)
+		safeError := service.SanitizeUpstreamTaskErrorWithCode(task.FailReason, task.PrivateData.ErrorCode)
+		aliResp.Output.VideoURL = ""
+		aliResp.Output.Code = fmt.Sprint(safeError.Code)
+		aliResp.Output.Message = safeError.Message
+		aliResp.Code = ""
+		aliResp.Message = ""
 	}
 	return common.Marshal(aliResp)
 }

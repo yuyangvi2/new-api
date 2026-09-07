@@ -557,8 +557,10 @@ func tryRealtimeFetch(c *gin.Context, task *model.Task, isOpenAIVideoAPI bool) [
 			task.FinishTime = now
 		}
 	}
-	if task.Status == model.TaskStatusFailure && ti.Reason != "" {
-		task.FailReason = ti.Reason
+	if task.Status == model.TaskStatusFailure {
+		safeError := service.SanitizeTaskFailure(ti, body)
+		task.FailReason = safeError.Message
+		task.PrivateData.ErrorCode = fmt.Sprint(safeError.Code)
 	}
 	if strings.HasPrefix(ti.Url, "data:") {
 		// data: URI — kept in Data, not ResultURL
@@ -569,7 +571,14 @@ func tryRealtimeFetch(c *gin.Context, task *model.Task, isOpenAIVideoAPI bool) [
 		task.PrivateData.ResultURL = taskcommon.BuildProxyURL(task.TaskID)
 	}
 	if channelModel.Type == constant.ChannelTypeXai {
-		task.Data = body
+		if task.Status == model.TaskStatusFailure {
+			maskedBody, maskErr := common.MaskSensitiveJSON(body)
+			if maskErr == nil {
+				task.Data = maskedBody
+			}
+		} else {
+			task.Data = body
+		}
 	}
 
 	if !snap.Equal(task.Snapshot()) {
@@ -590,20 +599,29 @@ func tryRealtimeFetch(c *gin.Context, task *model.Task, isOpenAIVideoAPI bool) [
 	}
 
 	// 非 OpenAI Video API: 构建自定义格式响应
+	respBody, _ := buildRealtimeTaskResponse(task, body)
+	return respBody
+}
+
+func buildRealtimeTaskResponse(task *model.Task, body []byte) ([]byte, error) {
 	format := detectVideoFormat(body)
+	_, taskError := taskFailureForClient(task)
+	resultURL := task.GetResultURL()
+	if task.Status == model.TaskStatusFailure && task.PrivateData.ResultURL == "" {
+		resultURL = ""
+	}
 	out := map[string]any{
-		"error":    nil,
+		"error":    taskError,
 		"format":   format,
 		"metadata": nil,
 		"status":   mapTaskStatusToSimple(task.Status),
 		"task_id":  task.TaskID,
-		"url":      task.GetResultURL(),
+		"url":      resultURL,
 	}
-	respBody, _ := common.Marshal(dto.TaskResponse[any]{
+	return common.Marshal(dto.TaskResponse[any]{
 		Code: "success",
 		Data: out,
 	})
-	return respBody
 }
 
 // detectVideoFormat 从 Gemini/Vertex 原始响应中探测视频格式

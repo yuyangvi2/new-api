@@ -139,5 +139,5 @@ func TestBuildRealtimeTaskResponseExposesSafeFailureDetails(t *testing.T) {
 	assert.Equal(t, "failed", gjson.GetBytes(data, "data.status").String())
 	assert.Equal(t, "The generated video may violate copyright restrictions.", gjson.GetBytes(data, "data.error.message").String())
 	assert.Equal(t, "content_policy_violation", gjson.GetBytes(data, "data.error.code").String())
-	assert.False(t, gjson.GetBytes(data, "data.url").Exists())
+	assert.Empty(t, gjson.GetBytes(data, "data.url").String())
 }

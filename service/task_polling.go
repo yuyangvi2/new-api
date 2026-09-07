@@ -560,7 +560,7 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 		if task.FinishTime == 0 {
 			task.FinishTime = now
 		}
-		safeError := sanitizeTaskFailure(taskResult, responseBody)
+		safeError := SanitizeTaskFailure(taskResult, responseBody)
 		task.FailReason = safeError.Message
 		task.PrivateData.ErrorCode = fmt.Sprint(safeError.Code)
 		logger.LogInfo(ctx, fmt.Sprintf("Task %s failed: %s", task.TaskID, task.FailReason))
@@ -635,7 +635,7 @@ func isUsableTaskErrorCode(code any) bool {
 	return codeText != "" && codeText != "0" && codeText != string(types.ErrorCodeBadResponseStatusCode) && codeText != "upstream_task_failed"
 }
 
-func sanitizeTaskFailure(taskResult *relaycommon.TaskInfo, responseBody []byte) types.OpenAIError {
+func SanitizeTaskFailure(taskResult *relaycommon.TaskInfo, responseBody []byte) types.OpenAIError {
 	reason := strings.TrimSpace(taskResult.Reason)
 	errorCode := strings.TrimSpace(taskResult.ErrorCode)
 	if errorCode == "" && taskResult.Code != 0 {

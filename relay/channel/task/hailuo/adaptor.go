@@ -276,8 +276,10 @@ func (a *TaskAdaptor) ConvertToHailuoVideo(originTask *model.Task) ([]byte, erro
 		hailuoResp.BaseResp.StatusMsg = "success"
 	}
 	if originTask.Status == model.TaskStatusFailure {
+		safeError := service.SanitizeUpstreamTaskErrorWithCode(originTask.FailReason, originTask.PrivateData.ErrorCode)
 		hailuoResp.BaseResp.StatusCode = 1
-		hailuoResp.BaseResp.StatusMsg = firstNonEmpty(originTask.FailReason, hailuoResp.BaseResp.StatusMsg)
+		hailuoResp.BaseResp.StatusMsg = safeError.Message
+		hailuoResp.FileID = ""
 	}
 	return common.Marshal(hailuoResp)
 }
