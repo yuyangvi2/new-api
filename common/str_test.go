@@ -37,6 +37,25 @@ func TestMaskSensitiveInfoMasksNamedSecretsAndIPURLs(t *testing.T) {
 	assert.NotContains(t, masked, ".40")
 }
 
+func TestMaskSensitiveInfoMasksAuthorizationSchemeCredential(t *testing.T) {
+	input := "Authorization: Token upstream-account-secret request rejected"
+
+	masked := MaskSensitiveInfo(input)
+
+	assert.NotContains(t, masked, "upstream-account-secret")
+	assert.Contains(t, masked, "Authorization: Token ***")
+	assert.Contains(t, masked, "request rejected")
+}
+
+func TestMaskSensitiveInfoMasksCommonCloudAccessKeyPrefixes(t *testing.T) {
+	input := "credentials AKIAABCDEFGHIJKLMNOP and ASIAABCDEFGHIJKLMNOP"
+
+	masked := MaskSensitiveInfo(input)
+
+	assert.NotContains(t, masked, "AKIAABCDEFGHIJKLMNOP")
+	assert.NotContains(t, masked, "ASIAABCDEFGHIJKLMNOP")
+}
+
 func TestMaskSensitiveJSONRedactsSecretFieldsRecursively(t *testing.T) {
 	input := []byte(`{
 		"message":"Width must be between 300px and 6000px.",

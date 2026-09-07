@@ -476,6 +476,23 @@ func TestSeedanceOfficialConvertToSeedanceVideoUsesSanitizedStoredFailure(t *tes
 	assert.NotContains(t, string(data), "sk-proj-")
 }
 
+func TestSeedanceOfficialConvertToSeedanceVideoPreservesStoredFailureCode(t *testing.T) {
+	task := &model.Task{
+		TaskID:     "task_public",
+		Status:     model.TaskStatusFailure,
+		FailReason: "The output may violate copyright restrictions.",
+		PrivateData: model.TaskPrivateData{
+			ErrorCode: "content_policy_violation",
+		},
+		Data: []byte(`{"id":"upstream_task","status":"failed"}`),
+	}
+
+	data, err := (&SeedanceOfficialTaskAdaptor{}).ConvertToSeedanceVideo(task)
+
+	require.NoError(t, err)
+	assert.Equal(t, "content_policy_violation", gjson.GetBytes(data, "error.code").String())
+}
+
 func TestSeedanceOfficialConvertToOpenAIVideoExposesTaskFailure(t *testing.T) {
 	reason := "The request failed because the output video may be related to copyright restrictions. Request id: req_123"
 	task := &model.Task{

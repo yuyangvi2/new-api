@@ -100,3 +100,28 @@ func TestGeneralErrorResponsePreservesSafeTopLevelDetailArray(t *testing.T) {
 	assert.Contains(t, message, "width")
 	assert.NotContains(t, message, "999999")
 }
+
+func TestGeneralErrorResponsePreservesTopLevelMessageAndDetail(t *testing.T) {
+	body := []byte(`{
+		"message":"Request validation failed",
+		"code":"invalid_request",
+		"detail":[{
+			"loc":["body","duration"],
+			"msg":"Input should be less than or equal to 60",
+			"type":"less_than_equal",
+			"input":999999
+		}]
+	}`)
+	var response GeneralErrorResponse
+	require.NoError(t, common.Unmarshal(body, &response))
+
+	openAIError := response.TryToOpenAIError()
+
+	require.NotNil(t, openAIError)
+	assert.Contains(t, openAIError.Message, "Request validation failed")
+	assert.Contains(t, openAIError.Message, "duration")
+	assert.Contains(t, openAIError.Message, "Input should be less than or equal to 60")
+	assert.NotContains(t, openAIError.Message, "999999")
+	assert.Contains(t, string(openAIError.Metadata), "detail")
+	assert.NotContains(t, string(openAIError.Metadata), "999999")
+}
