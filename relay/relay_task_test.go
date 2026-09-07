@@ -6,6 +6,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
@@ -140,4 +141,25 @@ func TestBuildRealtimeTaskResponseExposesSafeFailureDetails(t *testing.T) {
 	assert.Equal(t, "The generated video may violate copyright restrictions.", gjson.GetBytes(data, "data.error.message").String())
 	assert.Equal(t, "content_policy_violation", gjson.GetBytes(data, "data.error.code").String())
 	assert.Empty(t, gjson.GetBytes(data, "data.url").String())
+}
+
+func TestNormalizeRealtimeTaskResultRecognizesErrorWithoutStatus(t *testing.T) {
+	result, retry := normalizeRealtimeTaskResult(&relaycommon.TaskInfo{}, []byte(`{
+		"error":{"code":"content_policy_violation","message":"The generated video may violate copyright."}
+	}`))
+
+	assert.False(t, retry)
+	require.NotNil(t, result)
+	assert.Equal(t, model.TaskStatusFailure, result.Status)
+	assert.Equal(t, "The generated video may violate copyright.", result.Reason)
+	assert.Equal(t, "content_policy_violation", result.ErrorCode)
+}
+
+func TestNormalizeRealtimeTaskResultRetriesRateLimitWithoutStatus(t *testing.T) {
+	result, retry := normalizeRealtimeTaskResult(&relaycommon.TaskInfo{}, []byte(`{
+		"error":{"code":429,"message":"Too many requests"}
+	}`))
+
+	assert.True(t, retry)
+	assert.Nil(t, result)
 }
