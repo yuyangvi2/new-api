@@ -144,6 +144,15 @@ var WeChatAccountQRCodeImageURL = ""
 var TurnstileSiteKey = ""
 var TurnstileSecretKey = ""
 
+var CapRegisterCheckEnabled = false
+var CapLoginCheckEnabled = false
+var CapPublicEndpoint = ""
+var CapVerifyEndpoint = ""
+var CapRegisterSiteKey = ""
+var CapRegisterSecretKey = ""
+var CapLoginSiteKey = ""
+var CapLoginSecretKey = ""
+
 var TelegramBotToken = ""
 var TelegramBotName = ""
 

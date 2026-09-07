@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -231,6 +232,16 @@ func UpdateOption(c *gin.Context) {
 
 			return
 		}
+	case "CapRegisterCheckEnabled":
+		if option.Value == "true" && !capSceneConfigured(common.CapRegisterSiteKey, common.CapRegisterSecretKey) {
+			common.ApiErrorMsg(c, "无法启用注册 Cap 验证，请先填写完整的 Cap 端点、注册 Site Key 和 Secret Key")
+			return
+		}
+	case "CapLoginCheckEnabled":
+		if option.Value == "true" && !capSceneConfigured(common.CapLoginSiteKey, common.CapLoginSecretKey) {
+			common.ApiErrorMsg(c, "无法启用登录 Cap 验证，请先填写完整的 Cap 端点、登录 Site Key 和 Secret Key")
+			return
+		}
 	case "TelegramOAuthEnabled":
 		if option.Value == "true" && common.TelegramBotToken == "" {
 			c.JSON(http.StatusOK, gin.H{
@@ -369,4 +380,13 @@ func UpdateOption(c *gin.Context) {
 		"success": true,
 		"message": "",
 	})
+}
+
+func capSceneConfigured(siteKey string, secretKey string) bool {
+	publicURL, publicErr := url.Parse(common.CapPublicEndpoint)
+	verifyURL, verifyErr := url.Parse(common.CapVerifyEndpoint)
+	return publicErr == nil && verifyErr == nil &&
+		(publicURL.Scheme == "http" || publicURL.Scheme == "https") && publicURL.Host != "" &&
+		(verifyURL.Scheme == "http" || verifyURL.Scheme == "https") && verifyURL.Host != "" &&
+		strings.TrimSpace(siteKey) != "" && strings.TrimSpace(secretKey) != ""
 }
