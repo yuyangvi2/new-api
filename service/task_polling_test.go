@@ -19,6 +19,48 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestParseTaskPollingErrorPreservesActionableMessage(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "openai error",
+			body: `{"error":{"code":"InvalidParameter","message":"Width must be between 300px and 6000px."}}`,
+			want: "Width must be between 300px and 6000px.",
+		},
+		{
+			name: "provider msg",
+			body: `{"msg":"The output video may be related to copyright restrictions."}`,
+			want: "The output video may be related to copyright restrictions.",
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			reason, retry := parseTaskPollingError([]byte(testCase.body))
+
+			assert.False(t, retry)
+			assert.Equal(t, testCase.want, reason)
+		})
+	}
+}
+
+func TestParseTaskPollingErrorRecognizesNumericRateLimitCode(t *testing.T) {
+	t.Parallel()
+
+	reason, retry := parseTaskPollingError([]byte(`{"message":"Too many requests","code":429}`))
+
+	assert.True(t, retry)
+	assert.Empty(t, reason)
+}
+
 type taskPollingFetchAdaptor struct {
 	mu           sync.Mutex
 	taskIDs      []string
