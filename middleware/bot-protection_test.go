@@ -165,6 +165,24 @@ func TestBotProtectionCheckRejectsInvalidAndReplayedCapToken(t *testing.T) {
 	assert.Contains(t, second.Body.String(), "verification failed")
 }
 
+func TestBotProtectionCheckTreatsCapNotFoundAsInvalidToken(t *testing.T) {
+	snapshot := snapshotBotProtectionSettings()
+	t.Cleanup(snapshot.restore)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"success":false,"error":"Invalid token"}`))
+	}))
+	t.Cleanup(server.Close)
+	configureCapForTests(server.URL)
+
+	recorder := performBotProtectionRequest(BotProtectionSceneLogin, "replayed-token")
+
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), "verification failed")
+}
+
 func TestBotProtectionCheckFailsClosedWhenCapUnavailable(t *testing.T) {
 	snapshot := snapshotBotProtectionSettings()
 	t.Cleanup(snapshot.restore)
