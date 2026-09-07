@@ -48,3 +48,14 @@ func TestToOpenAIErrorRejectsUnsafeStructuredIdentifiers(t *testing.T) {
 	require.Empty(t, result.Param)
 	require.Equal(t, ErrorCodeBadResponseStatusCode, result.Code)
 }
+
+func TestToOpenAIErrorPreservesMissingCodeForCompatibility(t *testing.T) {
+	apiError := WithOpenAIError(OpenAIError{
+		Message: "Upstream failed",
+		Type:    "server_error",
+	}, http.StatusBadGateway)
+
+	result := apiError.ToOpenAIError()
+
+	require.Nil(t, result.Code)
+}
