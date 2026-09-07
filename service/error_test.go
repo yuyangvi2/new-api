@@ -158,6 +158,65 @@ func TestRelayErrorHandlerUsesNonEmptyFallbackWhenUpstreamOmitsMessage(t *testin
 	require.Equal(t, "Upstream returned an error without details", newAPIError.Error())
 }
 
+func TestRelayErrorHandlerHidesUpstreamCredentialFailure(t *testing.T) {
+	resp := &http.Response{
+		StatusCode: http.StatusUnauthorized,
+		Body: io.NopCloser(strings.NewReader(`{
+			"message":"Invalid bearer sk-proj-abcdefghijklmnop",
+			"type":"authentication_error",
+			"code":"invalid_api_key"
+		}`)),
+	}
+
+	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+
+	require.NotNil(t, newAPIError)
+	require.Equal(t, "Upstream authentication failed, please contact administrator", newAPIError.Error())
+	require.NotContains(t, newAPIError.ToOpenAIError().Message, "sk-proj-")
+}
+
+func TestRelayErrorHandlerHidesProviderAccountBalance(t *testing.T) {
+	resp := &http.Response{
+		StatusCode: http.StatusForbidden,
+		Body: io.NopCloser(strings.NewReader(`{
+			"error":{"message":"Insufficient account balance","type":"billing_error"}
+		}`)),
+	}
+
+	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+
+	require.NotNil(t, newAPIError)
+	require.Equal(t, "Upstream service temporarily unavailable, please contact administrator", newAPIError.Error())
+}
+
+func TestRelayErrorHandlerKeepsPolicyViolationReason(t *testing.T) {
+	message := "Request rejected due to terms of use violation."
+	resp := &http.Response{
+		StatusCode: http.StatusForbidden,
+		Body: io.NopCloser(strings.NewReader(`{
+			"error":{"message":"` + message + `","type":"permission_error"}
+		}`)),
+	}
+
+	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+
+	require.NotNil(t, newAPIError)
+	require.Equal(t, message, newAPIError.Error())
+}
+
+func TestRelayErrorHandlerLimitsUpstreamMessageLength(t *testing.T) {
+	message := strings.Repeat("x", 4096)
+	resp := &http.Response{
+		StatusCode: http.StatusBadRequest,
+		Body:       io.NopCloser(strings.NewReader(`{"message":"` + message + `"}`)),
+	}
+
+	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+
+	require.NotNil(t, newAPIError)
+	require.LessOrEqual(t, len(newAPIError.Error()), 2048)
+}
+
 func TestRelayErrorHandlerKeepsInvalidJSONBodyInDebugLog(t *testing.T) {
 	withDebugEnabled(t, true)
 
