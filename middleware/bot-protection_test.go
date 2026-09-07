@@ -198,3 +198,26 @@ func TestBotProtectionCheckRejectsOversizedResponse(t *testing.T) {
 
 	assert.Equal(t, http.StatusServiceUnavailable, recorder.Code)
 }
+
+func TestBotProtectionCheckDoesNotForwardSecretAcrossRedirects(t *testing.T) {
+	snapshot := snapshotBotProtectionSettings()
+	t.Cleanup(snapshot.restore)
+
+	var redirected atomic.Bool
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		redirected.Store(true)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true}`))
+	}))
+	t.Cleanup(target.Close)
+	redirector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusTemporaryRedirect)
+	}))
+	t.Cleanup(redirector.Close)
+	configureCapForTests(redirector.URL)
+
+	recorder := performBotProtectionRequest(BotProtectionSceneRegister, "token")
+
+	assert.Equal(t, http.StatusServiceUnavailable, recorder.Code)
+	assert.False(t, redirected.Load())
+}
