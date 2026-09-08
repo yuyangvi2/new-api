@@ -17,6 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import * as bunTest from 'bun:test'
+import { createInstance } from 'i18next'
+import * as reactI18next from 'react-i18next'
 
 import type { ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -31,10 +33,6 @@ const mock = (
 mock.module('@tanstack/react-router', () => ({
   Link: (props: { children: ReactNode }) => <a>{props.children}</a>,
   useSearch: () => ({ redirect: undefined }),
-}))
-
-mock.module('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
 }))
 
 mock.module('@/hooks/use-status', () => ({
@@ -60,22 +58,32 @@ mock.module('./sign-up/components/sign-up-form', () => ({
 
 const { SignIn } = await import('./sign-in')
 const { SignUp } = await import('./sign-up')
-const mockedReactI18next = await import('react-i18next')
+const { I18nextProvider, initReactI18next } = reactI18next
+const i18n = createInstance()
+await i18n.use(initReactI18next).init({ lng: 'en' })
 
 describe('authentication legal copy', () => {
   it('preserves unrelated react-i18next exports for other tests', () => {
-    expect(typeof mockedReactI18next.I18nextProvider).toBe('function')
+    expect(typeof I18nextProvider).toBe('function')
   })
 
   it('does not repeat the agreement notice below the sign-in form', () => {
-    const markup = renderToStaticMarkup(<SignIn />)
+    const markup = renderToStaticMarkup(
+      <I18nextProvider i18n={i18n}>
+        <SignIn />
+      </I18nextProvider>
+    )
 
     expect(markup.includes('Sign-in form')).toBe(true)
     expect(markup.includes('By clicking sign in')).toBe(false)
   })
 
   it('does not repeat the agreement notice below the sign-up form', () => {
-    const markup = renderToStaticMarkup(<SignUp />)
+    const markup = renderToStaticMarkup(
+      <I18nextProvider i18n={i18n}>
+        <SignUp />
+      </I18nextProvider>
+    )
 
     expect(markup.includes('Sign-up form')).toBe(true)
     expect(markup.includes('By creating an account')).toBe(false)
