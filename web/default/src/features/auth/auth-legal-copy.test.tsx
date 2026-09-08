@@ -60,8 +60,13 @@ mock.module('./sign-up/components/sign-up-form', () => ({
 
 const { SignIn } = await import('./sign-in')
 const { SignUp } = await import('./sign-up')
+const mockedReactI18next = await import('react-i18next')
 
 describe('authentication legal copy', () => {
+  it('preserves unrelated react-i18next exports for other tests', () => {
+    expect(typeof mockedReactI18next.I18nextProvider).toBe('function')
+  })
+
   it('does not repeat the agreement notice below the sign-in form', () => {
     const markup = renderToStaticMarkup(<SignIn />)
 
