@@ -50,6 +50,9 @@ export function applyCapWidgetTheme(
   element: HTMLElement,
   theme: CapWidgetTheme
 ) {
+  element.style.setProperty('display', 'block')
+  element.style.setProperty('width', '100%')
+
   for (const [name, value] of Object.entries(theme)) {
     element.style.setProperty(name, value)
   }

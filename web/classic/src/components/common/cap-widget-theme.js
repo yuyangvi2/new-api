@@ -40,6 +40,9 @@ const capCreditsRule =
   '.credits { color: var(--cap-credits-color) !important; }';
 
 export function applyCapWidgetTheme(element, theme) {
+  element.style.setProperty('display', 'block');
+  element.style.setProperty('width', '100%');
+
   for (const [name, value] of Object.entries(theme)) {
     element.style.setProperty(name, value);
   }
