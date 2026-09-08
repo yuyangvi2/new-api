@@ -17,11 +17,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import * as bunTest from 'bun:test'
-import { createInstance } from 'i18next'
-import * as reactI18next from 'react-i18next'
 
+import { createInstance } from 'i18next'
 import type { ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import * as reactI18next from 'react-i18next'
 
 const { describe, expect, it } = bunTest
 const mock = (
