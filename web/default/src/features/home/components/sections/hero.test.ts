@@ -18,22 +18,22 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, it } from 'bun:test'
 
-import { HERO_SLIDES } from './hero'
+import { HERO_SLIDES } from './hero-content'
 
 describe('home hero model lineup', () => {
   it('promotes the current flagship model versions', () => {
-    expect(HERO_SLIDES.slice(0, 3).map((slide) => slide.title)).toEqual([
-      'Fable 5.1',
-      'GPT-6 Astra',
-      'Grok 4.6',
-    ])
+    const titles = HERO_SLIDES.slice(0, 3).map((slide) => slide.title)
+
+    expect(JSON.stringify(titles)).toBe(
+      JSON.stringify(['Fable 5.1', 'GPT-6 Astra', 'Grok 4.6'])
+    )
   })
 
   it('does not advertise superseded model versions in hero content', () => {
     const heroContent = JSON.stringify(HERO_SLIDES.slice(0, 3))
 
-    expect(heroContent).not.toContain('Claude Opus 5')
-    expect(heroContent).not.toContain('GPT 5.6')
-    expect(heroContent).not.toContain('Grok 4.5')
+    expect(heroContent.includes('Claude Opus 5')).toBe(false)
+    expect(heroContent.includes('GPT 5.6')).toBe(false)
+    expect(heroContent.includes('Grok 4.5')).toBe(false)
   })
 })

@@ -32,66 +32,11 @@ import {
   IconGemini,
   IconOpenAI,
 } from '../model-brand-icons'
+import { HERO_SLIDES } from './hero-content'
 
 interface HeroProps {
   className?: string
 }
-
-const HERO_SLIDES = [
-  {
-    eyebrow: 'Frontier Reasoning',
-    title: 'Claude Opus 5',
-    description:
-      'Frontier intelligence near Fable 5 at half the price, making top-tier coding and complex reasoning your everyday workhorse.',
-    primary: 'View model',
-    secondary: 'API docs',
-    href: '/market',
-    tone: 'from-orange-100 via-amber-50 to-stone-100',
-    backgroundImage: '/images/hero/tokone-hero-slide-1.webp',
-    tags: ['Claude Opus 5', 'Advanced reasoning', 'Coding', 'Agents'],
-  },
-  {
-    eyebrow: 'Flagship',
-    title: 'GPT 5.6',
-    description:
-      'The latest flagship family with stronger reasoning, coding, and agentic workflows.',
-    primary: 'View model',
-    secondary: 'API docs',
-    href: '/market',
-    tone: 'from-blue-100 via-cyan-50 to-stone-100',
-    backgroundImage: '/images/hero/tokone-hero-slide-2.webp',
-    tags: ['GPT 5.6 Sol', 'GPT 5.6 Terra', 'GPT 5.6 Luna'],
-  },
-  {
-    eyebrow: 'Creative',
-    title: 'Grok 4.5',
-    description:
-      'Fast multimodal understanding and generation with real-time knowledge, through one unified API.',
-    primary: 'View model',
-    secondary: 'Pricing',
-    href: '/market',
-    tone: 'from-fuchsia-100 via-rose-50 to-stone-100',
-    backgroundImage: '/images/hero/tokone-hero-slide-3.webp',
-    tags: ['Multimodal', 'Real-time knowledge', 'Vision', 'Stable routing'],
-  },
-  {
-    eyebrow: 'Model Access',
-    title: 'Ready to unify access to AI models?',
-    description:
-      'Use one compatible API to connect models, billing, routing, and operations.',
-    primary: 'View models',
-    secondary: 'API docs',
-    href: '/market',
-    tone: 'from-emerald-100 via-cyan-50 to-stone-100',
-    backgroundImage: '/images/hero/tokone-hero-slide-4.webp',
-    tags: [
-      'OpenAI compatible',
-      'Transparent Billing',
-      'Stable routing',
-      'Model Access',
-    ],
-  },
-]
 
 const HERO_BACKGROUND_IMAGES = HERO_SLIDES.map((slide) => slide.backgroundImage)
 
