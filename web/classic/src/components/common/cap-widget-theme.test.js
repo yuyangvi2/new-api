@@ -57,6 +57,8 @@ describe('classic Cap widget theme', () => {
       'var(--semi-color-focus-border)',
     );
     expect(hostProperties.get('--cap-widget-width')).toBe('100%');
+    expect(hostProperties.get('display')).toBe('block');
+    expect(hostProperties.get('width')).toBe('100%');
     expect(styleAttributes.has('data-new-api-cap-theme')).toBe(true);
     expect(injectedStyle?.textContent).toBe(
       '.credits { color: var(--cap-credits-color) !important; }',

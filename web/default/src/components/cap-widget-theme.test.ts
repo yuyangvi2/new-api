@@ -55,6 +55,8 @@ describe('default Cap widget theme', () => {
     expect(hostProperties.get('--cap-color')).toBe('var(--foreground)')
     expect(hostProperties.get('--cap-focus-ring')).toBe('var(--ring)')
     expect(hostProperties.get('--cap-widget-width')).toBe('100%')
+    expect(hostProperties.get('display')).toBe('block')
+    expect(hostProperties.get('width')).toBe('100%')
     expect(styleAttributes.has('data-new-api-cap-theme')).toBe(true)
     expect(injectedStyles.length).toBe(1)
     expect(injectedStyles[0]?.textContent).toBe(
