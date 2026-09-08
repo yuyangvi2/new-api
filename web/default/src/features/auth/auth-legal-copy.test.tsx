@@ -16,10 +16,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { describe, expect, it, mock } from 'bun:test'
+import * as bunTest from 'bun:test'
 
 import type { ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+
+const { describe, expect, it } = bunTest
+const mock = (
+  bunTest as unknown as {
+    mock: { module: (specifier: string, factory: () => unknown) => void }
+  }
+).mock
 
 mock.module('@tanstack/react-router', () => ({
   Link: (props: { children: ReactNode }) => <a>{props.children}</a>,
