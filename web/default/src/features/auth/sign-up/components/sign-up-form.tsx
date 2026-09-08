@@ -39,12 +39,14 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { register, wechatLoginByCode } from '@/features/auth/api'
+import { AuthDivider } from '@/features/auth/components/auth-divider'
 import { LegalConsent } from '@/features/auth/components/legal-consent'
 import { OAuthProviders } from '@/features/auth/components/oauth-providers'
 import { registerFormSchema } from '@/features/auth/constants'
 import { useAuthRedirect } from '@/features/auth/hooks/use-auth-redirect'
 import { useBotProtection } from '@/features/auth/hooks/use-bot-protection'
 import { useEmailVerification } from '@/features/auth/hooks/use-email-verification'
+import { hasOAuthProviders } from '@/features/auth/lib/oauth'
 import {
   getAffiliateCode,
   saveAffiliateCode,
@@ -105,6 +107,7 @@ export function SignUpForm({
     status?.oauth_register_enabled ??
     status?.data?.oauth_register_enabled ??
     true
+  const hasOAuthRegister = oauthRegisterEnabled && hasOAuthProviders(status)
   const hasWeChatLogin = Boolean(status?.wechat_login)
   const captchaReady = !botProtectionConfig.enabled || Boolean(captchaToken)
   let verificationButtonContent: ReactNode = t('Send code')
@@ -373,14 +376,18 @@ export function SignUpForm({
           {t('Create account')}
         </Button>
 
-        {oauthRegisterEnabled && (
-          <OAuthProviders
-            status={status}
-            disabled={isLoading || (requiresLegalConsent && !agreedToLegal)}
-            onWeChatLogin={hasWeChatLogin ? handleOpenWeChatDialog : undefined}
-            isWeChatLoading={isWeChatSubmitting}
-            className='pt-2'
-          />
+        {hasOAuthRegister && (
+          <>
+            <AuthDivider />
+            <OAuthProviders
+              status={status}
+              disabled={isLoading || (requiresLegalConsent && !agreedToLegal)}
+              onWeChatLogin={
+                hasWeChatLogin ? handleOpenWeChatDialog : undefined
+              }
+              isWeChatLoading={isWeChatSubmitting}
+            />
+          </>
         )}
       </form>
 

@@ -40,6 +40,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { login, wechatLoginByCode } from '@/features/auth/api'
+import { AuthDivider } from '@/features/auth/components/auth-divider'
 import { LegalConsent } from '@/features/auth/components/legal-consent'
 import { OAuthProviders } from '@/features/auth/components/oauth-providers'
 import { loginFormSchema } from '@/features/auth/constants'
@@ -285,9 +286,9 @@ export function UserAuthForm({
   }
 
   const alternativeLoginMethods = (
-    <>
+    <div className='flex flex-col gap-2'>
       {passkeyLoginEnabled && (
-        <div className='mt-2 space-y-1'>
+        <div className='space-y-1'>
           <Button
             type='button'
             variant='outline'
@@ -317,7 +318,7 @@ export function UserAuthForm({
         onWeChatLogin={hasWeChatLogin ? handleOpenWeChatDialog : undefined}
         isWeChatLoading={isWeChatSubmitting}
       />
-    </>
+    </div>
   )
 
   return (
@@ -413,16 +414,8 @@ export function UserAuthForm({
           />
         )}
 
-        {hasAlternativeLogin && (
-          <>
-            <div className='my-2 flex items-center gap-4'>
-              <div className='bg-border h-px flex-1' />
-              <span className='text-muted-foreground text-xs'>{t('or')}</span>
-              <div className='bg-border h-px flex-1' />
-            </div>
-            {alternativeLoginMethods}
-          </>
-        )}
+        {passwordLoginEnabled && hasAlternativeLogin && <AuthDivider />}
+        {hasAlternativeLogin && alternativeLoginMethods}
       </form>
 
       {hasWeChatLogin && (

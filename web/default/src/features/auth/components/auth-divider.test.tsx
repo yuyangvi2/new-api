@@ -17,15 +17,33 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, it } from 'bun:test'
+
+import { createInstance } from 'i18next'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { I18nextProvider, initReactI18next } from 'react-i18next'
 
 import { AuthDivider } from './auth-divider'
 
 describe('AuthDivider', () => {
-  it('renders one semantic divider with the alternative-login label', () => {
-    const markup = renderToStaticMarkup(<AuthDivider />)
+  it('renders one semantic divider with the localized alternative-login label', async () => {
+    const i18n = createInstance()
+    await i18n.use(initReactI18next).init({
+      lng: 'en',
+      resources: {
+        en: {
+          translation: {
+            'Or continue with': 'Continue another way',
+          },
+        },
+      },
+    })
+    const markup = renderToStaticMarkup(
+      <I18nextProvider i18n={i18n}>
+        <AuthDivider />
+      </I18nextProvider>
+    )
 
-    expect(markup.match(/data-slot="separator"/g)).toHaveLength(1)
-    expect(markup).toContain('Or continue with')
+    expect(markup.match(/data-slot="separator"/g)?.length).toBe(1)
+    expect(markup.includes('Continue another way')).toBe(true)
   })
 })

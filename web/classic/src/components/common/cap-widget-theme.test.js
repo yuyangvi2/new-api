@@ -18,32 +18,32 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, it } from 'bun:test';
 
-import {
-  applyCapWidgetTheme,
-  classicCapWidgetTheme,
-} from './cap-widget-theme';
+import { applyCapWidgetTheme, classicCapWidgetTheme } from './cap-widget-theme';
 
 describe('classic Cap widget theme', () => {
   it('uses Semi semantic colors and weakens only the attribution', () => {
     const hostProperties = new Map();
-    const creditProperties = new Map();
+    const styleAttributes = new Map();
+    let injectedStyle = null;
     const element = {
       style: {
         setProperty: (name, value) => hostProperties.set(name, value),
       },
       shadowRoot: {
-        querySelector: (selector) => {
-          if (selector !== '.credits') return null;
-          return {
-            style: {
-              setProperty: (name, value, priority) =>
-                creditProperties.set(name, [value, priority]),
-            },
-          };
+        querySelector: () => injectedStyle,
+        append: (node) => {
+          injectedStyle = node;
         },
+      },
+      ownerDocument: {
+        createElement: () => ({
+          textContent: null,
+          setAttribute: (name, value) => styleAttributes.set(name, value),
+        }),
       },
     };
 
+    applyCapWidgetTheme(element, classicCapWidgetTheme);
     applyCapWidgetTheme(element, classicCapWidgetTheme);
 
     expect(hostProperties.get('--cap-background')).toBe(
@@ -52,16 +52,14 @@ describe('classic Cap widget theme', () => {
     expect(hostProperties.get('--cap-border-color')).toBe(
       'var(--semi-color-border)',
     );
-    expect(hostProperties.get('--cap-color')).toBe(
-      'var(--semi-color-text-0)',
-    );
+    expect(hostProperties.get('--cap-color')).toBe('var(--semi-color-text-0)');
     expect(hostProperties.get('--cap-focus-ring')).toBe(
       'var(--semi-color-focus-border)',
     );
     expect(hostProperties.get('--cap-widget-width')).toBe('100%');
-    expect(creditProperties.get('color')).toEqual([
-      'var(--cap-credits-color)',
-      'important',
-    ]);
+    expect(styleAttributes.has('data-new-api-cap-theme')).toBe(true);
+    expect(injectedStyle?.textContent).toBe(
+      '.credits { color: var(--cap-credits-color) !important; }',
+    );
   });
 });

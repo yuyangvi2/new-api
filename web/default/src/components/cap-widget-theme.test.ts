@@ -18,15 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, it } from 'bun:test'
 
-import {
-  applyCapWidgetTheme,
-  defaultCapWidgetTheme,
-} from './cap-widget-theme'
+import { applyCapWidgetTheme, defaultCapWidgetTheme } from './cap-widget-theme'
 
 describe('default Cap widget theme', () => {
   it('uses application semantic colors and weakens only the attribution', () => {
     const hostProperties = new Map<string, string>()
-    const creditProperties = new Map<string, [string, string | undefined]>()
+    const styleAttributes = new Map<string, string>()
+    const injectedStyles: Array<{ textContent: string | null }> = []
     const element = {
       style: {
         setProperty: (name: string, value: string) => {
@@ -34,19 +32,22 @@ describe('default Cap widget theme', () => {
         },
       },
       shadowRoot: {
-        querySelector: (selector: string) => {
-          if (selector !== '.credits') return null
-          return {
-            style: {
-              setProperty: (name: string, value: string, priority?: string) => {
-                creditProperties.set(name, [value, priority])
-              },
-            },
-          }
+        querySelector: () => injectedStyles[0] ?? null,
+        append: (node: { textContent: string | null }) => {
+          injectedStyles.push(node)
         },
+      },
+      ownerDocument: {
+        createElement: () => ({
+          textContent: null,
+          setAttribute: (name: string, value: string) => {
+            styleAttributes.set(name, value)
+          },
+        }),
       },
     } as unknown as HTMLElement
 
+    applyCapWidgetTheme(element, defaultCapWidgetTheme)
     applyCapWidgetTheme(element, defaultCapWidgetTheme)
 
     expect(hostProperties.get('--cap-background')).toBe('var(--background)')
@@ -54,9 +55,10 @@ describe('default Cap widget theme', () => {
     expect(hostProperties.get('--cap-color')).toBe('var(--foreground)')
     expect(hostProperties.get('--cap-focus-ring')).toBe('var(--ring)')
     expect(hostProperties.get('--cap-widget-width')).toBe('100%')
-    expect(creditProperties.get('color')).toEqual([
-      'var(--cap-credits-color)',
-      'important',
-    ])
+    expect(styleAttributes.has('data-new-api-cap-theme')).toBe(true)
+    expect(injectedStyles.length).toBe(1)
+    expect(injectedStyles[0]?.textContent).toBe(
+      '.credits { color: var(--cap-credits-color) !important; }'
+    )
   })
 })

@@ -21,7 +21,9 @@ import { useTranslation } from 'react-i18next'
 
 import { buildCapEndpoint } from '@/features/auth/lib/bot-protection'
 import type { BotProtectionConfig } from '@/features/auth/types'
+import { cn } from '@/lib/utils'
 
+import { applyCapWidgetTheme, defaultCapWidgetTheme } from './cap-widget-theme'
 import { Turnstile } from './turnstile'
 
 declare global {
@@ -98,7 +100,9 @@ function CapProtection(props: BotProtectionProps) {
         element.addEventListener('solve', handleSolve)
         element.addEventListener('reset', handleReset)
         element.addEventListener('error', handleReset)
+        applyCapWidgetTheme(element, defaultCapWidgetTheme)
         container.replaceChildren(element)
+        applyCapWidgetTheme(element, defaultCapWidgetTheme)
       })
       .catch(() => {
         if (!disposed) setLoadFailed(true)
@@ -123,5 +127,5 @@ function CapProtection(props: BotProtectionProps) {
     )
   }
 
-  return <div ref={containerRef} className={props.className} />
+  return <div ref={containerRef} className={cn('w-full', props.className)} />
 }

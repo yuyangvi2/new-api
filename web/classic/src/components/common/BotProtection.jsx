@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 import Turnstile from 'react-turnstile';
 
 import { buildCapEndpoint } from './bot-protection';
+import { applyCapWidgetTheme, classicCapWidgetTheme } from './cap-widget-theme';
 
 const BotProtection = ({ config, onVerify, onExpire, className }) => {
   if (!config.enabled) return null;
@@ -89,7 +90,9 @@ const CapProtection = ({ config, onVerify, onExpire, className }) => {
         element.addEventListener('solve', handleSolve);
         element.addEventListener('reset', handleReset);
         element.addEventListener('error', handleReset);
+        applyCapWidgetTheme(element, classicCapWidgetTheme);
         container.replaceChildren(element);
+        applyCapWidgetTheme(element, classicCapWidgetTheme);
       })
       .catch(() => {
         if (!disposed) setLoadFailed(true);
@@ -114,7 +117,12 @@ const CapProtection = ({ config, onVerify, onExpire, className }) => {
     );
   }
 
-  return <div ref={containerRef} className={className} />;
+  return (
+    <div
+      ref={containerRef}
+      className={['w-full', className].filter(Boolean).join(' ')}
+    />
+  );
 };
 
 export default BotProtection;
