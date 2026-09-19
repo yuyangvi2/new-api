@@ -101,6 +101,9 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 	if err != nil {
 		return service.TaskErrorWrapperLocal(err, "invalid_request", http.StatusBadRequest)
 	}
+	if len(req.Images) > 1 {
+		return service.TaskErrorWrapperLocal(fmt.Errorf("xAI video generation supports at most one image"), "invalid_image_count", http.StatusBadRequest)
+	}
 	if req.Model == "grok-imagine-video-1.5" && !req.HasImage() {
 		return service.TaskErrorWrapperLocal(fmt.Errorf("image is required for grok-imagine-video-1.5"), "missing_image", http.StatusBadRequest)
 	}
@@ -168,14 +171,12 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	if req.AspectRatio != "" {
 		body["aspect_ratio"] = req.AspectRatio
 	}
-	if req.Image != "" {
-		body["image"] = req.Image
-	}
 	if len(req.Images) > 0 {
-		body["images"] = req.Images
+		body["image"] = map[string]string{"url": req.Images[0]}
 	}
 	for key, value := range req.Metadata {
-		if key == "size" || key == "model" || key == "prompt" {
+		switch key {
+		case "size", "model", "prompt", "image", "images", "reference_images":
 			continue
 		}
 		body[key] = value

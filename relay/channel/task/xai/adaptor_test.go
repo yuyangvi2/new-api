@@ -35,6 +35,26 @@ func TestValidateRequestRequiresImageForGrokImagineVideo15(t *testing.T) {
 	assert.True(t, taskErr.LocalError)
 }
 
+func TestValidateRequestRejectsMultipleImages(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(
+		http.MethodPost,
+		"/v1/videos/generations",
+		strings.NewReader(`{"model":"grok-imagine-video","prompt":"animate","images":["https://example.com/a.png","https://example.com/b.png"]}`),
+	)
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	taskErr := (&TaskAdaptor{}).ValidateRequestAndSetAction(c, &relaycommon.RelayInfo{
+		TaskRelayInfo: &relaycommon.TaskRelayInfo{},
+	})
+
+	require.NotNil(t, taskErr)
+	assert.Equal(t, "invalid_image_count", taskErr.Code)
+	assert.Equal(t, http.StatusBadRequest, taskErr.StatusCode)
+	assert.True(t, taskErr.LocalError)
+}
+
 func TestEstimateBillingUsesDurationResolutionAndInputImage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
@@ -82,6 +102,8 @@ func TestBuildRequestBodyPreservesTopLevelResolutionAndAspectRatio(t *testing.T)
 	require.NoError(t, common.Unmarshal(body, &payload))
 	assert.Equal(t, "1080p", payload["resolution"])
 	assert.Equal(t, "16:9", payload["aspect_ratio"])
+	assert.Equal(t, map[string]any{"url": "https://example.com/a.png"}, payload["image"])
+	assert.NotContains(t, payload, "images")
 	assert.InDelta(t, 15.75, ratios["xai_imagine_price"], 0.000001)
 }
 
