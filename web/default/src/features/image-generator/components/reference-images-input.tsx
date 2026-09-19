@@ -16,43 +16,87 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useRef, useState } from 'react'
 import { UploadIcon, XIcon } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+
 import { Input } from '@/components/ui/input'
+
+import { uploadReferenceMedia } from '../api'
 import { MAX_IMAGE_UPLOAD_BYTES, MAX_REFERENCE_IMAGES } from '../constants'
 
 interface ReferenceImagesInputProps {
   images: string[]
   onChange: (images: string[]) => void
+  onUploadingChange?: (isUploading: boolean) => void
   disabled?: boolean
+  maxImages?: number
+  uploadFiles?: boolean
+  allowedMimeTypes?: readonly string[]
 }
 
 export function ReferenceImagesInput({
   images,
   onChange,
+  onUploadingChange,
   disabled,
+  maxImages = MAX_REFERENCE_IMAGES,
+  uploadFiles = false,
+  allowedMimeTypes,
 }: ReferenceImagesInputProps) {
   const { t } = useTranslation()
   const fileRef = useRef<HTMLInputElement>(null)
+  const uploadControllerRef = useRef<AbortController | null>(null)
+  const uploadingChangeRef = useRef(onUploadingChange)
+  uploadingChangeRef.current = onUploadingChange
+  const latestPropsRef = useRef({ images, maxImages, onChange, disabled })
+  latestPropsRef.current = { images, maxImages, onChange, disabled }
   const [urlText, setUrlText] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
 
-  const canAdd = images.length < MAX_REFERENCE_IMAGES && !disabled
+  useEffect(() => {
+    return () => {
+      const controller = uploadControllerRef.current
+      uploadControllerRef.current = null
+      controller?.abort()
+      uploadingChangeRef.current?.(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (uploadFiles || !uploadControllerRef.current) return
+
+    const controller = uploadControllerRef.current
+    uploadControllerRef.current = null
+    controller.abort()
+    setIsUploading(false)
+    uploadingChangeRef.current?.(false)
+  }, [uploadFiles])
+
+  const canAdd = images.length < maxImages && !disabled && !isUploading
 
   const addImage = (src: string) => {
-    if (images.length >= MAX_REFERENCE_IMAGES) {
-      toast.error(t('Maximum {{count}} reference images', { count: MAX_REFERENCE_IMAGES }))
+    const latest = latestPropsRef.current
+    if (latest.images.includes(src)) return
+    if (latest.disabled || latest.images.length >= latest.maxImages) {
+      if (!latest.disabled) {
+        toast.error(
+          t('Maximum {{count}} reference images', {
+            count: latest.maxImages,
+          })
+        )
+      }
       return
     }
-    onChange([...images, src])
+    latest.onChange([...latest.images, src])
   }
 
-  const removeImage = (index: number) => {
-    onChange(images.filter((_, i) => i !== index))
+  const removeImage = (src: string) => {
+    onChange(images.filter((image) => image !== src))
   }
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
@@ -60,15 +104,52 @@ export function ReferenceImagesInput({
       toast.error(t('Please choose an image file'))
       return
     }
+    if (
+      allowedMimeTypes &&
+      !allowedMimeTypes.includes(file.type.toLowerCase())
+    ) {
+      toast.error(t('Tencent VOD supports JPEG, PNG, and WebP images only'))
+      return
+    }
     if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
       toast.error(t('Image is too large (max 10MB)'))
       return
     }
-    const reader = new FileReader()
-    reader.onload = () => {
-      addImage(String(reader.result))
+    if (uploadFiles) {
+      const controller = new AbortController()
+      uploadControllerRef.current = controller
+      setIsUploading(true)
+      uploadingChangeRef.current?.(true)
+      try {
+        const uploadedURL = await uploadReferenceMedia(
+          file,
+          'image',
+          controller.signal
+        )
+        if (!controller.signal.aborted) {
+          addImage(uploadedURL)
+        }
+      } catch (error: unknown) {
+        if (controller.signal.aborted) return
+        const message =
+          error instanceof Error ? error.message : t('Upload failed')
+        toast.error(message)
+      } finally {
+        if (uploadControllerRef.current === controller) {
+          uploadControllerRef.current = null
+          setIsUploading(false)
+          uploadingChangeRef.current?.(false)
+        }
+      }
+      return
     }
-    reader.onerror = () => toast.error(t('Failed to read the image'))
+    const reader = new FileReader()
+    reader.addEventListener('load', () => {
+      addImage(String(reader.result))
+    })
+    reader.addEventListener('error', () => {
+      toast.error(t('Failed to read the image'))
+    })
     reader.readAsDataURL(file)
   }
 
@@ -98,12 +179,12 @@ export function ReferenceImagesInput({
             onBlur={commitUrl}
             onKeyDown={handleKeyDown}
             placeholder={t('Paste image URL')}
-            disabled={disabled}
+            disabled={disabled || isUploading}
             className='pr-9'
           />
           <button
             type='button'
-            disabled={disabled}
+            disabled={disabled || isUploading}
             onClick={() => fileRef.current?.click()}
             className='text-muted-foreground hover:text-foreground absolute right-1.5 rounded-md p-1 transition-colors disabled:opacity-50'
             aria-label={t('Upload image')}
@@ -116,20 +197,22 @@ export function ReferenceImagesInput({
       {/* Image previews */}
       {images.length > 0 && (
         <div className='grid grid-cols-3 gap-2'>
-          {images.map((src, i) => (
+          {[...new Set(images)].map((src) => (
             <div
-              key={i}
+              key={src}
               className='bg-muted/40 relative overflow-hidden rounded-lg border'
             >
               <img
                 src={src}
-                alt={t('Reference image {{index}}', { index: i + 1 })}
+                alt={t('Reference image {{index}}', {
+                  index: images.indexOf(src) + 1,
+                })}
                 className='aspect-square w-full object-cover'
               />
               {!disabled && (
                 <button
                   type='button'
-                  onClick={() => removeImage(i)}
+                  onClick={() => removeImage(src)}
                   className='bg-background/80 hover:bg-background absolute top-1 right-1 rounded-full border p-0.5 transition-colors'
                   aria-label={t('Remove image')}
                 >
@@ -144,7 +227,7 @@ export function ReferenceImagesInput({
       <p className='text-muted-foreground text-xs'>
         {t('{{current}}/{{max}} reference images (optional)', {
           current: images.length,
-          max: MAX_REFERENCE_IMAGES,
+          max: maxImages,
         })}
       </p>
 
@@ -152,7 +235,7 @@ export function ReferenceImagesInput({
       <input
         ref={fileRef}
         type='file'
-        accept='image/*'
+        accept={allowedMimeTypes?.join(',') ?? 'image/*'}
         className='hidden'
         onChange={handleFile}
       />

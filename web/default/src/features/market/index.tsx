@@ -42,6 +42,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { CurrencyToggle } from '@/components/currency-toggle'
+import { ErrorState } from '@/components/error-state'
 import { PublicLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -53,6 +54,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Tooltip,
   TooltipContent,
@@ -80,7 +82,6 @@ import {
 } from '../pricing/lib/price'
 import { buildSeedanceOfficialPriceEntries } from '../pricing/lib/seedance-official-pricing'
 import {
-  FALLBACK_MODELS,
   inferKind,
   marketKindLabelKey,
   splitTags,
@@ -414,10 +415,7 @@ function getCurrentMinutes(timeZone: string): number | null {
   }
 }
 
-function getPricingPeriodLabel(
-  t: TFunction,
-  name: string
-): string {
+function getPricingPeriodLabel(t: TFunction, name: string): string {
   if (name === 'peak') return t('Peak')
   if (name === 'off_peak') return t('Off-peak')
   return name
@@ -849,7 +847,7 @@ function MarketPricePanel(props: {
     <Tooltip>
       <TooltipTrigger
         render={
-          <div className='bg-muted/30 hover:bg-muted/40 h-[124px] overflow-hidden rounded-2xl border p-3 text-left transition-colors' />
+          <div className='border-border/80 bg-muted/35 hover:bg-muted/45 h-[124px] overflow-hidden rounded-2xl border p-3 text-left shadow-sm transition-colors' />
         }
       >
         <div className='mb-2 flex items-center justify-between'>
@@ -948,7 +946,7 @@ function MarketModelCard(props: {
   }
 
   return (
-    <article className='group bg-card hover:border-brand/35 border-border/70 flex h-[360px] min-w-0 flex-col rounded-[22px] border p-4 shadow-[0_14px_36px_rgba(15,23,42,0.07)] transition-all duration-200 hover:shadow-[0_18px_44px_rgba(15,23,42,0.1)] dark:shadow-[0_14px_36px_rgba(0,0,0,0.24)] dark:hover:shadow-[0_18px_44px_rgba(0,0,0,0.32)]'>
+    <article className='group bg-card hover:border-brand/35 border-border/70 flex h-[380px] min-w-0 flex-col rounded-[22px] border p-4 shadow-[0_14px_36px_rgba(15,23,42,0.07)] transition-all duration-200 hover:shadow-[0_18px_44px_rgba(15,23,42,0.1)] dark:shadow-[0_14px_36px_rgba(0,0,0,0.24)] dark:hover:shadow-[0_18px_44px_rgba(0,0,0,0.32)]'>
       <div className='flex min-w-0 items-start gap-3'>
         <div className='text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-xl border bg-transparent'>
           {modelIcon || <span className='text-base font-bold'>{initial}</span>}
@@ -1002,7 +1000,7 @@ function MarketModelCard(props: {
         </div>
       </div>
 
-      <p className='text-muted-foreground mt-3 line-clamp-3 min-h-[54px] text-xs leading-[18px]'>
+      <p className='text-muted-foreground mt-3 line-clamp-4 min-h-[72px] text-xs leading-[18px]'>
         {model.description || t('No description available.')}
       </p>
 
@@ -1023,7 +1021,7 @@ function MarketModelCard(props: {
         ) : null}
       </div>
 
-      <div className='mt-auto shrink-0 pt-3'>
+      <div className='mt-3 shrink-0'>
         <MarketPricePanel
           model={model}
           priceRate={props.priceRate}
@@ -1130,6 +1128,42 @@ function MarketSidebar(props: {
   )
 }
 
+function MarketLoadingSkeleton() {
+  return (
+    <>
+      <aside className='bg-card/92 rounded-2xl border p-4 shadow-sm'>
+        <Skeleton className='h-5 w-24' />
+        <div className='mt-3 grid gap-2'>
+          {Array.from({ length: 5 }, (_, index) => (
+            <Skeleton key={index} className='h-9 rounded-xl' />
+          ))}
+        </div>
+        <Skeleton className='mt-5 h-5 w-20' />
+        <div className='mt-3 grid gap-2'>
+          {Array.from({ length: 5 }, (_, index) => (
+            <Skeleton key={index} className='h-9 rounded-xl' />
+          ))}
+        </div>
+      </aside>
+
+      <div className='bg-card/92 rounded-2xl border p-3 shadow-sm sm:rounded-3xl sm:p-4 md:p-5'>
+        <div className='bg-background/65 space-y-4 rounded-2xl border p-3 sm:p-4'>
+          <div className='flex items-center justify-between gap-3'>
+            <Skeleton className='h-7 w-36' />
+            <Skeleton className='h-9 w-48 rounded-full' />
+          </div>
+          <Skeleton className='h-11 w-full rounded-full' />
+        </div>
+        <div className='mt-4 grid auto-rows-fr gap-4 xl:grid-cols-2 2xl:grid-cols-3'>
+          {Array.from({ length: 6 }, (_, index) => (
+            <Skeleton key={index} className='h-[380px] rounded-[22px]' />
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
 export function Market() {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
@@ -1141,9 +1175,7 @@ export function Market() {
   const pricing = usePricingData()
 
   const models = useMemo<IndexedMarketModel[]>(() => {
-    const source = pricing.models.length > 0 ? pricing.models : FALLBACK_MODELS
-
-    return source
+    return pricing.models
       .map((model) => {
         const marketKind = inferKind(model)
         return {
@@ -1262,130 +1294,159 @@ export function Market() {
           </p>
         </section>
 
-        <section className='mt-5 grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]'>
-          <MarketSidebar
-            kindCounts={marketSummary.kindCounts}
-            vendors={marketSummary.vendors}
-            providerScopeCount={marketSummary.providerScopeCount}
-            activeVendor={activeVendor}
-            activeKind={activeKind}
-            onKindChange={setActiveKind}
-            onVendorChange={setActiveVendor}
-          />
+        <section
+          className='mt-5 grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]'
+          aria-busy={pricing.isLoading}
+        >
+          {pricing.isLoading ? (
+            <MarketLoadingSkeleton />
+          ) : (
+            <>
+              <MarketSidebar
+                kindCounts={marketSummary.kindCounts}
+                vendors={marketSummary.vendors}
+                providerScopeCount={marketSummary.providerScopeCount}
+                activeVendor={activeVendor}
+                activeKind={activeKind}
+                onKindChange={setActiveKind}
+                onVendorChange={setActiveVendor}
+              />
 
-          <div className='bg-card/92 rounded-2xl border p-3 shadow-sm sm:rounded-3xl sm:p-4 md:p-5'>
-            <div className='bg-background/65 space-y-4 rounded-2xl border p-3 sm:p-4'>
-              <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-                <h2 className='text-lg font-bold'>{t('Available models')}</h2>
-                <div className='flex items-center gap-2'>
-                  <CurrencyToggle />
-                  <Select
-                    value={sortBy}
-                    onValueChange={(value) => {
-                      if (value !== null) {
-                        setSortBy(value as MarketSortOption)
-                      }
-                    }}
-                  >
-                    <SelectTrigger
-                      className='bg-card h-9 w-full rounded-full sm:w-[190px]'
-                      aria-label={t('Sort')}
-                    >
-                      <SelectValue>
-                        {t(
-                          MARKET_SORT_OPTIONS.find(
-                            (option) => option.value === sortBy
-                          )?.label ?? 'Recommended'
-                        )}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent alignItemWithTrigger={false}>
-                      {MARKET_SORT_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {t(option.label)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className='relative'>
-                <div className='relative'>
-                  <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2' />
-                  <Input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder={t('Search model, task, or provider')}
-                    className='bg-card h-11 rounded-full pr-4 pl-9'
+              <div className='bg-card/92 rounded-2xl border p-3 shadow-sm sm:rounded-3xl sm:p-4 md:p-5'>
+                {pricing.error && models.length === 0 ? (
+                  <ErrorState
+                    title={t('Failed to load models')}
+                    description={t('Please try again later.')}
+                    onRetry={() => void pricing.refetch()}
+                    className='min-h-[420px]'
                   />
-                </div>
-              </div>
-            </div>
+                ) : (
+                  <>
+                    <div className='bg-background/65 space-y-4 rounded-2xl border p-3 sm:p-4'>
+                      <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+                        <h2 className='text-lg font-bold'>
+                          {t('Available models')}
+                        </h2>
+                        <div className='flex items-center gap-2'>
+                          <CurrencyToggle />
+                          <Select
+                            value={sortBy}
+                            onValueChange={(value) => {
+                              if (value !== null) {
+                                setSortBy(value as MarketSortOption)
+                              }
+                            }}
+                          >
+                            <SelectTrigger
+                              className='bg-card h-9 w-full rounded-full sm:w-[190px]'
+                              aria-label={t('Sort')}
+                            >
+                              <SelectValue>
+                                {t(
+                                  MARKET_SORT_OPTIONS.find(
+                                    (option) => option.value === sortBy
+                                  )?.label ?? 'Recommended'
+                                )}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent alignItemWithTrigger={false}>
+                              {MARKET_SORT_OPTIONS.map((option) => (
+                                <SelectItem
+                                  key={option.value}
+                                  value={option.value}
+                                >
+                                  {t(option.label)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
 
-            <div className='mt-4 grid auto-rows-fr gap-4 xl:grid-cols-2 2xl:grid-cols-3'>
-              {pagedModels.map((model) => (
-                <MarketModelCard
-                  key={model.model_name}
-                  model={model}
-                  priceRate={pricing.priceRate}
-                  usdExchangeRate={pricing.usdExchangeRate}
-                />
-              ))}
-            </div>
+                      <div className='relative'>
+                        <div className='relative'>
+                          <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2' />
+                          <Input
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder={t('Search model, task, or provider')}
+                            className='bg-card h-11 rounded-full pr-4 pl-9'
+                          />
+                        </div>
+                      </div>
+                    </div>
 
-            {filteredModels.length === 0 && (
-              <div className='text-muted-foreground flex min-h-48 items-center justify-center text-sm'>
-                {t('No models match your current filters.')}
-              </div>
-            )}
+                    <div className='mt-4 grid auto-rows-fr gap-4 xl:grid-cols-2 2xl:grid-cols-3'>
+                      {pagedModels.map((model) => (
+                        <MarketModelCard
+                          key={model.model_name}
+                          model={model}
+                          priceRate={pricing.priceRate}
+                          usdExchangeRate={pricing.usdExchangeRate}
+                        />
+                      ))}
+                    </div>
 
-            {filteredModels.length > 0 && (
-              <div className='mt-5 flex flex-col items-center justify-between gap-3 border-t pt-4 text-sm sm:flex-row'>
-                <p className='text-muted-foreground'>
-                  {t('Showing {{start}}-{{end}} of {{total}} models', {
-                    start: displayStart,
-                    end: displayEnd,
-                    total: filteredModels.length,
-                  })}
-                </p>
-                {totalPages > 1 && (
-                  <div className='flex items-center gap-2'>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      size='sm'
-                      onClick={() =>
-                        setPage((current) => Math.max(1, current - 1))
-                      }
-                      disabled={currentPage <= 1}
-                    >
-                      <ChevronLeft className='size-4' />
-                      {t('Previous page')}
-                    </Button>
-                    <span className='text-muted-foreground px-1 text-xs'>
-                      {t('Page {{current}} of {{total}}', {
-                        current: currentPage,
-                        total: totalPages,
-                      })}
-                    </span>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      size='sm'
-                      onClick={() =>
-                        setPage((current) => Math.min(totalPages, current + 1))
-                      }
-                      disabled={currentPage >= totalPages}
-                    >
-                      {t('Next page')}
-                      <ChevronRight className='size-4' />
-                    </Button>
-                  </div>
+                    {filteredModels.length === 0 && (
+                      <div className='text-muted-foreground flex min-h-48 items-center justify-center text-sm'>
+                        {models.length === 0
+                          ? t('No models available')
+                          : t('No models match your current filters.')}
+                      </div>
+                    )}
+
+                    {filteredModels.length > 0 && (
+                      <div className='mt-5 flex flex-col items-center justify-between gap-3 border-t pt-4 text-sm sm:flex-row'>
+                        <p className='text-muted-foreground'>
+                          {t('Showing {{start}}-{{end}} of {{total}} models', {
+                            start: displayStart,
+                            end: displayEnd,
+                            total: filteredModels.length,
+                          })}
+                        </p>
+                        {totalPages > 1 && (
+                          <div className='flex items-center gap-2'>
+                            <Button
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              onClick={() =>
+                                setPage((current) => Math.max(1, current - 1))
+                              }
+                              disabled={currentPage <= 1}
+                            >
+                              <ChevronLeft className='size-4' />
+                              {t('Previous page')}
+                            </Button>
+                            <span className='text-muted-foreground px-1 text-xs'>
+                              {t('Page {{current}} of {{total}}', {
+                                current: currentPage,
+                                total: totalPages,
+                              })}
+                            </span>
+                            <Button
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              onClick={() =>
+                                setPage((current) =>
+                                  Math.min(totalPages, current + 1)
+                                )
+                              }
+                              disabled={currentPage >= totalPages}
+                            >
+                              {t('Next page')}
+                              <ChevronRight className='size-4' />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </section>
       </main>
     </PublicLayout>

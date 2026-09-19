@@ -68,6 +68,8 @@ func SetRelayRouter(router *gin.Engine) {
 	{
 		playgroundRouter.POST("/chat/completions", controller.Playground)
 		playgroundRouter.POST("/images/generations", controller.Playground)
+		playgroundRouter.POST("/images/tasks", controller.PlaygroundTask)
+		playgroundRouter.GET("/images/tasks/:task_id", controller.PlaygroundTaskFetch)
 		playgroundRouter.POST("/video/generations", controller.PlaygroundTask)
 		playgroundRouter.GET("/video/generations/:task_id", controller.PlaygroundTaskFetch)
 	}
@@ -120,6 +122,8 @@ func SetRelayRouter(router *gin.Engine) {
 		httpRouter.POST("/images/edits", func(c *gin.Context) {
 			controller.Relay(c, types.RelayFormatOpenAIImage)
 		})
+		httpRouter.POST("/images/tasks", controller.RelayTask)
+		httpRouter.GET("/images/tasks/:task_id", controller.RelayTaskFetch)
 
 		// embedding related routes
 		httpRouter.POST("/embeddings", func(c *gin.Context) {

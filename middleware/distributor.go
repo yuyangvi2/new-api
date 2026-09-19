@@ -67,6 +67,10 @@ func Distribute() func(c *gin.Context) {
 				abortWithOpenAiMessage(c, http.StatusNotFound, i18n.T(c, i18n.MsgDistributorModelNotAvailable), types.ErrorCodeModelNotFound)
 				return
 			}
+			if !channelSupportsRequestPath(channel, c.Request.URL.Path) {
+				abortWithOpenAiMessage(c, http.StatusNotFound, i18n.T(c, i18n.MsgDistributorModelNotAvailable), types.ErrorCodeModelNotFound)
+				return
+			}
 		} else {
 			// Select a channel for the user
 			// check token model mapping
@@ -100,6 +104,7 @@ func Distribute() func(c *gin.Context) {
 				// check path is a playground request (chat / image / video)
 				if strings.HasPrefix(c.Request.URL.Path, "/pg/chat/completions") ||
 					strings.HasPrefix(c.Request.URL.Path, "/pg/images/generations") ||
+					strings.HasPrefix(c.Request.URL.Path, "/pg/images/tasks") ||
 					strings.HasPrefix(c.Request.URL.Path, "/pg/video/generations") {
 					playgroundRequest := &dto.PlayGroundRequest{}
 					err = common.UnmarshalBodyReusable(c, playgroundRequest)
@@ -195,6 +200,7 @@ func Distribute() func(c *gin.Context) {
 
 func shouldAutoResolvePlaygroundGroup(path string) bool {
 	return strings.HasPrefix(path, "/pg/images/generations") ||
+		strings.HasPrefix(path, "/pg/images/tasks") ||
 		strings.HasPrefix(path, "/pg/video/generations")
 }
 
@@ -235,11 +241,13 @@ func groupSupportsModel(group, modelName string) bool {
 	return false
 }
 
-// channelSupportsRequestPath reports whether a channel can serve the request path.
-// Only Advanced Custom (type 58) channels are path-checked; all other channel types
-// always pass. A type-58 channel is usable only when one of its routes matches.
+// channelSupportsRequestPath checks built-in endpoint capabilities and Advanced
+// Custom route configuration.
 func channelSupportsRequestPath(channel *model.Channel, requestPath string) bool {
 	if channel == nil {
+		return false
+	}
+	if !constant.ChannelTypeSupportsRelayPath(channel.Type, requestPath) {
 		return false
 	}
 	if channel.Type != constant.ChannelTypeAdvancedCustom {
@@ -384,6 +392,22 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 			if c.Param("task_id") == "" && strings.HasPrefix(c.Request.URL.Path, "/v1/query/video_generation") {
 				c.Set("task_id", c.Query("task_id"))
 			}
+			modelRequest.Model = getTaskOriginModelName(c)
+		}
+		c.Set("relay_mode", relayMode)
+	} else if strings.HasPrefix(c.Request.URL.Path, "/v1/images/tasks") ||
+		strings.HasPrefix(c.Request.URL.Path, "/pg/images/tasks") {
+		relayMode := relayconstant.RelayModeUnknown
+		if c.Request.Method == http.MethodPost {
+			req, err := getModelFromRequest(c)
+			if err != nil {
+				return nil, false, err
+			}
+			modelRequest.Model = req.Model
+			relayMode = relayconstant.RelayModeImageTaskSubmit
+		} else if c.Request.Method == http.MethodGet {
+			relayMode = relayconstant.RelayModeImageTaskFetchByID
+			shouldSelectChannel = false
 			modelRequest.Model = getTaskOriginModelName(c)
 		}
 		c.Set("relay_mode", relayMode)

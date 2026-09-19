@@ -108,6 +108,7 @@ export function getChannelTypeIcon(type: number): string {
     9004: 'Doubao', // apiz.ai / xskill.ai
     9005: 'Doubao', // ToAPIs
     9006: 'Doubao', // SeedanceM
+    9007: 'Tencent', // Tencent VOD Image
     10001: 'Doubao', // Seedance Official
 
     // Tools & Platforms

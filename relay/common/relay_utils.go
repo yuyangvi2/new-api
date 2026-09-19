@@ -269,3 +269,20 @@ func ValidateBasicTaskRequest(c *gin.Context, info *RelayInfo, action string) *d
 	storeTaskRequest(c, info, action, req)
 	return nil
 }
+
+// ValidateImageTaskRequest parses an asynchronous image request. Unlike video
+// tasks, VOD image tasks may omit the prompt when reference images are present.
+func ValidateImageTaskRequest(c *gin.Context, info *RelayInfo, action string) *dto.TaskError {
+	var req TaskSubmitReq
+	if err := common.UnmarshalBodyReusable(c, &req); err != nil {
+		return createTaskError(err, "invalid_request", http.StatusBadRequest, true)
+	}
+	if len(req.Images) == 0 && strings.TrimSpace(req.Image) != "" {
+		req.Images = []string{req.Image}
+	}
+	if strings.TrimSpace(req.Prompt) == "" && len(req.Images) == 0 {
+		return createTaskError(fmt.Errorf("prompt is required when no reference image is provided"), "invalid_request", http.StatusBadRequest, true)
+	}
+	storeTaskRequest(c, info, action, req)
+	return nil
+}

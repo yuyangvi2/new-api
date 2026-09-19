@@ -430,6 +430,62 @@ function buildImageSample(lang: Lang, ctx: SampleContext): string {
   ].join('\n')
 }
 
+function buildImageTaskSample(lang: Lang, ctx: SampleContext): string {
+  const url = `${ctx.baseUrl}${ctx.endpointPath}`
+  const body = {
+    model: ctx.modelName,
+    prompt: 'A serene koi pond at sunset, ukiyo-e style.',
+  }
+  const bodyJson = JSON.stringify(body, null, 2)
+
+  if (lang === 'curl') {
+    return [
+      `curl ${url} \\`,
+      `  -H "Authorization: Bearer $${ctx.apiKeyEnv}" \\`,
+      `  -H "Content-Type: application/json" \\`,
+      `  -d '${bodyJson.replaceAll('\n', '\n     ')}'`,
+      '',
+      '# Query the task with the task_id returned above',
+      `curl ${url}/<TASK_ID> \\`,
+      `  -H "Authorization: Bearer $${ctx.apiKeyEnv}"`,
+    ].join('\n')
+  }
+
+  if (lang === 'python') {
+    return [
+      'import requests',
+      '',
+      `url = "${url}"`,
+      `headers = {"Authorization": "Bearer <YOUR_API_KEY>"}`,
+      `response = requests.post(url, headers=headers, json=${bodyJson})`,
+      `response.raise_for_status()`,
+      `task_id = response.json()["task_id"]`,
+      `task = requests.get(f"{url}/{task_id}", headers=headers)`,
+      `task.raise_for_status()`,
+      `print(task.json())`,
+    ].join('\n')
+  }
+
+  return [
+    `const headers = {`,
+    `  Authorization: \`Bearer \${process.env.${ctx.apiKeyEnv}}\`,`,
+    `  'Content-Type': 'application/json',`,
+    `}`,
+    '',
+    `const response = await fetch('${url}', {`,
+    `  method: 'POST',`,
+    `  headers,`,
+    `  body: JSON.stringify(${bodyJson.replaceAll('\n', '\n    ')}),`,
+    `})`,
+    `if (!response.ok) throw new Error(await response.text())`,
+    `const { task_id: taskId } = await response.json()`,
+    '',
+    `const taskResponse = await fetch(\`${url}/\${taskId}\`, { headers })`,
+    `if (!taskResponse.ok) throw new Error(await taskResponse.text())`,
+    `console.log(await taskResponse.json())`,
+  ].join('\n')
+}
+
 function isSeedanceVideoModel(modelName: string): boolean {
   return /seedance|doubao-seedance/i.test(modelName)
 }
@@ -635,6 +691,9 @@ function buildSample(
   }
   if (endpointType === 'image-generation') {
     return buildImageSample(lang, ctx)
+  }
+  if (endpointType === 'image-task') {
+    return buildImageTaskSample(lang, ctx)
   }
   if (endpointType === 'openai-video' || endpointType === 'seedance') {
     return buildVideoSample(lang, ctx)

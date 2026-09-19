@@ -424,7 +424,7 @@ func inferPricingModelType(modelName string, tags string, channelTypes []int, en
 
 	for _, channelType := range channelTypes {
 		switch channelType {
-		case constant.ChannelTypeJimeng, constant.ChannelTypeAIArt:
+		case constant.ChannelTypeJimeng, constant.ChannelTypeAIArt, constant.ChannelTypeVODAIGC:
 			return pricingModelTypeImage
 		}
 	}

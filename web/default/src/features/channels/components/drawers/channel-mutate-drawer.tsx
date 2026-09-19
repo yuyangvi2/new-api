@@ -156,6 +156,7 @@ import {
   type ChannelFormValues,
   deduplicateKeys,
   getChannelTypeIcon,
+  getChannelTypeConfig,
   getKeyPromptForType,
   parseModelsString,
   formatModelsArray,
@@ -280,6 +281,9 @@ const SENSITIVE_FORM_FIELDS = [
   'vertex_key_type',
   'aws_key_type',
   'azure_responses_version',
+  'vod_sub_app_id',
+  'vod_input_region',
+  'vod_default_model_name',
   'force_format',
   'thinking_to_content',
   'responses_via_chat_completions',
@@ -1263,6 +1267,22 @@ export function ChannelMutateDrawer({
       const currentOther = form.getValues('other')
       if (!currentOther || currentOther === '') {
         form.setValue('other', 'v2.1')
+      }
+    }
+
+    if (currentType === 9007) {
+      const config = getChannelTypeConfig(currentType)
+      if (!form.getValues('base_url') && config.defaultBaseUrl) {
+        form.setValue('base_url', config.defaultBaseUrl)
+      }
+      if (!form.getValues('models') && config.supportedModels) {
+        form.setValue('models', config.supportedModels.join(','))
+      }
+      if (!form.getValues('model_mapping') && config.defaultModelMapping) {
+        form.setValue(
+          'model_mapping',
+          JSON.stringify(config.defaultModelMapping, null, 2)
+        )
       }
     }
   }, [currentType, isEditing, form])
@@ -2756,6 +2776,143 @@ export function ChannelMutateDrawer({
                                   </FormItem>
                                 )}
                               />
+                            )}
+
+                            {currentType === 9007 && (
+                              <div className='grid gap-4 sm:grid-cols-3'>
+                                <FormField
+                                  control={form.control}
+                                  name='vod_sub_app_id'
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>
+                                        {t('Tencent VOD SubAppId *')}
+                                      </FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          inputMode='numeric'
+                                          placeholder='1480226150'
+                                          {...field}
+                                        />
+                                      </FormControl>
+                                      <FormDescription>
+                                        {t(
+                                          'Used for image task submission and polling'
+                                        )}
+                                      </FormDescription>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name='vod_input_region'
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>{t('Input region')}</FormLabel>
+                                      <Select
+                                        items={[
+                                          {
+                                            value: 'Mainland',
+                                            label: t('Mainland China'),
+                                          },
+                                          {
+                                            value: 'Oversea',
+                                            label: t('Overseas'),
+                                          },
+                                          {
+                                            value: 'OverseaUSWest',
+                                            label: t('Overseas - US West'),
+                                          },
+                                        ]}
+                                        onValueChange={field.onChange}
+                                        value={field.value || 'Mainland'}
+                                      >
+                                        <FormControl>
+                                          <SelectTrigger>
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent
+                                          alignItemWithTrigger={false}
+                                        >
+                                          <SelectGroup>
+                                            <SelectItem value='Mainland'>
+                                              {t('Mainland China')}
+                                            </SelectItem>
+                                            <SelectItem value='Oversea'>
+                                              {t('Overseas')}
+                                            </SelectItem>
+                                            <SelectItem value='OverseaUSWest'>
+                                              {t('Overseas - US West')}
+                                            </SelectItem>
+                                          </SelectGroup>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name='vod_default_model_name'
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>
+                                        {t('Default model family')}
+                                      </FormLabel>
+                                      <Select
+                                        items={[
+                                          'OG',
+                                          'GG',
+                                          'Hunyuan',
+                                          'Vidu',
+                                          'Kling',
+                                          'Mingmou',
+                                        ].map((value) => ({
+                                          value,
+                                          label: value,
+                                        }))}
+                                        onValueChange={field.onChange}
+                                        value={field.value || 'GG'}
+                                      >
+                                        <FormControl>
+                                          <SelectTrigger>
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent
+                                          alignItemWithTrigger={false}
+                                        >
+                                          <SelectGroup>
+                                            {[
+                                              'OG',
+                                              'GG',
+                                              'Hunyuan',
+                                              'Vidu',
+                                              'Kling',
+                                              'Mingmou',
+                                            ].map((value) => (
+                                              <SelectItem
+                                                key={value}
+                                                value={value}
+                                              >
+                                                {value}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectGroup>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormDescription>
+                                        {t(
+                                          'Used only for legacy model mappings without a family prefix'
+                                        )}
+                                      </FormDescription>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
                             )}
 
                             {currentType === CHANNEL_TYPE_ADVANCED_CUSTOM && (

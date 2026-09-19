@@ -24,6 +24,8 @@ import type {
   ImageGenerationRequest,
   ImageGenerationResponse,
   ImageTaskRequest,
+  ImageTaskResponse,
+  ImageTaskSubmitResponse,
   ModelOption,
   ToAPIsAvatarAsset,
   ToAPIsAvatarGroup,
@@ -40,6 +42,10 @@ type RawUserModel =
       label?: string
       value?: string
       groups?: string[]
+      image_task_groups?: string[]
+      tencent_vod_image_groups?: string[]
+      mixed_image_task_groups?: string[]
+      tencent_vod_upstream_models?: Record<string, string>
       model_ratio?: number
       modelRatio?: number
     }
@@ -105,6 +111,20 @@ export async function getUserModels(): Promise<ModelOption[]> {
         label: model.label || value,
         value,
         groups: Array.isArray(model.groups) ? model.groups : undefined,
+        imageTaskGroups: Array.isArray(model.image_task_groups)
+          ? model.image_task_groups
+          : undefined,
+        tencentVODImageGroups: Array.isArray(model.tencent_vod_image_groups)
+          ? model.tencent_vod_image_groups
+          : undefined,
+        mixedImageTaskGroups: Array.isArray(model.mixed_image_task_groups)
+          ? model.mixed_image_task_groups
+          : undefined,
+        tencentVODUpstreamModels:
+          model.tencent_vod_upstream_models &&
+          typeof model.tencent_vod_upstream_models === 'object'
+            ? model.tencent_vod_upstream_models
+            : undefined,
         modelRatio:
           typeof model.model_ratio === 'number'
             ? model.model_ratio
@@ -153,18 +173,17 @@ export async function generateImages(
 
 /**
  * Submit a task-based image generation (for async models like image-gi).
- * Uses the same task API as video generation.
  */
 export async function submitImageTask(
   payload: ImageTaskRequest,
   signal?: AbortSignal
-): Promise<VideoSubmitResponse> {
+): Promise<ImageTaskSubmitResponse> {
   const res = await api.post(API_ENDPOINTS.IMAGE_TASK_SUBMIT, payload, {
     skipErrorHandler: true,
     skipBusinessError: true,
     signal,
   } as Record<string, unknown>)
-  return res.data as VideoSubmitResponse
+  return res.data as ImageTaskSubmitResponse
 }
 
 /**
@@ -173,7 +192,7 @@ export async function submitImageTask(
 export async function fetchImageTask(
   taskId: string,
   signal?: AbortSignal
-): Promise<VideoTaskResponse> {
+): Promise<ImageTaskResponse> {
   const res = await api.get(API_ENDPOINTS.IMAGE_TASK(taskId), {
     skipErrorHandler: true,
     skipBusinessError: true,
@@ -190,7 +209,7 @@ export async function fetchImageTask(
     progress: normalizeTaskProgress(raw.progress),
     url: (raw.result_url as string) || (raw.url as string) || undefined,
     error: errorMessage ? { message: errorMessage } : undefined,
-  } as VideoTaskResponse
+  } as ImageTaskResponse
 }
 
 /**

@@ -17,14 +17,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useRef, useState } from 'react'
+
 import { fetchImageTask, generateImages, submitImageTask } from '../api'
 import {
   DEFAULT_CONFIG,
   detectImageModelFamily,
+  getTencentVODImageOutputConfig,
+  getTencentVODImageProfile,
   IMAGE_TASK_FAILED_STATUSES,
   IMAGE_TASK_POLL_INTERVAL_MS,
   IMAGE_TASK_POLL_TIMEOUT_MS,
   IMAGE_TASK_SUCCESS_STATUSES,
+  hasValidImageGenerationInput,
   isTaskBasedImageModel,
   STORAGE_KEY,
 } from '../constants'
@@ -102,7 +106,12 @@ interface UseImageGeneratorResult {
   ) => void
   batches: GenerationBatch[]
   isGenerating: boolean
-  generate: () => Promise<void>
+  generate: (
+    useImageTaskEndpoint?: boolean,
+    useTencentVODEndpoint?: boolean,
+    tencentVODUpstreamModel?: string,
+    promptOnlyTask?: boolean
+  ) => Promise<void>
   cancel: () => void
   clearHistory: () => void
 }
@@ -133,188 +142,235 @@ export function useImageGenerator(): UseImageGeneratorResult {
     []
   )
 
-  const generate = useCallback(async () => {
-    const prompt = config.prompt.trim()
-    if (!prompt || isGenerating) return
+  const generate = useCallback(
+    async (
+      useImageTaskEndpoint = false,
+      useTencentVODEndpoint = false,
+      tencentVODUpstreamModel?: string,
+      promptOnlyTask = false
+    ) => {
+      const prompt = config.prompt.trim()
+      const family = detectImageModelFamily(config.model, useTencentVODEndpoint)
+      const isTaskBased = useImageTaskEndpoint || isTaskBasedImageModel(family)
+      const tencentVODProfile = getTencentVODImageProfile(
+        tencentVODUpstreamModel
+      )
+      let requestImages = config.images
+      if (promptOnlyTask) {
+        requestImages = []
+      } else if (family === 'tencent-vod-image') {
+        requestImages = config.images.slice(
+          0,
+          tencentVODProfile.maxReferenceImages
+        )
+      }
+      if (
+        !hasValidImageGenerationInput(family, prompt, requestImages.length) ||
+        isGenerating
+      ) {
+        return
+      }
 
-    const family = detectImageModelFamily(config.model)
-    const isTaskBased = isTaskBasedImageModel(family)
+      const batchId = genId()
+      const batch: GenerationBatch = {
+        id: batchId,
+        status: 'loading',
+        prompt,
+        model: config.model,
+        size: config.size,
+        count: isTaskBased ? 1 : config.n,
+        images: [],
+        createdAt: Date.now(),
+      }
+      setBatches((prev) => [batch, ...prev])
+      setIsGenerating(true)
 
-    const batchId = genId()
-    const batch: GenerationBatch = {
-      id: batchId,
-      status: 'loading',
-      prompt,
-      model: config.model,
-      size: config.size,
-      count: isTaskBased ? 1 : config.n,
-      images: [],
-      createdAt: Date.now(),
-    }
-    setBatches((prev) => [batch, ...prev])
-    setIsGenerating(true)
+      const controller = new AbortController()
+      abortRef.current = controller
 
-    const controller = new AbortController()
-    abortRef.current = controller
-
-    try {
-      if (isTaskBased) {
-        // ---- Task-based flow (image-gi / image-gi2) ----
-        const meta: Record<string, unknown> = {}
-        if (config.metadata) {
-          for (const [k, v] of Object.entries(config.metadata)) {
-            if (v !== '' && v !== undefined && v !== null) {
-              meta[k] = v
+      try {
+        if (isTaskBased) {
+          // ---- Task-based image flow ----
+          const meta: Record<string, unknown> = {}
+          if (!promptOnlyTask && config.metadata) {
+            for (const [k, v] of Object.entries(config.metadata)) {
+              if (v !== '' && v !== undefined && v !== null) {
+                meta[k] = v
+              }
             }
           }
-        }
 
-        const submit = await submitImageTask(
-          {
+          const isTencentVODImage = family === 'tencent-vod-image'
+          const outputConfig: Pick<
+            Parameters<typeof submitImageTask>[0],
+            'size' | 'aspect_ratio' | 'resolution'
+          > = {}
+          if (!promptOnlyTask) {
+            if (isTencentVODImage) {
+              const vodOutputConfig = getTencentVODImageOutputConfig(
+                tencentVODUpstreamModel,
+                config.size,
+                config.resolution
+              )
+              if (vodOutputConfig.aspectRatio) {
+                outputConfig.aspect_ratio = vodOutputConfig.aspectRatio
+              }
+              if (vodOutputConfig.resolution) {
+                outputConfig.resolution = vodOutputConfig.resolution
+              }
+            } else {
+              outputConfig.size = config.size
+            }
+          }
+          const submit = await submitImageTask(
+            {
+              model: config.model,
+              group: config.group,
+              prompt,
+              images:
+                requestImages.length > 0
+                  ? requestImages.map(toBackendImage)
+                  : undefined,
+              ...outputConfig,
+              ...(Object.keys(meta).length > 0 ? { metadata: meta } : {}),
+            },
+            controller.signal
+          )
+
+          if (!submit.task_id) {
+            throw new Error('No task id returned')
+          }
+
+          patchBatch(batchId, { status: 'loading' })
+
+          // Poll until terminal state
+          const deadline = Date.now() + IMAGE_TASK_POLL_TIMEOUT_MS
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            await sleep(IMAGE_TASK_POLL_INTERVAL_MS, controller.signal)
+
+            const task = await fetchImageTask(submit.task_id, controller.signal)
+            const status = (task.status || '').toLowerCase()
+
+            if (IMAGE_TASK_SUCCESS_STATUSES.includes(status)) {
+              if (task.url) {
+                const img: GeneratedImage = {
+                  id: genId(),
+                  src: task.url,
+                  prompt,
+                  model: config.model,
+                  size: config.size,
+                  createdAt: Date.now(),
+                }
+                patchBatch(batchId, { status: 'complete', images: [img] })
+              } else {
+                patchBatch(batchId, {
+                  status: 'error',
+                  errorMessage: 'Task succeeded but no image URL was returned',
+                })
+              }
+              break
+            }
+
+            if (IMAGE_TASK_FAILED_STATUSES.includes(status)) {
+              patchBatch(batchId, {
+                status: 'error',
+                errorMessage: task.error?.message || 'Image generation failed',
+              })
+              break
+            }
+
+            if (Date.now() > deadline) {
+              patchBatch(batchId, {
+                status: 'error',
+                errorMessage: 'Timed out waiting for image generation',
+              })
+              break
+            }
+          }
+        } else {
+          // ---- Synchronous flow (dall-e, gpt-image, etc.) ----
+          const isDallE3 = family === 'dall-e'
+          const isGptImage = family === 'gpt-image'
+
+          const payload: Record<string, unknown> = {
             model: config.model,
             group: config.group,
             prompt,
-            images: config.images.length > 0
-              ? config.images.map(toBackendImage)
-              : undefined,
+            n: isDallE3 ? 1 : config.n,
             size: config.size,
-            ...(Object.keys(meta).length > 0 ? { metadata: meta } : {}),
-          },
-          controller.signal
-        )
+          }
 
-        if (!submit.task_id) {
-          throw new Error('No task id returned')
-        }
+          if (isDallE3) {
+            payload.quality = config.quality
+          }
 
-        patchBatch(batchId, { status: 'loading' })
+          if (isGptImage) {
+            payload.quality = config.quality
+            // Pass gpt-image specific metadata (background)
+            const bg = config.metadata?.background
+            if (bg && bg !== 'auto') {
+              payload.background = bg
+            }
+          }
 
-        // Poll until terminal state
-        const deadline = Date.now() + IMAGE_TASK_POLL_TIMEOUT_MS
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          await sleep(IMAGE_TASK_POLL_INTERVAL_MS, controller.signal)
+          const response = await generateImages(
+            payload as unknown as Parameters<typeof generateImages>[0],
+            controller.signal
+          )
 
-          const task = await fetchImageTask(submit.task_id, controller.signal)
-          const status = (task.status || '').toLowerCase()
-
-          if (IMAGE_TASK_SUCCESS_STATUSES.includes(status)) {
-            if (task.url) {
-              const img: GeneratedImage = {
+          const images: GeneratedImage[] = (response.data ?? [])
+            .map((item) => {
+              const src = toSrc(item)
+              if (!src) return null
+              return {
                 id: genId(),
-                src: task.url,
-                prompt,
+                src,
+                prompt: item.revised_prompt || prompt,
                 model: config.model,
                 size: config.size,
                 createdAt: Date.now(),
               }
-              patchBatch(batchId, { status: 'complete', images: [img] })
-            } else {
-              patchBatch(batchId, {
-                status: 'error',
-                errorMessage: 'Task succeeded but no image URL was returned',
-              })
-            }
-            break
-          }
+            })
+            .filter((x): x is GeneratedImage => x !== null)
 
-          if (IMAGE_TASK_FAILED_STATUSES.includes(status)) {
+          if (images.length === 0) {
             patchBatch(batchId, {
               status: 'error',
-              errorMessage: task.error?.message || 'Image generation failed',
+              errorMessage: 'No image was returned',
             })
-            break
-          }
-
-          if (Date.now() > deadline) {
-            patchBatch(batchId, {
-              status: 'error',
-              errorMessage: 'Timed out waiting for image generation',
-            })
-            break
+          } else {
+            patchBatch(batchId, { status: 'complete', images })
           }
         }
-      } else {
-        // ---- Synchronous flow (dall-e, gpt-image, etc.) ----
-        const isDallE3 = family === 'dall-e'
-        const isGptImage = family === 'gpt-image'
-
-        const payload: Record<string, unknown> = {
-          model: config.model,
-          group: config.group,
-          prompt,
-          n: isDallE3 ? 1 : config.n,
-          size: config.size,
-        }
-
-        if (isDallE3) {
-          payload.quality = config.quality
-        }
-
-        if (isGptImage) {
-          payload.quality = config.quality
-          // Pass gpt-image specific metadata (background)
-          const bg = config.metadata?.background
-          if (bg && bg !== 'auto') {
-            payload.background = bg
+      } catch (error: unknown) {
+        const err = error as {
+          name?: string
+          response?: {
+            data?: { message?: string; error?: { message?: string } }
           }
+          message?: string
         }
-
-        const response = await generateImages(
-          payload as unknown as Parameters<typeof generateImages>[0],
-          controller.signal
-        )
-
-        const images: GeneratedImage[] = (response.data ?? [])
-          .map((item) => {
-            const src = toSrc(item)
-            if (!src) return null
-            return {
-              id: genId(),
-              src,
-              prompt: item.revised_prompt || prompt,
-              model: config.model,
-              size: config.size,
-              createdAt: Date.now(),
-            }
-          })
-          .filter((x): x is GeneratedImage => x !== null)
-
-        if (images.length === 0) {
+        if (err?.name === 'CanceledError' || err?.name === 'AbortError') {
           patchBatch(batchId, {
             status: 'error',
-            errorMessage: 'No image was returned',
+            errorMessage: 'Generation cancelled',
           })
         } else {
-          patchBatch(batchId, { status: 'complete', images })
+          const message =
+            err?.response?.data?.error?.message ||
+            err?.response?.data?.message ||
+            err?.message ||
+            'Image generation failed'
+          patchBatch(batchId, { status: 'error', errorMessage: message })
         }
+      } finally {
+        abortRef.current = null
+        setIsGenerating(false)
       }
-    } catch (error: unknown) {
-      const err = error as {
-        name?: string
-        response?: {
-          data?: { message?: string; error?: { message?: string } }
-        }
-        message?: string
-      }
-      if (err?.name === 'CanceledError' || err?.name === 'AbortError') {
-        patchBatch(batchId, {
-          status: 'error',
-          errorMessage: 'Generation cancelled',
-        })
-      } else {
-        const message =
-          err?.response?.data?.error?.message ||
-          err?.response?.data?.message ||
-          err?.message ||
-          'Image generation failed'
-        patchBatch(batchId, { status: 'error', errorMessage: message })
-      }
-    } finally {
-      abortRef.current = null
-      setIsGenerating(false)
-    }
-  }, [config, isGenerating, patchBatch])
+    },
+    [config, isGenerating, patchBatch]
+  )
 
   const cancel = useCallback(() => {
     abortRef.current?.abort()

@@ -1,6 +1,7 @@
 package common
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/QuantumNous/new-api/constant"
@@ -42,4 +43,18 @@ func TestSeedanceDefaultEndpointInfo(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "/volcengine/api/v3/contents/generations/tasks", info.Path)
 	assert.Equal(t, "POST", info.Method)
+}
+
+func TestVODAIGCEndpointTypes(t *testing.T) {
+	endpointTypes := GetEndpointTypesByChannelType(
+		constant.ChannelTypeVODAIGC,
+		"gemini-3.1-flash-image",
+	)
+
+	assert.Equal(t, []constant.EndpointType{constant.EndpointTypeImageTask}, endpointTypes)
+
+	info, ok := GetDefaultEndpointInfo(constant.EndpointTypeImageTask)
+	require.True(t, ok)
+	assert.Equal(t, "/v1/images/tasks", info.Path)
+	assert.Equal(t, http.MethodPost, info.Method)
 }

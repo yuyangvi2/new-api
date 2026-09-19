@@ -44,3 +44,20 @@ func TestAdvancedCustomValidateResponsesToChatConverterPath(t *testing.T) {
 		})
 	}
 }
+
+func TestVODAIGCSettingsValidate(t *testing.T) {
+	require.NoError(t, (&VODAIGCSettings{
+		SubAppID:         1480226150,
+		InputRegion:      "Mainland",
+		DefaultModelName: "Vidu",
+	}).Validate())
+
+	tests := []VODAIGCSettings{
+		{SubAppID: -1},
+		{InputRegion: "Moon"},
+		{DefaultModelName: "Unknown"},
+	}
+	for _, settings := range tests {
+		assert.Error(t, settings.Validate())
+	}
+}

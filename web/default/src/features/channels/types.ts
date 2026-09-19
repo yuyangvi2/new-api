@@ -108,6 +108,13 @@ export interface ChannelOtherSettings {
   upstream_model_update_last_check_time?: number
   upstream_model_update_last_detected_models?: string[]
   advanced_custom?: AdvancedCustomConfig
+  vod_aigc?: VODAIGCSettings
+}
+
+export interface VODAIGCSettings {
+  sub_app_id?: number
+  input_region?: 'Mainland' | 'Oversea' | 'OverseaUSWest'
+  default_model_name?: 'OG' | 'GG' | 'Hunyuan' | 'Vidu' | 'Kling' | 'Mingmou'
 }
 
 export interface AdvancedCustomConfig {

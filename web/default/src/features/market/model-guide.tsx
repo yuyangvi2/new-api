@@ -29,6 +29,7 @@ import { useMemo, type ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { CopyButton } from '@/components/copy-button'
+import { ErrorState } from '@/components/error-state'
 import { PublicLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -40,7 +41,6 @@ import type { PricingModel } from '@/features/pricing/types'
 import { cn } from '@/lib/utils'
 
 import {
-  FALLBACK_MODELS,
   inferKind,
   marketKindLabelKey,
   toModelGuideSlug,
@@ -243,17 +243,20 @@ export function ModelGuide() {
     endpointMap,
     autoGroups,
     isLoading,
+    error,
+    refetch,
     priceRate,
     usdExchangeRate,
   } = usePricingData()
 
-  const allModels = useMemo(() => {
-    const source = models.length > 0 ? models : FALLBACK_MODELS
-    return source.map((model) => ({
-      ...model,
-      marketKind: inferKind(model),
-    }))
-  }, [models])
+  const allModels = useMemo(
+    () =>
+      models.map((model) => ({
+        ...model,
+        marketKind: inferKind(model),
+      })),
+    [models]
+  )
 
   const model = useMemo(
     () =>
@@ -263,7 +266,7 @@ export function ModelGuide() {
     [allModels, modelSlug]
   )
 
-  if (isLoading && models.length === 0 && !model) {
+  if (isLoading) {
     return (
       <PublicLayout showMainContainer={false} showNotifications={false}>
         <main className='mx-auto max-w-6xl px-4 pt-28 pb-16 md:px-6'>
@@ -274,6 +277,21 @@ export function ModelGuide() {
               <Skeleton key={item} className='h-44 rounded-2xl' />
             ))}
           </div>
+        </main>
+      </PublicLayout>
+    )
+  }
+
+  if (error && models.length === 0) {
+    return (
+      <PublicLayout showMainContainer={false} showNotifications={false}>
+        <main className='mx-auto flex min-h-[70vh] max-w-2xl items-center justify-center px-4'>
+          <ErrorState
+            title={t('Failed to load models')}
+            description={t('Please try again later.')}
+            onRetry={() => void refetch()}
+            className='w-full'
+          />
         </main>
       </PublicLayout>
     )

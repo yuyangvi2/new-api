@@ -957,6 +957,29 @@ func (channel *Channel) ValidateSettings() error {
 			return err
 		}
 	}
+	if channel.Type == constant.ChannelTypeVODAIGC {
+		if err := channelOtherSettings.VODAIGC.Validate(); err != nil {
+			return err
+		}
+		mappingJSON := channel.GetModelMapping()
+		for _, modelName := range strings.Split(channel.Models, ",") {
+			modelName = strings.TrimSpace(modelName)
+			if modelName == "" {
+				continue
+			}
+			mappedModel, err := common.ResolveStrictModelMapping(modelName, mappingJSON)
+			if err != nil {
+				return fmt.Errorf("vod_aigc model mapping for %s: %w", modelName, err)
+			}
+			defaultModelName := "GG"
+			if channelOtherSettings.VODAIGC != nil && channelOtherSettings.VODAIGC.DefaultModelName != "" {
+				defaultModelName = channelOtherSettings.VODAIGC.DefaultModelName
+			}
+			if _, _, err := constant.ParseVODAIGCUpstreamModel(mappedModel, defaultModelName); err != nil {
+				return fmt.Errorf("vod_aigc model mapping for %s: %w", modelName, err)
+			}
+		}
+	}
 	return nil
 }
 

@@ -98,6 +98,7 @@ func (m Properties) Value() (driver.Value, error) {
 
 type TaskPrivateData struct {
 	Key            string `json:"key,omitempty"`
+	SubAppID       int64  `json:"sub_app_id,omitempty"`
 	UpstreamTaskID string `json:"upstream_task_id,omitempty"` // 上游真实 task ID
 	ResultURL      string `json:"result_url,omitempty"`       // 任务成功后的结果 URL（视频地址等）
 	ErrorCode      string `json:"error_code,omitempty"`       // 已脱敏的上游失败代码
@@ -182,8 +183,12 @@ func InitTask(platform constant.TaskPlatform, relayInfo *commonRelay.RelayInfo) 
 	if relayInfo != nil && relayInfo.ChannelMeta != nil {
 		if relayInfo.ChannelMeta.ChannelType == constant.ChannelTypeGemini ||
 			relayInfo.ChannelMeta.ChannelType == constant.ChannelTypeVertexAi ||
-			relayInfo.ChannelMeta.ChannelType == constant.ChannelTypeSeedanceM {
+			relayInfo.ChannelMeta.ChannelType == constant.ChannelTypeSeedanceM ||
+			relayInfo.ChannelMeta.ChannelType == constant.ChannelTypeVODAIGC {
 			privateData.Key = relayInfo.ChannelMeta.ApiKey
+		}
+		if relayInfo.ChannelMeta.ChannelType == constant.ChannelTypeVODAIGC && relayInfo.TaskRelayInfo != nil {
+			privateData.SubAppID = relayInfo.TaskRelayInfo.SubAppID
 		}
 		if relayInfo.UpstreamModelName != "" {
 			properties.UpstreamModelName = relayInfo.UpstreamModelName

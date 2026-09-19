@@ -64,6 +64,15 @@ type TaskPollDto struct {
 	Progress   string            `json:"progress,omitempty"`
 }
 
+type ImageTaskSubmitResponse struct {
+	ID        string `json:"id"`
+	TaskID    string `json:"task_id"`
+	Object    string `json:"object"`
+	Model     string `json:"model"`
+	Status    string `json:"status"`
+	CreatedAt int64  `json:"created_at"`
+}
+
 type FetchReq struct {
 	IDs []string `json:"ids"`
 }

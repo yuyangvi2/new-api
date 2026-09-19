@@ -16,12 +16,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-
 // Model and group options (mirror the shape consumed by ModelGroupSelector)
 export interface ModelOption {
   label: string
   value: string
   groups?: string[]
+  imageTaskGroups?: string[]
+  tencentVODImageGroups?: string[]
+  mixedImageTaskGroups?: string[]
+  tencentVODUpstreamModels?: Record<string, string>
   modelRatio?: number
 }
 
@@ -40,7 +43,24 @@ export interface ImageTaskRequest {
   // Reference images: URLs or raw base64 strings
   images?: string[]
   size?: string
+  resolution?: string
+  aspect_ratio?: string
   metadata?: Record<string, unknown>
+}
+
+export interface ImageTaskSubmitResponse {
+  task_id: string
+  status: string
+}
+
+export interface ImageTaskResponse {
+  task_id: string
+  status: string
+  progress?: string
+  url?: string
+  error?: {
+    message: string
+  }
 }
 
 // Request payload sent to /pg/images/generations
@@ -99,6 +119,7 @@ export interface GeneratorConfig {
   group: string
   prompt: string
   size: string
+  resolution: string
   quality: string
   n: number
   // Reference images (URLs or data: URIs) for image-gi models
@@ -248,6 +269,7 @@ export type ImageModelFamily =
   | 'image-gi'
   | 'image-gi2'
   | 'hunyuan-image'
+  | 'tencent-vod-image'
   | 'generic-image'
 
 export type ModelFamily = 'kling' | 'vidu' | 'seedance' | 'unknown'

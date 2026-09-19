@@ -33,8 +33,8 @@ export const API_ENDPOINTS = {
   // API key is required — a temp token is created server-side, like chat.
   IMAGE_GENERATIONS: '/pg/images/generations',
   // Task-based image generation (for async models like image-gi)
-  IMAGE_TASK_SUBMIT: '/pg/video/generations',
-  IMAGE_TASK: (taskId: string) => `/pg/video/generations/${taskId}`,
+  IMAGE_TASK_SUBMIT: '/pg/images/tasks',
+  IMAGE_TASK: (taskId: string) => `/pg/images/tasks/${taskId}`,
   VIDEO_SUBMIT: '/pg/video/generations',
   VIDEO_TASK: (taskId: string) => `/pg/video/generations/${taskId}`,
   MEDIA_UPLOAD: '/api/media/upload',
@@ -78,6 +78,7 @@ export const DEFAULT_CONFIG: GeneratorConfig = {
   group: DEFAULT_GROUP,
   prompt: '',
   size: '1024x1024',
+  resolution: '1K',
   quality: 'standard',
   n: 1,
   images: [],
@@ -660,8 +661,31 @@ const GPT_IMAGE_RE = /gpt-image/i
 const IMAGE_GI2_RE = /image-gi-?2/i
 const IMAGE_GI_RE = /image-gi/i
 const HUNYUAN_IMAGE_RE = /hunyuan-image/i
+export const TENCENT_VOD_IMAGE_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+] as const
 
-export function detectImageModelFamily(model: string): ImageModelFamily {
+interface TencentVODImageOption {
+  label: string
+  value: string
+}
+
+export interface TencentVODImageProfile {
+  aspectRatios: readonly TencentVODImageOption[]
+  resolutions: readonly TencentVODImageOption[]
+  defaultAspectRatio?: string
+  defaultResolution?: string
+  maxReferenceImages: number
+}
+export function detectImageModelFamily(
+  model: string,
+  useTencentVODEndpoint = false
+): ImageModelFamily {
+  if (useTencentVODEndpoint) {
+    return 'tencent-vod-image'
+  }
   if (GPT_IMAGE_RE.test(model)) return 'gpt-image'
   if (DALLE_RE.test(model)) return 'dall-e'
   if (HUNYUAN_IMAGE_RE.test(model)) return 'hunyuan-image'
@@ -670,12 +694,26 @@ export function detectImageModelFamily(model: string): ImageModelFamily {
   return 'generic-image'
 }
 
+export function getTencentVODReferenceImageLimit(
+  upstreamModel: string
+): number {
+  return getTencentVODImageProfile(upstreamModel).maxReferenceImages
+}
+
+export function limitTencentVODReferenceImages(
+  images: string[],
+  upstreamModel: string
+): string[] {
+  return images.slice(0, getTencentVODReferenceImageLimit(upstreamModel))
+}
+
 /** Whether the model uses async task-based generation (submit/poll) */
 export function isTaskBasedImageModel(family: ImageModelFamily): boolean {
   return (
     family === 'image-gi' ||
     family === 'image-gi2' ||
-    family === 'hunyuan-image'
+    family === 'hunyuan-image' ||
+    family === 'tencent-vod-image'
   )
 }
 
@@ -684,7 +722,19 @@ export function supportsReferenceImages(family: ImageModelFamily): boolean {
   return (
     family === 'image-gi' ||
     family === 'image-gi2' ||
-    family === 'hunyuan-image'
+    family === 'hunyuan-image' ||
+    family === 'tencent-vod-image'
+  )
+}
+
+export function hasValidImageGenerationInput(
+  family: ImageModelFamily,
+  prompt: string,
+  referenceImageCount: number
+): boolean {
+  return (
+    prompt.trim().length > 0 ||
+    (family === 'tencent-vod-image' && referenceImageCount > 0)
   )
 }
 
@@ -773,7 +823,154 @@ export const IMAGE_FAMILY_PARAMS: Record<ImageModelFamily, FamilyParam[]> = {
     },
   ],
   'hunyuan-image': [],
+  'tencent-vod-image': [],
   'generic-image': [],
+}
+
+export const TENCENT_VOD_ASPECT_RATIOS = [
+  { label: '1:1', value: '1:1' },
+  { label: '2:3', value: '2:3' },
+  { label: '3:2', value: '3:2' },
+  { label: '3:4', value: '3:4' },
+  { label: '4:3', value: '4:3' },
+  { label: '4:5', value: '4:5' },
+  { label: '5:4', value: '5:4' },
+  { label: '9:16', value: '9:16' },
+  { label: '16:9', value: '16:9' },
+  { label: '21:9', value: '21:9' },
+] as const
+
+export const TENCENT_VOD_EXTENDED_ASPECT_RATIOS = [
+  ...TENCENT_VOD_ASPECT_RATIOS,
+  { label: '1:4', value: '1:4' },
+  { label: '1:8', value: '1:8' },
+  { label: '4:1', value: '4:1' },
+  { label: '8:1', value: '8:1' },
+] as const
+
+export const TENCENT_VOD_RESOLUTIONS = [
+  { label: '1K', value: '1K' },
+  { label: '2K', value: '2K' },
+  { label: '4K', value: '4K' },
+] as const
+
+export const TENCENT_VOD_EXTENDED_RESOLUTIONS = [
+  { label: '720P', value: '720P' },
+  ...TENCENT_VOD_RESOLUTIONS,
+] as const
+
+export const TENCENT_VOD_VIDU_ASPECT_RATIOS = [
+  { label: '1:1', value: '1:1' },
+  { label: '2:3', value: '2:3' },
+  { label: '3:2', value: '3:2' },
+  { label: '3:4', value: '3:4' },
+  { label: '4:3', value: '4:3' },
+  { label: '9:16', value: '9:16' },
+  { label: '16:9', value: '16:9' },
+  { label: '21:9', value: '21:9' },
+] as const
+
+export const TENCENT_VOD_VIDU_RESOLUTIONS = [
+  { label: '1080p', value: '1080p' },
+  { label: '2K', value: '2K' },
+  { label: '4K', value: '4K' },
+] as const
+
+const EMPTY_TENCENT_VOD_IMAGE_PROFILE: TencentVODImageProfile = {
+  aspectRatios: [],
+  resolutions: [],
+  maxReferenceImages: 0,
+}
+
+const TENCENT_VOD_IMAGE_PROFILES: Record<string, TencentVODImageProfile> = {
+  'gg:2.5': {
+    aspectRatios: TENCENT_VOD_ASPECT_RATIOS,
+    resolutions: TENCENT_VOD_RESOLUTIONS,
+    defaultAspectRatio: '1:1',
+    defaultResolution: '1K',
+    maxReferenceImages: 3,
+  },
+  'gg:3.0': {
+    aspectRatios: TENCENT_VOD_ASPECT_RATIOS,
+    resolutions: TENCENT_VOD_RESOLUTIONS,
+    defaultAspectRatio: '1:1',
+    defaultResolution: '1K',
+    maxReferenceImages: 14,
+  },
+  'gg:3.1': {
+    aspectRatios: TENCENT_VOD_EXTENDED_ASPECT_RATIOS,
+    resolutions: TENCENT_VOD_EXTENDED_RESOLUTIONS,
+    defaultAspectRatio: '1:1',
+    defaultResolution: '1K',
+    maxReferenceImages: 14,
+  },
+  'gg:3.1-lite': {
+    aspectRatios: TENCENT_VOD_EXTENDED_ASPECT_RATIOS,
+    resolutions: TENCENT_VOD_EXTENDED_RESOLUTIONS,
+    defaultAspectRatio: '1:1',
+    defaultResolution: '1K',
+    maxReferenceImages: 14,
+  },
+  'vidu:q2': {
+    aspectRatios: TENCENT_VOD_VIDU_ASPECT_RATIOS,
+    resolutions: TENCENT_VOD_VIDU_RESOLUTIONS,
+    defaultAspectRatio: '1:1',
+    defaultResolution: '1080p',
+    maxReferenceImages: 7,
+  },
+  'kling:2.1': {
+    ...EMPTY_TENCENT_VOD_IMAGE_PROFILE,
+    maxReferenceImages: 4,
+  },
+  'kling:3.0': {
+    ...EMPTY_TENCENT_VOD_IMAGE_PROFILE,
+    maxReferenceImages: 1,
+  },
+  'kling:3.0-omni': {
+    ...EMPTY_TENCENT_VOD_IMAGE_PROFILE,
+    maxReferenceImages: 10,
+  },
+  'kling:o1': {
+    ...EMPTY_TENCENT_VOD_IMAGE_PROFILE,
+    maxReferenceImages: 10,
+  },
+  'hunyuan:3.0': {
+    ...EMPTY_TENCENT_VOD_IMAGE_PROFILE,
+    maxReferenceImages: 3,
+  },
+}
+
+export function getTencentVODImageProfile(
+  upstreamModel: string | undefined
+): TencentVODImageProfile {
+  if (!upstreamModel) return EMPTY_TENCENT_VOD_IMAGE_PROFILE
+  return (
+    TENCENT_VOD_IMAGE_PROFILES[upstreamModel.trim().toLowerCase()] ??
+    EMPTY_TENCENT_VOD_IMAGE_PROFILE
+  )
+}
+
+export function getTencentVODImageOutputConfig(
+  upstreamModel: string | undefined,
+  aspectRatio: string,
+  resolution: string
+): { aspectRatio?: string; resolution?: string } {
+  const profile = getTencentVODImageProfile(upstreamModel)
+  const selectedAspectRatio = profile.aspectRatios.some(
+    (option) => option.value === aspectRatio
+  )
+    ? aspectRatio
+    : profile.defaultAspectRatio
+  const selectedResolution = profile.resolutions.some(
+    (option) => option.value === resolution
+  )
+    ? resolution
+    : profile.defaultResolution
+
+  return {
+    ...(selectedAspectRatio ? { aspectRatio: selectedAspectRatio } : {}),
+    ...(selectedResolution ? { resolution: selectedResolution } : {}),
+  }
 }
 
 // Task-based image generation polling config

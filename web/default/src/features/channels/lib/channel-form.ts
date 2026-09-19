@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { t } from 'i18next'
 import { z } from 'zod'
 
 import {
@@ -63,6 +64,44 @@ function isOptionalModelMapping(value: string | undefined): boolean {
   } catch {
     return false
   }
+}
+
+const TENCENT_VOD_MODEL_NAMES = new Set([
+  'og',
+  'gg',
+  'hunyuan',
+  'vidu',
+  'kling',
+  'mingmou',
+])
+
+export function isValidTencentVODModelMapping(
+  publicModel: string,
+  mapping: Record<string, unknown>,
+  fallbackModelName: string
+): boolean {
+  let current = publicModel.trim()
+  const visited = new Set([current])
+  let mapped = false
+
+  while (true) {
+    const mappedValue = mapping[current]
+    if (typeof mappedValue !== 'string') break
+    const next = mappedValue.trim()
+    if (!next || visited.has(next)) return false
+    visited.add(next)
+    current = next
+    mapped = true
+  }
+  if (!mapped) return false
+
+  const parts = current.split(':')
+  if (parts.length > 2) return false
+  const name = (parts.length === 2 ? parts[0] : fallbackModelName)
+    .trim()
+    .toLowerCase()
+  const version = (parts.length === 2 ? parts[1] : parts[0]).trim()
+  return TENCENT_VOD_MODEL_NAMES.has(name) && version.length > 0
 }
 
 function isOptionalStatusCodeMapping(value: string | undefined): boolean {
@@ -197,6 +236,13 @@ export const channelFormSchema = z
     vertex_key_type: z.enum(['json', 'api_key']).optional(), // Vertex AI specific
     aws_key_type: z.enum(['ak_sk', 'api_key']).optional(), // AWS specific
     azure_responses_version: z.string().optional(), // Azure specific
+    vod_sub_app_id: z.string().optional(), // Tencent VOD Image specific
+    vod_input_region: z
+      .enum(['Mainland', 'Oversea', 'OverseaUSWest'])
+      .optional(),
+    vod_default_model_name: z
+      .enum(['OG', 'GG', 'Hunyuan', 'Vidu', 'Kling', 'Mingmou'])
+      .optional(),
     // Field passthrough controls (stored in settings JSON)
     allow_service_tier: z.boolean().optional(), // OpenAI/Anthropic
     disable_store: z.boolean().optional(), // OpenAI only
@@ -291,6 +337,66 @@ export const channelFormSchema = z
         'Vertex AI API Key mode does not support batch creation'
       )
     }
+
+    if (data.type === 9007) {
+      const subAppId = Number(data.vod_sub_app_id)
+      if (!Number.isSafeInteger(subAppId) || subAppId <= 0) {
+        addRequiredIssue(
+          ctx,
+          'vod_sub_app_id',
+          t('Tencent VOD SubAppId must be a positive integer')
+        )
+      }
+
+      try {
+        const mapping = JSON.parse(data.model_mapping || '{}') as Record<
+          string,
+          unknown
+        >
+        const missingModels = data.models
+          .split(',')
+          .map((model) => model.trim())
+          .filter(
+            (model) =>
+              model &&
+              (typeof mapping[model] !== 'string' ||
+                String(mapping[model]).trim() === '')
+          )
+        if (missingModels.length > 0) {
+          addRequiredIssue(
+            ctx,
+            'model_mapping',
+            t('Tencent VOD model mapping is missing: {{models}}', {
+              models: missingModels.join(', '),
+            })
+          )
+        }
+        const invalidModels = data.models
+          .split(',')
+          .map((model) => model.trim())
+          .filter(
+            (model) =>
+              model &&
+              !missingModels.includes(model) &&
+              !isValidTencentVODModelMapping(
+                model,
+                mapping,
+                data.vod_default_model_name || 'GG'
+              )
+          )
+        if (invalidModels.length > 0) {
+          addRequiredIssue(
+            ctx,
+            'model_mapping',
+            t('Tencent VOD model mapping is invalid: {{models}}', {
+              models: invalidModels.join(', '),
+            })
+          )
+        }
+      } catch {
+        // The field-level model_mapping validator reports malformed JSON.
+      }
+    }
   })
 
 export type ChannelFormValues = z.infer<typeof channelFormSchema>
@@ -338,6 +444,9 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   vertex_key_type: 'json',
   aws_key_type: 'ak_sk',
   azure_responses_version: '',
+  vod_sub_app_id: '1480226150',
+  vod_input_region: 'Mainland',
+  vod_default_model_name: 'GG',
   // Field passthrough controls
   allow_service_tier: false,
   disable_store: false,
@@ -410,6 +519,15 @@ export function transformChannelToFormDefaults(
   let upstreamModelUpdateAutoSyncEnabled = false
   let upstreamModelUpdateIgnoredModels = ''
   let advancedCustom = ''
+  let vodSubAppId = '1480226150'
+  let vodInputRegion: 'Mainland' | 'Oversea' | 'OverseaUSWest' = 'Mainland'
+  let vodDefaultModelName:
+    | 'OG'
+    | 'GG'
+    | 'Hunyuan'
+    | 'Vidu'
+    | 'Kling'
+    | 'Mingmou' = 'GG'
 
   if (channel.settings) {
     try {
@@ -437,6 +555,11 @@ export function transformChannelToFormDefaults(
         : ''
       if (parsed.advanced_custom) {
         advancedCustom = stringifyAdvancedCustomConfig(parsed.advanced_custom)
+      }
+      if (parsed.vod_aigc) {
+        vodSubAppId = String(parsed.vod_aigc.sub_app_id || 1480226150)
+        vodInputRegion = parsed.vod_aigc.input_region || 'Mainland'
+        vodDefaultModelName = parsed.vod_aigc.default_model_name || 'GG'
       }
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -489,6 +612,9 @@ export function transformChannelToFormDefaults(
     upstream_model_update_auto_sync_enabled: upstreamModelUpdateAutoSyncEnabled,
     upstream_model_update_ignored_models: upstreamModelUpdateIgnoredModels,
     advanced_custom: advancedCustom,
+    vod_sub_app_id: vodSubAppId,
+    vod_input_region: vodInputRegion,
+    vod_default_model_name: vodDefaultModelName,
   }
 }
 
@@ -553,6 +679,16 @@ function buildSettingsJSON(formData: ChannelFormValues): string {
     delete settingsObj.aws_key_type
   }
 
+  if (formData.type === 9007) {
+    settingsObj.vod_aigc = {
+      sub_app_id: Number(formData.vod_sub_app_id),
+      input_region: formData.vod_input_region || 'Mainland',
+      default_model_name: formData.vod_default_model_name || 'GG',
+    }
+  } else if ('vod_aigc' in settingsObj) {
+    delete settingsObj.vod_aigc
+  }
+
   // Field passthrough controls:
   // - OpenAI (type 1) and Anthropic (type 14): allow_service_tier
   // - OpenAI only: disable_store, allow_safety_identifier
@@ -571,12 +707,15 @@ function buildSettingsJSON(formData: ChannelFormValues): string {
     settingsObj.allow_inference_geo = formData.allow_inference_geo === true
   } else {
     if ('disable_store' in settingsObj) delete settingsObj.disable_store
-    if ('allow_safety_identifier' in settingsObj)
+    if ('allow_safety_identifier' in settingsObj) {
       delete settingsObj.allow_safety_identifier
-    if ('allow_include_obfuscation' in settingsObj)
+    }
+    if ('allow_include_obfuscation' in settingsObj) {
       delete settingsObj.allow_include_obfuscation
-    if (formData.type !== 14 && 'allow_inference_geo' in settingsObj)
+    }
+    if (formData.type !== 14 && 'allow_inference_geo' in settingsObj) {
       delete settingsObj.allow_inference_geo
+    }
   }
 
   // Anthropic (type 14): claude_beta_query, allow_inference_geo, allow_speed
@@ -599,14 +738,14 @@ function buildSettingsJSON(formData: ChannelFormValues): string {
     settingsObj.upstream_model_update_auto_sync_enabled =
       settingsObj.upstream_model_update_check_enabled === true &&
       formData.upstream_model_update_auto_sync_enabled === true
-    settingsObj.upstream_model_update_ignored_models = Array.from(
-      new Set(
+    settingsObj.upstream_model_update_ignored_models = [
+      ...new Set(
         String(formData.upstream_model_update_ignored_models || '')
           .split(',')
           .map((model) => model.trim())
           .filter(Boolean)
-      )
-    )
+      ),
+    ]
     if (
       !Array.isArray(settingsObj.upstream_model_update_last_detected_models) ||
       settingsObj.upstream_model_update_check_enabled !== true

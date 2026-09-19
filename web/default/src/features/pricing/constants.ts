@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { type TFunction } from 'i18next'
+import type { TFunction } from 'i18next'
 
 import type { TokenUnit } from './types'
 
@@ -73,6 +73,7 @@ export const ENDPOINT_TYPES = {
   GEMINI: 'gemini',
   JINA_RERANK: 'jina-rerank',
   IMAGE_GENERATION: 'image-generation',
+  IMAGE_TASK: 'image-task',
   EMBEDDINGS: 'embeddings',
   OPENAI_VIDEO: 'openai-video',
   SEEDANCE: 'seedance',
@@ -93,6 +94,7 @@ export function getEndpointTypeLabels(
     [ENDPOINT_TYPES.GEMINI]: 'Gemini',
     [ENDPOINT_TYPES.JINA_RERANK]: 'Rerank',
     [ENDPOINT_TYPES.IMAGE_GENERATION]: t('Image'),
+    [ENDPOINT_TYPES.IMAGE_TASK]: t('Image'),
     [ENDPOINT_TYPES.EMBEDDINGS]: t('Embeddings'),
     [ENDPOINT_TYPES.OPENAI_VIDEO]: t('Video'),
     [ENDPOINT_TYPES.SEEDANCE]: t('Seedance'),

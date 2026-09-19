@@ -9,7 +9,6 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
-	"github.com/QuantumNous/new-api/dto"
 
 	"github.com/samber/lo"
 	"gorm.io/gorm"
@@ -28,15 +27,30 @@ type Ability struct {
 
 type AbilityWithChannel struct {
 	Ability
-	ChannelType int `json:"channel_type"`
+	ChannelType          int     `json:"channel_type"`
+	ChannelModelMapping  *string `json:"channel_model_mapping"`
+	ChannelOtherSettings *string `json:"channel_other_settings"`
 }
 
 func GetAllEnableAbilityWithChannels() ([]AbilityWithChannel, error) {
 	var abilities []AbilityWithChannel
 	err := DB.Table("abilities").
-		Select("abilities.*, channels.type as channel_type").
+		Select("abilities.*, channels.type as channel_type, channels.model_mapping as channel_model_mapping, channels.settings as channel_other_settings").
 		Joins("left join channels on abilities.channel_id = channels.id").
 		Where("abilities.enabled = ?", true).
+		Scan(&abilities).Error
+	return abilities, err
+}
+
+func GetEnableAbilityWithChannelsByGroups(groups []string) ([]AbilityWithChannel, error) {
+	if len(groups) == 0 {
+		return []AbilityWithChannel{}, nil
+	}
+	var abilities []AbilityWithChannel
+	err := DB.Table("abilities").
+		Select("abilities.*, channels.type as channel_type, channels.model_mapping as channel_model_mapping, channels.settings as channel_other_settings").
+		Joins("join channels on abilities.channel_id = channels.id").
+		Where("abilities."+commonGroupCol+" IN ? AND abilities.enabled = ? AND channels.status = ?", groups, true, common.ChannelStatusEnabled).
 		Scan(&abilities).Error
 	return abilities, err
 }
@@ -110,7 +124,11 @@ func GetChannel(group string, model string, retry int, requestPath string, requi
 	var abilities []Ability
 
 	var err error = nil
-	if requiredChannelType > 0 {
+	// Path capability filtering must happen before priority selection. Otherwise
+	// an incompatible high-priority channel can hide a compatible lower-priority
+	// channel for the same model.
+	filterBeforePriority := requiredChannelType > 0 || requestPath != ""
+	if filterBeforePriority {
 		err = DB.Where(commonGroupCol+" = ? and model = ? and enabled = ?", group, model, true).Find(&abilities).Error
 	} else {
 		channelQuery, queryErr := getChannelQuery(group, model, retry)
@@ -128,7 +146,7 @@ func GetChannel(group string, model string, retry int, requestPath string, requi
 	}
 	abilities = filterAbilitiesByRequiredChannelType(abilities, requiredChannelType)
 	abilities = filterAbilitiesByRequestPath(abilities, requestPath)
-	if requiredChannelType > 0 {
+	if filterBeforePriority {
 		abilities = filterAbilitiesByRetryPriority(abilities, retry)
 	}
 	channel := Channel{}
@@ -225,10 +243,8 @@ func abilityPriority(ability Ability) int64 {
 	return *ability.Priority
 }
 
-// filterAbilitiesByRequestPath restricts candidates by request path for the DB
-// (non-memory-cache) selection path. Only Advanced Custom (type 58) channels are
-// path-checked: kept only when one of their routes matches requestPath; all other
-// channel types always pass. When requestPath is empty, filtering is skipped.
+// filterAbilitiesByRequestPath restricts DB-backed candidates by endpoint
+// capability and Advanced Custom route configuration.
 func filterAbilitiesByRequestPath(abilities []Ability, requestPath string) []Ability {
 	if requestPath == "" || len(abilities) == 0 {
 		return abilities
@@ -250,20 +266,25 @@ func filterAbilitiesByRequestPath(abilities []Ability, requestPath string) []Abi
 		return abilities
 	}
 
-	advancedConfigs := make(map[int]*dto.AdvancedCustomConfig)
+	channelsByID := make(map[int]*Channel, len(channels))
 	for _, channel := range channels {
-		if channel.Type == constant.ChannelTypeAdvancedCustom {
-			advancedConfigs[channel.Id] = channel.GetOtherSettings().AdvancedCustom
-		}
+		channelsByID[channel.Id] = channel
 	}
 
 	filtered := make([]Ability, 0, len(abilities))
 	for _, ability := range abilities {
-		config, isAdvancedCustom := advancedConfigs[ability.ChannelId]
-		if !isAdvancedCustom {
+		channel, ok := channelsByID[ability.ChannelId]
+		if !ok {
+			continue
+		}
+		if !constant.ChannelTypeSupportsRelayPath(channel.Type, requestPath) {
+			continue
+		}
+		if channel.Type != constant.ChannelTypeAdvancedCustom {
 			filtered = append(filtered, ability)
 			continue
 		}
+		config := channel.GetOtherSettings().AdvancedCustom
 		if config != nil && config.SupportsPath(requestPath) {
 			filtered = append(filtered, ability)
 		}

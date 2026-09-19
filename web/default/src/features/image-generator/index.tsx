@@ -1,6 +1,3 @@
-import { useQuery } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
-import { ArrowLeft, ImageIcon, FilmIcon } from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -19,6 +16,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
+import { ArrowLeft, FilmIcon, ImageIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
@@ -34,11 +34,13 @@ import { VideoPanel } from './components/video-panel'
 import { VideoResults } from './components/video-results'
 import {
   detectImageModelFamily,
+  getTencentVODImageProfile,
   getVideoVariantDisplayName,
   isHiddenVideoVariantModel,
+  limitTencentVODReferenceImages,
 } from './constants'
-import { isVideoGenerationModelName } from './model-classification'
 import { useImageGenerator, useVideoGenerator } from './hooks'
+import { isVideoGenerationModelName } from './model-classification'
 import type { GeneratorMode, GroupOption, ModelOption } from './types'
 
 const IMAGE_MODEL_RE =
@@ -52,6 +54,35 @@ function selectGroupForModel(model: ModelOption, currentGroup: string): string {
   if (!model.groups || model.groups.length === 0) return currentGroup
   if (model.groups.includes(currentGroup)) return currentGroup
   return model.groups[0]
+}
+
+function usesImageTaskEndpoint(
+  model: ModelOption | undefined,
+  group: string
+): boolean {
+  return model?.imageTaskGroups?.includes(group) ?? false
+}
+
+function usesTencentVODEndpoint(
+  model: ModelOption | undefined,
+  group: string
+): boolean {
+  return model?.tencentVODImageGroups?.includes(group) ?? false
+}
+
+function usesMixedImageTaskEndpoint(
+  model: ModelOption | undefined,
+  group: string
+): boolean {
+  return model?.mixedImageTaskGroups?.includes(group) ?? false
+}
+
+function getTencentVODUpstreamModel(
+  model: ModelOption | undefined,
+  group: string
+): string | undefined {
+  if (!model?.tencentVODImageGroups?.includes(group)) return undefined
+  return model.tencentVODUpstreamModels?.[group]
 }
 
 function getDisplayVideoModels(models: ModelOption[]): ModelOption[] {
@@ -109,6 +140,7 @@ export function ImageGenerator(props: ImageGeneratorProps) {
   const imageConfig = imageGen.config
   const videoConfig = videoGen.config
   const updateImageConfig = imageGen.updateConfig
+  const generateImage = imageGen.generate
   const updateVideoConfig = videoGen.updateConfig
   const recoverVideoTask = videoGen.recoverTask
   const isVideoGenerating = videoGen.isGenerating
@@ -158,8 +190,33 @@ export function ImageGenerator(props: ImageGeneratorProps) {
 
   // Filter models by tab type so image tab only shows image models, etc.
   const imageModels = useMemo(
-    () => models.filter((m) => IMAGE_MODEL_RE.test(m.value)),
+    () =>
+      models.filter(
+        (model) =>
+          IMAGE_MODEL_RE.test(model.value) ||
+          (model.imageTaskGroups?.length ?? 0) > 0
+      ),
     [models]
+  )
+  const selectedImageModel = useMemo(
+    () => imageModels.find((model) => model.value === imageConfig.model),
+    [imageConfig.model, imageModels]
+  )
+  const imageTaskEndpoint = usesImageTaskEndpoint(
+    selectedImageModel,
+    imageConfig.group
+  )
+  const tencentVODEndpoint = usesTencentVODEndpoint(
+    selectedImageModel,
+    imageConfig.group
+  )
+  const promptOnlyTask = usesMixedImageTaskEndpoint(
+    selectedImageModel,
+    imageConfig.group
+  )
+  const tencentVODUpstreamModel = getTencentVODUpstreamModel(
+    selectedImageModel,
+    imageConfig.group
   )
   const allVideoModels = useMemo(
     () => models.filter(isVideoGenerationModel),
@@ -180,41 +237,100 @@ export function ImageGenerator(props: ImageGeneratorProps) {
 
   const applyImageModelChange = useCallback(
     (value: string) => {
-      const oldFamily = detectImageModelFamily(imageConfig.model)
-      const newFamily = detectImageModelFamily(value)
+      const nextModel = imageModels.find((model) => model.value === value)
+      const nextGroup = nextModel
+        ? selectGroupForModel(nextModel, imageConfig.group)
+        : imageConfig.group
+      const nextTencentVODUpstreamModel = getTencentVODUpstreamModel(
+        nextModel,
+        nextGroup
+      )
+      const oldFamily = detectImageModelFamily(
+        imageConfig.model,
+        usesTencentVODEndpoint(selectedImageModel, imageConfig.group) ||
+          usesMixedImageTaskEndpoint(selectedImageModel, imageConfig.group)
+      )
+      const newFamily = detectImageModelFamily(
+        value,
+        usesTencentVODEndpoint(nextModel, nextGroup) ||
+          usesMixedImageTaskEndpoint(nextModel, nextGroup)
+      )
+      const nextTencentVODProfile = getTencentVODImageProfile(
+        nextTencentVODUpstreamModel
+      )
       updateImageConfig('model', value)
+      if (nextGroup !== imageConfig.group) {
+        updateImageConfig('group', nextGroup)
+      }
       // Reset size when switching between families with different size formats
-      if (oldFamily !== newFamily) {
+      const changedTencentVODModel =
+        newFamily === 'tencent-vod-image' && imageConfig.model !== value
+      if (oldFamily !== newFamily || changedTencentVODModel) {
         let defaultSize = '1024x1024'
         if (newFamily === 'hunyuan-image') {
           defaultSize = '1024:1024'
         } else if (newFamily === 'image-gi' || newFamily === 'image-gi2') {
           defaultSize = '1:1'
+        } else if (
+          newFamily === 'tencent-vod-image' &&
+          nextTencentVODProfile.defaultAspectRatio
+        ) {
+          defaultSize = nextTencentVODProfile.defaultAspectRatio
         }
         updateImageConfig('size', defaultSize)
+        updateImageConfig(
+          'resolution',
+          nextTencentVODProfile.defaultResolution ?? ''
+        )
       }
       // Clear metadata when switching families
       if (oldFamily !== newFamily) {
         updateImageConfig('metadata', {})
         updateImageConfig('images', [])
+      } else if (newFamily === 'tencent-vod-image') {
+        const maxImages = nextTencentVODProfile.maxReferenceImages
+        if (imageConfig.images.length > maxImages) {
+          updateImageConfig(
+            'images',
+            limitTencentVODReferenceImages(
+              imageConfig.images,
+              nextTencentVODUpstreamModel ?? ''
+            )
+          )
+        }
       }
     },
-    [imageConfig.model, updateImageConfig]
+    [
+      imageConfig.group,
+      imageConfig.images,
+      imageConfig.model,
+      imageModels,
+      selectedImageModel,
+      updateImageConfig,
+    ]
   )
 
   const handleImageModelChange = useCallback(
     (value: string) => {
       applyImageModelChange(value)
-      const nextModel = imageModels.find((m) => m.value === value)
-      if (nextModel) {
-        updateImageConfig(
-          'group',
-          selectGroupForModel(nextModel, imageConfig.group)
-        )
-      }
     },
-    [applyImageModelChange, imageConfig.group, imageModels, updateImageConfig]
+    [applyImageModelChange]
   )
+
+  const handleImageGenerate = useCallback(() => {
+    void generateImage(
+      imageTaskEndpoint,
+      tencentVODEndpoint || promptOnlyTask,
+      tencentVODUpstreamModel,
+      promptOnlyTask
+    )
+  }, [
+    generateImage,
+    imageTaskEndpoint,
+    promptOnlyTask,
+    tencentVODEndpoint,
+    tencentVODUpstreamModel,
+  ])
 
   const handleVideoModelChange = useCallback(
     (value: string) => {
@@ -343,9 +459,12 @@ export function ImageGenerator(props: ImageGeneratorProps) {
               updateConfig={imageGen.updateConfig}
               onModelChange={handleImageModelChange}
               models={imageModels}
+              useTencentVODEndpoint={tencentVODEndpoint || promptOnlyTask}
+              tencentVODUpstreamModel={tencentVODUpstreamModel}
+              promptOnlyTask={promptOnlyTask}
               isModelLoading={isModelLoading}
               isGenerating={imageGen.isGenerating}
-              onGenerate={imageGen.generate}
+              onGenerate={handleImageGenerate}
               onCancel={imageGen.cancel}
             />
           ) : (

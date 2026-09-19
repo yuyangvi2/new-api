@@ -39,10 +39,14 @@ type userModelsResponse struct {
 type userModelsWithGroupsResponse struct {
 	Success bool `json:"success"`
 	Data    []struct {
-		Label      string   `json:"label"`
-		Value      string   `json:"value"`
-		Groups     []string `json:"groups"`
-		ModelRatio float64  `json:"model_ratio"`
+		Label                    string            `json:"label"`
+		Value                    string            `json:"value"`
+		Groups                   []string          `json:"groups"`
+		ImageTaskGroups          []string          `json:"image_task_groups"`
+		TencentVODImageGroups    []string          `json:"tencent_vod_image_groups"`
+		MixedImageTaskGroups     []string          `json:"mixed_image_task_groups"`
+		TencentVODUpstreamModels map[string]string `json:"tencent_vod_upstream_models"`
+		ModelRatio               float64           `json:"model_ratio"`
 	} `json:"data"`
 }
 
@@ -265,6 +269,66 @@ func TestGetUserModelsWithGroupsIncludesModelRatio(t *testing.T) {
 	require.Equal(t, "zz-priced-video-model", payload.Data[0].Value)
 	require.ElementsMatch(t, []string{"default"}, payload.Data[0].Groups)
 	require.InDelta(t, 2.5, payload.Data[0].ModelRatio, 0.000001)
+}
+
+func TestGetUserModelsWithGroupsSelectsImageEndpointByHighestPriority(t *testing.T) {
+	vodMapping := `{"gemini-vod-image":"GG:2.5","custom-vod-alias":"q2","mixed-task-image":"GG:2.5"}`
+	vodSettings := `{"vod_aigc":{"default_model_name":"Vidu"}}`
+	db := setupModelListControllerTestDB(t)
+	require.NoError(t, db.Create(&model.User{
+		Id:       1004,
+		Username: "playground-image-endpoint-user",
+		Password: "password",
+		Group:    "default",
+		Status:   common.UserStatusEnabled,
+	}).Error)
+	require.NoError(t, db.Create(&[]model.Channel{
+		{Id: 11, Name: "gemini", Type: constant.ChannelTypeGemini, Status: common.ChannelStatusEnabled},
+		{Id: 12, Name: "vod-aigc", Type: constant.ChannelTypeVODAIGC, Status: common.ChannelStatusEnabled, ModelMapping: &vodMapping, OtherSettings: vodSettings},
+		{Id: 13, Name: "aiart", Type: constant.ChannelTypeAIArt, Status: common.ChannelStatusEnabled},
+	}).Error)
+	require.NoError(t, db.Create(&[]model.Ability{
+		{Group: "default", Model: "gemini-sync-image", ChannelId: 11, Enabled: true},
+		{Group: "default", Model: "gemini-vod-image", ChannelId: 12, Enabled: true},
+		{Group: "default", Model: "custom-vod-alias", ChannelId: 12, Enabled: true},
+		{Group: "default", Model: "gemini-task-preferred-image", ChannelId: 11, Enabled: true, Priority: common.GetPointer(int64(0))},
+		{Group: "default", Model: "gemini-task-preferred-image", ChannelId: 12, Enabled: true, Priority: common.GetPointer(int64(10))},
+		{Group: "default", Model: "gemini-sync-preferred-image", ChannelId: 11, Enabled: true, Priority: common.GetPointer(int64(10))},
+		{Group: "default", Model: "gemini-sync-preferred-image", ChannelId: 12, Enabled: true, Priority: common.GetPointer(int64(0))},
+		{Group: "default", Model: "gemini-equal-priority-image", ChannelId: 11, Enabled: true},
+		{Group: "default", Model: "gemini-equal-priority-image", ChannelId: 12, Enabled: true},
+		{Group: "default", Model: "mixed-task-image", ChannelId: 12, Enabled: true},
+		{Group: "default", Model: "mixed-task-image", ChannelId: 13, Enabled: true},
+	}).Error)
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/user/self/models?with_groups=true", nil)
+	ctx.Set("id", 1004)
+
+	GetUserModels(ctx)
+
+	payload := decodeUserModelsWithGroupsResponse(t, recorder)
+	modelsByName := make(map[string][]string, len(payload.Data))
+	vodGroupsByName := make(map[string][]string, len(payload.Data))
+	vodModelsByName := make(map[string]map[string]string, len(payload.Data))
+	mixedGroupsByName := make(map[string][]string, len(payload.Data))
+	for _, item := range payload.Data {
+		modelsByName[item.Value] = item.ImageTaskGroups
+		vodGroupsByName[item.Value] = item.TencentVODImageGroups
+		vodModelsByName[item.Value] = item.TencentVODUpstreamModels
+		mixedGroupsByName[item.Value] = item.MixedImageTaskGroups
+	}
+	assert.Empty(t, modelsByName["gemini-sync-image"])
+	assert.Equal(t, []string{"default"}, modelsByName["gemini-vod-image"])
+	assert.Equal(t, []string{"default"}, modelsByName["gemini-task-preferred-image"])
+	assert.Empty(t, modelsByName["gemini-sync-preferred-image"])
+	assert.Empty(t, modelsByName["gemini-equal-priority-image"])
+	assert.Equal(t, []string{"default"}, vodGroupsByName["custom-vod-alias"])
+	assert.Equal(t, "Vidu:q2", vodModelsByName["custom-vod-alias"]["default"])
+	assert.Equal(t, []string{"default"}, modelsByName["mixed-task-image"])
+	assert.Equal(t, []string{"default"}, mixedGroupsByName["mixed-task-image"])
+	assert.Empty(t, vodGroupsByName["mixed-task-image"])
 }
 
 func TestListModelsIncludesTieredBillingModel(t *testing.T) {

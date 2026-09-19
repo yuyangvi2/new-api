@@ -30,6 +30,7 @@ export interface ChannelTypeConfig {
   requiresOrganization?: boolean
   requiresRegion?: boolean
   supportedModels?: string[]
+  defaultModelMapping?: Record<string, string>
   hints?: {
     baseUrl?: string
     key?: string
@@ -176,6 +177,35 @@ export const CHANNEL_TYPE_CONFIGS: Record<number, ChannelTypeConfig> = {
       baseUrl: 'Default: https://zhenze-huhehaote.cmecloud.cn/api/v3',
       key: 'Bearer API key',
       models: 'doubao-seedance-2.0, doubao-seedance-2-0-260128',
+    },
+  },
+  9007: {
+    id: 9007,
+    name: CHANNEL_TYPES[9007],
+    icon: 'tencent',
+    defaultBaseUrl: 'https://vod.tencentcloudapi.com',
+    supportedModels: [
+      'gemini-2.5-flash-image',
+      'gemini-3-pro-image',
+      'gemini-3.1-flash-image',
+      'gemini-3.1-flash-lite-image',
+      'vidu-q2',
+    ],
+    defaultModelMapping: {
+      'gemini-2.5-flash-image': 'GG:2.5',
+      'gemini-3-pro-image': 'GG:3.0',
+      'gemini-3.1-flash-image': 'GG:3.1',
+      'gemini-3.1-flash-lite-image': 'GG:3.1-lite',
+      'vidu-q2': 'Vidu:q2',
+    },
+    hints: {
+      baseUrl: 'Default: https://vod.tencentcloudapi.com',
+      key: 'Format: SecretId|SecretKey',
+      models:
+        'gemini-2.5-flash-image, gemini-3-pro-image, gemini-3.1-flash-image, gemini-3.1-flash-lite-image, vidu-q2',
+    },
+    validation: {
+      keyFormat: /^[^|]+\|[^|]+$/,
     },
   },
   10001: {

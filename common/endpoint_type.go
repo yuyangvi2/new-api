@@ -6,6 +6,8 @@ import "github.com/QuantumNous/new-api/constant"
 func GetEndpointTypesByChannelType(channelType int, modelName string) []constant.EndpointType {
 	var endpointTypes []constant.EndpointType
 	switch channelType {
+	case constant.ChannelTypeAIArt, constant.ChannelTypeVODAIGC:
+		endpointTypes = []constant.EndpointType{constant.EndpointTypeImageTask}
 	case constant.ChannelTypeSeedanceOfficial:
 		endpointTypes = []constant.EndpointType{constant.EndpointTypeSeedance}
 	case constant.ChannelTypeSeedanceM:

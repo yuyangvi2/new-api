@@ -51,6 +51,37 @@ type ChannelOtherSettings struct {
 	UpstreamModelUpdateIgnoredModels      []string              `json:"upstream_model_update_ignored_models,omitempty"`       // 手动忽略的模型
 	AdvancedCustom                        *AdvancedCustomConfig `json:"advanced_custom,omitempty"`
 	SeedanceM                             *SeedanceMSettings    `json:"seedance_m,omitempty"`
+	VODAIGC                               *VODAIGCSettings      `json:"vod_aigc,omitempty"`
+}
+
+type VODAIGCSettings struct {
+	SubAppID         int64  `json:"sub_app_id,omitempty"`
+	InputRegion      string `json:"input_region,omitempty"`
+	DefaultModelName string `json:"default_model_name,omitempty"`
+}
+
+func (s *VODAIGCSettings) Validate() error {
+	if s == nil {
+		return nil
+	}
+	if s.SubAppID < 0 {
+		return fmt.Errorf("vod_aigc.sub_app_id must not be negative")
+	}
+	if s.InputRegion != "" {
+		switch s.InputRegion {
+		case "Mainland", "Oversea", "OverseaUSWest":
+		default:
+			return fmt.Errorf("vod_aigc.input_region is invalid: %s", s.InputRegion)
+		}
+	}
+	if s.DefaultModelName != "" {
+		switch s.DefaultModelName {
+		case "OG", "GG", "Hunyuan", "Vidu", "Kling", "Mingmou":
+		default:
+			return fmt.Errorf("vod_aigc.default_model_name is invalid: %s", s.DefaultModelName)
+		}
+	}
+	return nil
 }
 
 type SeedanceMSettings struct {

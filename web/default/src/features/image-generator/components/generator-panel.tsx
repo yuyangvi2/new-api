@@ -16,10 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMemo } from 'react'
 import { SparklesIcon, SquareIcon } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { cn } from '@/lib/utils'
+
+import { ModelSelector } from '@/components/model-group-selector'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
@@ -30,22 +31,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { ModelSelector } from '@/components/model-group-selector'
+import { cn } from '@/lib/utils'
+
 import {
   AIART_ASPECT_RATIOS,
   COUNT_OPTIONS,
   detectImageModelFamily,
+  getTencentVODImageProfile,
   GPT_IMAGE_QUALITY_OPTIONS,
   GPT_IMAGE_SIZE_PRESETS,
+  hasValidImageGenerationInput,
   HUNYUAN_IMAGE_RESOLUTIONS,
   IMAGE_FAMILY_PARAMS,
   MAX_PROMPT_LENGTH,
   QUALITY_OPTIONS,
   SIZE_PRESETS,
   supportsReferenceImages,
+  TENCENT_VOD_IMAGE_MIME_TYPES,
 } from '../constants'
 import type { GeneratorConfig, ModelOption } from '../types'
 import { ReferenceImagesInput } from './reference-images-input'
@@ -58,6 +63,9 @@ interface GeneratorPanelProps {
   ) => void
   onModelChange: (value: string) => void
   models: ModelOption[]
+  useTencentVODEndpoint: boolean
+  tencentVODUpstreamModel?: string
+  promptOnlyTask: boolean
   isModelLoading: boolean
   isGenerating: boolean
   onGenerate: () => void
@@ -69,21 +77,47 @@ export function GeneratorPanel({
   updateConfig,
   onModelChange,
   models,
+  useTencentVODEndpoint,
+  tencentVODUpstreamModel,
+  promptOnlyTask,
   isModelLoading,
   isGenerating,
   onGenerate,
   onCancel,
 }: GeneratorPanelProps) {
   const { t } = useTranslation()
+  const [isUploadingReference, setIsUploadingReference] = useState(false)
 
-  const family = useMemo(() => detectImageModelFamily(config.model), [config.model])
+  const family = useMemo(
+    () => detectImageModelFamily(config.model, useTencentVODEndpoint),
+    [config.model, useTencentVODEndpoint]
+  )
   const familyParams = useMemo(() => IMAGE_FAMILY_PARAMS[family], [family])
   const isDallE3 = family === 'dall-e'
   const isGptImage = family === 'gpt-image'
   const isImageGI = family === 'image-gi' || family === 'image-gi2'
   const isHunyuanImage = family === 'hunyuan-image'
-  const hasRefImages = supportsReferenceImages(family)
-  const canGenerate = !!config.prompt.trim() && !isGenerating
+  const isTencentVODImage = family === 'tencent-vod-image'
+  const tencentVODProfile = useMemo(
+    () => getTencentVODImageProfile(tencentVODUpstreamModel),
+    [tencentVODUpstreamModel]
+  )
+  const hasRefImages =
+    !promptOnlyTask &&
+    supportsReferenceImages(family) &&
+    (!isTencentVODImage || tencentVODProfile.maxReferenceImages > 0)
+  const canGenerate =
+    hasValidImageGenerationInput(
+      family,
+      config.prompt,
+      hasRefImages ? config.images.length : 0
+    ) &&
+    !isGenerating &&
+    !isUploadingReference
+  let maxReferenceImages: number | undefined
+  if (isTencentVODImage) {
+    maxReferenceImages = tencentVODProfile.maxReferenceImages
+  }
 
   const updateMeta = (key: string, value: unknown) => {
     updateConfig('metadata', { ...config.metadata, [key]: value })
@@ -92,10 +126,12 @@ export function GeneratorPanel({
   const getMetaValue = (key: string, defaultValue: unknown) =>
     config.metadata[key] ?? defaultValue
 
-  let sizeOptions: { label: string; value: string }[] = SIZE_PRESETS.map((p) => ({
-    label: `${p.ratioLabel} (${p.value})`,
-    value: p.value,
-  }))
+  let sizeOptions: { label: string; value: string }[] = SIZE_PRESETS.map(
+    (p) => ({
+      label: `${p.ratioLabel} (${p.value})`,
+      value: p.value,
+    })
+  )
   if (isHunyuanImage) {
     sizeOptions = HUNYUAN_IMAGE_RESOLUTIONS.map((p) => ({
       label: p.label,
@@ -103,6 +139,8 @@ export function GeneratorPanel({
     }))
   } else if (isImageGI) {
     sizeOptions = [...AIART_ASPECT_RATIOS]
+  } else if (isTencentVODImage) {
+    sizeOptions = [...tencentVODProfile.aspectRatios]
   } else if (isGptImage) {
     sizeOptions = GPT_IMAGE_SIZE_PRESETS.map((p) => ({
       label: 'ratioLabel' in p ? `${p.ratioLabel} (${p.value})` : p.label,
@@ -111,16 +149,34 @@ export function GeneratorPanel({
   }
 
   // Quality options vary by family
-  const qualityOptions = isGptImage ? GPT_IMAGE_QUALITY_OPTIONS : QUALITY_OPTIONS
+  const qualityOptions = isGptImage
+    ? GPT_IMAGE_QUALITY_OPTIONS
+    : QUALITY_OPTIONS
 
   // Show count selector only for models that support n > 1
-  const showCount = !isDallE3 && !isImageGI && !isHunyuanImage
+  const showCount =
+    !promptOnlyTask &&
+    !isDallE3 &&
+    !isImageGI &&
+    !isHunyuanImage &&
+    !isTencentVODImage
   let sizeLabel = t('Size')
-  if (isImageGI) {
+  if (isImageGI || isTencentVODImage) {
     sizeLabel = t('Aspect ratio')
   } else if (isHunyuanImage) {
     sizeLabel = t('Resolution')
   }
+  const tencentVODResolutionOptions = tencentVODProfile.resolutions
+  const selectedSize = sizeOptions.some(
+    (option) => option.value === config.size
+  )
+    ? config.size
+    : tencentVODProfile.defaultAspectRatio
+  const selectedResolution = tencentVODResolutionOptions.some(
+    (option) => option.value === config.resolution
+  )
+    ? config.resolution
+    : tencentVODProfile.defaultResolution
 
   return (
     <div className='flex h-full flex-col'>
@@ -164,42 +220,82 @@ export function GeneratorPanel({
             <ReferenceImagesInput
               images={config.images}
               onChange={(imgs) => updateConfig('images', imgs)}
+              onUploadingChange={setIsUploadingReference}
               disabled={isGenerating}
+              maxImages={maxReferenceImages}
+              uploadFiles={isTencentVODImage}
+              allowedMimeTypes={
+                isTencentVODImage ? TENCENT_VOD_IMAGE_MIME_TYPES : undefined
+              }
             />
           </div>
         )}
 
         {/* Aspect ratio / size */}
-        <div className='space-y-2'>
-          <Label className='text-sm font-medium'>{sizeLabel}</Label>
-          <Select
-            items={sizeOptions.map((p) => ({
-              value: p.value,
-              label: p.label,
-            }))}
-            onValueChange={(v) => {
-              if (v) updateConfig('size', v)
-            }}
-            value={config.size}
-            disabled={isGenerating}
-          >
-            <SelectTrigger className='w-full'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {sizeOptions.map((p) => (
-                  <SelectItem key={p.value} value={p.value}>
-                    {p.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
+        {!promptOnlyTask && (!isTencentVODImage || sizeOptions.length > 0) && (
+          <div className='space-y-2'>
+            <Label className='text-sm font-medium'>{sizeLabel}</Label>
+            <Select
+              items={sizeOptions.map((p) => ({
+                value: p.value,
+                label: p.label,
+              }))}
+              onValueChange={(v) => {
+                if (v) updateConfig('size', v)
+              }}
+              value={selectedSize}
+              disabled={isGenerating}
+            >
+              <SelectTrigger className='w-full'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {sizeOptions.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {!promptOnlyTask &&
+          isTencentVODImage &&
+          tencentVODResolutionOptions.length > 0 && (
+            <div className='space-y-2'>
+              <Label className='text-sm font-medium'>{t('Resolution')}</Label>
+              <Select
+                items={tencentVODResolutionOptions.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+                onValueChange={(value) => {
+                  if (value) updateConfig('resolution', value)
+                }}
+                value={selectedResolution}
+                disabled={isGenerating}
+              >
+                <SelectTrigger className='w-full'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {tencentVODResolutionOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
         {/* Quality (dall-e-3 and gpt-image) */}
-        {(isDallE3 || isGptImage) && (
+        {!promptOnlyTask && (isDallE3 || isGptImage) && (
           <div className='space-y-2'>
             <Label className='text-sm font-medium'>{t('Quality')}</Label>
             <div className='grid grid-cols-2 gap-2'>
@@ -257,10 +353,10 @@ export function GeneratorPanel({
         )}
 
         {/* Model-family specific parameters */}
-        {familyParams.length > 0 && (
+        {!promptOnlyTask && familyParams.length > 0 && (
           <>
             <div className='border-muted-foreground/20 border-t pt-4'>
-              <Label className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+              <Label className='text-muted-foreground text-xs font-medium tracking-wide uppercase'>
                 {t('Advanced')}
               </Label>
             </div>
@@ -306,7 +402,9 @@ export function GeneratorPanel({
                       className='flex-1'
                     />
                     <span className='text-muted-foreground w-8 text-right text-xs'>
-                      {Number(getMetaValue(param.key, param.default)).toFixed(1)}
+                      {Number(getMetaValue(param.key, param.default)).toFixed(
+                        1
+                      )}
                     </span>
                   </div>
                 )}

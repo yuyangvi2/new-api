@@ -663,12 +663,111 @@ func GetUserModels(c *gin.Context) {
 	}
 	sort.Strings(models)
 	if c.Query("with_groups") == "true" {
+		enabledAbilities, err := model.GetEnableAbilityWithChannelsByGroups(groupNames)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		type imageEndpointCapability struct {
+			priority                int64
+			initialized             bool
+			hasTaskChannel          bool
+			hasNonTaskChannel       bool
+			hasVODTaskChannel       bool
+			hasOtherTaskChannel     bool
+			vodUpstreamModel        string
+			vodUpstreamModelInvalid bool
+		}
+		imageCapabilities := make(map[string]map[string]imageEndpointCapability)
+		for _, ability := range enabledAbilities {
+			groupCapabilities := imageCapabilities[ability.Model]
+			if groupCapabilities == nil {
+				groupCapabilities = make(map[string]imageEndpointCapability)
+				imageCapabilities[ability.Model] = groupCapabilities
+			}
+			capability := groupCapabilities[ability.Group]
+			priority := int64(0)
+			if ability.Priority != nil {
+				priority = *ability.Priority
+			}
+			if !capability.initialized || priority > capability.priority {
+				capability = imageEndpointCapability{
+					priority:    priority,
+					initialized: true,
+				}
+			} else if priority < capability.priority {
+				continue
+			}
+			if constant.IsImageTaskChannelType(ability.ChannelType) {
+				capability.hasTaskChannel = true
+				if ability.ChannelType == constant.ChannelTypeVODAIGC {
+					capability.hasVODTaskChannel = true
+					mappingJSON := ""
+					if ability.ChannelModelMapping != nil {
+						mappingJSON = *ability.ChannelModelMapping
+					}
+					mappedModel, mappingErr := common.ResolveStrictModelMapping(ability.Model, mappingJSON)
+					if mappingErr != nil {
+						capability.vodUpstreamModelInvalid = true
+					} else {
+						if !strings.Contains(mappedModel, ":") {
+							defaultModelName := "GG"
+							var channelSettings dto.ChannelOtherSettings
+							channelOtherSettings := ""
+							if ability.ChannelOtherSettings != nil {
+								channelOtherSettings = *ability.ChannelOtherSettings
+							}
+							if common.UnmarshalJsonStr(channelOtherSettings, &channelSettings) == nil &&
+								channelSettings.VODAIGC != nil && channelSettings.VODAIGC.DefaultModelName != "" {
+								defaultModelName = channelSettings.VODAIGC.DefaultModelName
+							}
+							mappedModel = defaultModelName + ":" + mappedModel
+						}
+						if capability.vodUpstreamModel == "" {
+							capability.vodUpstreamModel = mappedModel
+						} else if capability.vodUpstreamModel != mappedModel {
+							capability.vodUpstreamModelInvalid = true
+						}
+					}
+				} else {
+					capability.hasOtherTaskChannel = true
+				}
+			} else {
+				capability.hasNonTaskChannel = true
+			}
+			groupCapabilities[ability.Group] = capability
+		}
+		// The frontend must choose the endpoint before channel distribution runs.
+		// Follow channel priority; when both endpoint kinds tie, prefer the
+		// synchronous endpoint so existing Gemini image channels keep working.
 		data := make([]gin.H, 0, len(models))
 		for _, modelName := range models {
+			imageTaskGroups := make([]string, 0)
+			tencentVODImageGroups := make([]string, 0)
+			mixedImageTaskGroups := make([]string, 0)
+			tencentVODUpstreamModels := make(map[string]string)
+			for _, group := range modelGroups[modelName] {
+				capability := imageCapabilities[modelName][group]
+				if capability.hasTaskChannel && !capability.hasNonTaskChannel {
+					imageTaskGroups = append(imageTaskGroups, group)
+					if capability.hasVODTaskChannel && capability.hasOtherTaskChannel {
+						mixedImageTaskGroups = append(mixedImageTaskGroups, group)
+					} else if capability.hasVODTaskChannel {
+						tencentVODImageGroups = append(tencentVODImageGroups, group)
+						if !capability.vodUpstreamModelInvalid && capability.vodUpstreamModel != "" {
+							tencentVODUpstreamModels[group] = capability.vodUpstreamModel
+						}
+					}
+				}
+			}
 			item := gin.H{
-				"label":  modelName,
-				"value":  modelName,
-				"groups": modelGroups[modelName],
+				"label":                       modelName,
+				"value":                       modelName,
+				"groups":                      modelGroups[modelName],
+				"image_task_groups":           imageTaskGroups,
+				"tencent_vod_image_groups":    tencentVODImageGroups,
+				"mixed_image_task_groups":     mixedImageTaskGroups,
+				"tencent_vod_upstream_models": tencentVODUpstreamModels,
 			}
 			if modelRatio, ok, _ := ratio_setting.GetModelRatio(modelName); ok {
 				item["model_ratio"] = modelRatio

@@ -294,9 +294,10 @@ func noteTaskQuotaClamp(info *relaycommon.RelayInfo, clamp *common.QuotaClamp) {
 }
 
 var fetchRespBuilders = map[int]func(c *gin.Context) (respBody []byte, taskResp *dto.TaskError){
-	relayconstant.RelayModeSunoFetchByID:  sunoFetchByIDRespBodyBuilder,
-	relayconstant.RelayModeSunoFetch:      sunoFetchRespBodyBuilder,
-	relayconstant.RelayModeVideoFetchByID: videoFetchByIDRespBodyBuilder,
+	relayconstant.RelayModeSunoFetchByID:      sunoFetchByIDRespBodyBuilder,
+	relayconstant.RelayModeSunoFetch:          sunoFetchRespBodyBuilder,
+	relayconstant.RelayModeVideoFetchByID:     videoFetchByIDRespBodyBuilder,
+	relayconstant.RelayModeImageTaskFetchByID: videoFetchByIDRespBodyBuilder,
 }
 
 func RelayTaskFetch(c *gin.Context, relayMode int) (taskResp *dto.TaskError) {
@@ -520,10 +521,14 @@ func tryRealtimeFetch(c *gin.Context, task *model.Task, isOpenAIVideoAPI bool) [
 		return nil
 	}
 
-	resp, err := adaptor.FetchTask(baseURL, channelModel.Key, map[string]any{
+	fetchBody := map[string]any{
 		"task_id": task.GetUpstreamTaskID(),
 		"action":  task.Action,
-	}, proxy)
+	}
+	if task.PrivateData.SubAppID > 0 {
+		fetchBody["sub_app_id"] = task.PrivateData.SubAppID
+	}
+	resp, err := adaptor.FetchTask(baseURL, channelModel.Key, fetchBody, proxy)
 	if err != nil || resp == nil {
 		return nil
 	}
