@@ -301,7 +301,7 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 				return err
 			}
 
-			return nil
+			return model.InsertInitialToken(tx, user.Id, user.Username)
 		})
 		if err != nil {
 			return nil, err
@@ -330,7 +330,7 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 				return err
 			}
 
-			return nil
+			return model.InsertInitialToken(tx, user.Id, user.Username)
 		})
 		if err != nil {
 			return nil, err

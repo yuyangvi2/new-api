@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
@@ -29,6 +31,41 @@ type Token struct {
 	Group              string         `json:"group" gorm:"default:''"`
 	CrossGroupRetry    bool           `json:"cross_group_retry"` // 跨分组重试，仅auto分组有效
 	DeletedAt          gorm.DeletedAt `gorm:"index"`
+}
+
+// InsertInitialToken creates the API token provisioned for a newly registered
+// user. Keeping this in the model layer lets every registration method include
+// the token in the same database transaction as the user.
+func InsertInitialToken(tx *gorm.DB, userId int, username string) error {
+	if !constant.GenerateDefaultToken {
+		return nil
+	}
+	if tx == nil {
+		tx = DB
+	}
+
+	key, err := common.GenerateKey()
+	if err != nil {
+		return err
+	}
+	useAutoGroup := setting.DefaultUseAutoGroup
+	token := Token{
+		UserId:             userId,
+		Name:               username + "的初始令牌",
+		Key:                key,
+		Status:             common.TokenStatusEnabled,
+		CreatedTime:        common.GetTimestamp(),
+		AccessedTime:       common.GetTimestamp(),
+		ExpiredTime:        -1,
+		RemainQuota:        500000,
+		UnlimitedQuota:     true,
+		ModelLimitsEnabled: false,
+		CrossGroupRetry:    useAutoGroup,
+	}
+	if useAutoGroup {
+		token.Group = "auto"
+	}
+	return tx.Create(&token).Error
 }
 
 func (token *Token) Clean() {
