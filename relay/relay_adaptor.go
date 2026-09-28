@@ -131,6 +131,8 @@ func GetAdaptor(apiType int) channel.Adaptor {
 		return &codex.Adaptor{}
 	case constant.APITypeAdvancedCustom:
 		return &advancedcustom.Adaptor{}
+	case constant.APITypeVODAIGC:
+		return &taskvodaigc.ImageAdaptor{}
 	}
 	return nil
 }

@@ -66,7 +66,7 @@ func IsSynchronousImageRequestPath(requestPath string) bool {
 // selected for synchronous image requests, and vice versa.
 func ChannelTypeSupportsRelayPath(channelType int, requestPath string) bool {
 	if channelType == ChannelTypeVODAIGC {
-		return IsImageTaskRequestPath(requestPath)
+		return IsImageTaskRequestPath(requestPath) || IsSynchronousImageRequestPath(requestPath)
 	}
 
 	if IsImageTaskRequestPath(requestPath) {

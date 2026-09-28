@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -181,6 +182,32 @@ func GetAndValidOpenAIImageRequest(c *gin.Context, relayMode int) (*dto.ImageReq
 			}
 			imageRequest.Quality = formData.Get("quality")
 			imageRequest.Size = formData.Get("size")
+			imageRequest.ResponseFormat = formData.Get("response_format")
+			if background := formData.Get("background"); background != "" {
+				imageRequest.Background, _ = common.Marshal(background)
+			}
+			if outputFormat := formData.Get("output_format"); outputFormat != "" {
+				imageRequest.OutputFormat, _ = common.Marshal(outputFormat)
+			}
+			if inputFidelity := formData.Get("input_fidelity"); inputFidelity != "" {
+				imageRequest.InputFidelity, _ = common.Marshal(inputFidelity)
+			}
+			for _, key := range []string{"negative_prompt", "enhance_prompt", "seed", "tasks_priority"} {
+				if value := formData.Get(key); value != "" {
+					if imageRequest.Extra == nil {
+						imageRequest.Extra = make(map[string]json.RawMessage)
+					}
+					if key == "seed" || key == "tasks_priority" {
+						parsed, err := strconv.Atoi(value)
+						if err != nil {
+							return nil, fmt.Errorf("%s must be an integer", key)
+						}
+						imageRequest.Extra[key], _ = common.Marshal(parsed)
+					} else {
+						imageRequest.Extra[key], _ = common.Marshal(value)
+					}
+				}
+			}
 			if streamValue := strings.TrimSpace(formData.Get("stream")); streamValue != "" {
 				stream, err := strconv.ParseBool(streamValue)
 				if err != nil {

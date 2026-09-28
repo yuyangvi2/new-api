@@ -98,13 +98,18 @@ type outputConfig struct {
 }
 
 type createRequest struct {
-	SubAppID     int64           `json:"SubAppId"`
-	ModelName    string          `json:"ModelName"`
-	ModelVersion string          `json:"ModelVersion"`
-	FileInfos    []inputFileInfo `json:"FileInfos,omitempty"`
-	Prompt       string          `json:"Prompt,omitempty"`
-	OutputConfig outputConfig    `json:"OutputConfig"`
-	InputRegion  string          `json:"InputRegion"`
+	SubAppID       int64           `json:"SubAppId"`
+	ModelName      string          `json:"ModelName"`
+	ModelVersion   string          `json:"ModelVersion"`
+	FileInfos      []inputFileInfo `json:"FileInfos,omitempty"`
+	Prompt         string          `json:"Prompt,omitempty"`
+	NegativePrompt string          `json:"NegativePrompt,omitempty"`
+	EnhancePrompt  string          `json:"EnhancePrompt,omitempty"`
+	OutputConfig   outputConfig    `json:"OutputConfig"`
+	InputRegion    string          `json:"InputRegion"`
+	Seed           *int            `json:"Seed,omitempty"`
+	TasksPriority  *int            `json:"TasksPriority,omitempty"`
+	ExtInfo        string          `json:"ExtInfo,omitempty"`
 }
 
 type tcError struct {
