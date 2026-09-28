@@ -42,3 +42,9 @@ func TestGrokImagineModelClassification(t *testing.T) {
 		})
 	}
 }
+
+func TestGPTImage2ModelClassification(t *testing.T) {
+	for _, model := range []string{"gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare"} {
+		assert.True(t, IsImageGenerationModel(model), model)
+	}
+}

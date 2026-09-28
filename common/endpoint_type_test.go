@@ -58,3 +58,18 @@ func TestVODAIGCEndpointTypes(t *testing.T) {
 	assert.Equal(t, "/v1/images/tasks", info.Path)
 	assert.Equal(t, http.MethodPost, info.Method)
 }
+
+func TestVODAIGCSynchronousImageEndpointAndAPIType(t *testing.T) {
+	endpointTypes := GetEndpointTypesByChannelType(
+		constant.ChannelTypeVODAIGC,
+		"gpt-image-2.5-sunburst",
+	)
+	apiType, ok := ChannelType2APIType(constant.ChannelTypeVODAIGC)
+
+	require.True(t, ok)
+	assert.Equal(t, constant.APITypeVODAIGC, apiType)
+	assert.Equal(t, []constant.EndpointType{
+		constant.EndpointTypeImageGeneration,
+		constant.EndpointTypeImageTask,
+	}, endpointTypes)
+}
