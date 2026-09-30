@@ -40,6 +40,8 @@ const DEFAULT_PRICES: Record<string, number> = {
   'web_search_preview:gpt-4.1-mini*': 25.0,
   file_search: 2.5,
   google_search: 14.0,
+  tencent_web_search_lite: 7.0 / 7.14,
+  tencent_web_search_standard: 12.0 / 7.14,
 }
 
 type ToolPriceRow = {

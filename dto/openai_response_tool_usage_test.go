@@ -20,6 +20,7 @@ func TestUsagePreservesTencentWebSearchCallCount(t *testing.T) {
 		}
 	}`), &response))
 
+	require.NotNil(t, response.Usage.ToolUsage)
 	assert.Equal(t, 2, response.Usage.ToolUsage.WebSearchCall)
 
 	encoded, err := common.Marshal(response)

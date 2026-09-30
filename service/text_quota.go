@@ -100,10 +100,24 @@ func isLegacyClaudeDerivedOpenAIUsage(relayInfo *relaycommon.RelayInfo, usage *d
 func calculateTextToolCallSurcharge(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, summary *textQuotaSummary) decimal.Decimal {
 	dGroupRatio := decimal.NewFromFloat(summary.GroupRatio)
 	dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
+	tencentWebSearchCallCount := summary.WebSearchCallCount
+	summary.WebSearchCallCount = 0
 
 	var surcharge decimal.Decimal
 
-	if relayInfo.ResponsesUsageInfo != nil {
+	if source, ok := relaycommon.TencentTokenHubWebSearchSource(relayInfo); ok && tencentWebSearchCallCount > 0 {
+		toolName := constant.ToolNameTencentWebSearchStandard
+		if source == "lite" {
+			toolName = constant.ToolNameTencentWebSearchLite
+		}
+		summary.WebSearchCallCount = tencentWebSearchCallCount
+		summary.WebSearchPrice = operation_setting.GetToolPriceForModel(toolName, summary.ModelName)
+		surcharge = surcharge.Add(decimal.NewFromFloat(summary.WebSearchPrice).
+			Mul(decimal.NewFromInt(int64(summary.WebSearchCallCount))).
+			Div(decimal.NewFromInt(1000)).
+			Mul(dGroupRatio).
+			Mul(dQuotaPerUnit))
+	} else if relayInfo.ResponsesUsageInfo != nil {
 		if webSearchTool, exists := relayInfo.ResponsesUsageInfo.BuiltInTools[dto.BuildInToolWebSearchPreview]; exists && webSearchTool.CallCount > 0 {
 			summary.WebSearchCallCount = webSearchTool.CallCount
 			summary.WebSearchPrice = operation_setting.GetToolPriceForModel("web_search_preview", summary.ModelName)
@@ -229,6 +243,9 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 	summary.CacheCreationTokens1h = usage.ClaudeCacheCreation1hTokens
 	summary.ImageTokens = usage.PromptTokensDetails.ImageTokens
 	summary.AudioTokens = usage.PromptTokensDetails.AudioTokens
+	if usage.ToolUsage != nil {
+		summary.WebSearchCallCount = usage.ToolUsage.WebSearchCall
+	}
 	legacyClaudeDerived := isLegacyClaudeDerivedOpenAIUsage(relayInfo, usage)
 	isOpenRouterClaudeBilling := relayInfo.ChannelMeta != nil &&
 		relayInfo.ChannelType == constant.ChannelTypeOpenRouter &&

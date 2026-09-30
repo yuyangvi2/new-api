@@ -98,7 +98,7 @@ func TestCalculateTextQuotaSummaryBillsTencentTokenHubSearchUsage(t *testing.T) 
 			usage := &dto.Usage{
 				PromptTokens: 1,
 				TotalTokens:  1,
-				ToolUsage: dto.ToolUsage{
+				ToolUsage: &dto.ToolUsage{
 					WebSearchCall: tc.callCount,
 				},
 			}
