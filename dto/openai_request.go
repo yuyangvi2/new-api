@@ -832,6 +832,8 @@ func (m *Message) ParseContent() []MediaContent {
 }*/
 
 type WebSearchOptions struct {
+	Enable            *bool           `json:"enable,omitempty"`
+	SearchSource      string          `json:"search_source,omitempty"`
 	SearchContextSize string          `json:"search_context_size,omitempty"`
 	UserLocation      json.RawMessage `json:"user_location,omitempty"`
 }
