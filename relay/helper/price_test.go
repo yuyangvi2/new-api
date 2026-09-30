@@ -6,15 +6,90 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/config"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestApplyTencentTokenHubSearchPreConsume(t *testing.T) {
+	saved := map[string]string{}
+	require.NoError(t, config.GlobalConfig.SaveToDB(func(key, value string) error {
+		saved[key] = value
+		return nil
+	}))
+	t.Cleanup(func() {
+		require.NoError(t, config.GlobalConfig.LoadFromDB(saved))
+		operation_setting.RebuildToolPriceIndex()
+	})
+
+	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{
+		"tool_price_setting.prices": `{"tencent_web_search_lite":0.98,"tencent_web_search_standard":1.68}`,
+	}))
+	operation_setting.RebuildToolPriceIndex()
+
+	enabled := true
+	tests := []struct {
+		name      string
+		baseURL   string
+		options   *dto.WebSearchOptions
+		initial   int
+		wantQuota int
+		wantFree  bool
+	}{
+		{
+			name:      "lite search reserves one possible call",
+			baseURL:   "https://tokenhub.tencentmaas.com",
+			options:   &dto.WebSearchOptions{Enable: &enabled, SearchSource: "lite"},
+			initial:   100,
+			wantQuota: 590,
+		},
+		{
+			name:      "missing search source defaults to standard",
+			baseURL:   "https://tokenhub.tencentmaas.com/v1",
+			options:   &dto.WebSearchOptions{Enable: &enabled},
+			initial:   100,
+			wantQuota: 940,
+		},
+		{
+			name:      "other upstream is not charged",
+			baseURL:   "https://api.openai.com",
+			options:   &dto.WebSearchOptions{Enable: &enabled, SearchSource: "lite"},
+			initial:   100,
+			wantQuota: 100,
+			wantFree:  true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			info := &relaycommon.RelayInfo{
+				OriginModelName: "deepseek-v4-flash",
+				Request: &dto.GeneralOpenAIRequest{
+					WebSearchOptions: tc.options,
+				},
+				ChannelMeta: &relaycommon.ChannelMeta{ChannelBaseUrl: tc.baseURL},
+			}
+			priceData := types.PriceData{
+				FreeModel:         true,
+				QuotaToPreConsume: tc.initial,
+				GroupRatioInfo:    types.GroupRatioInfo{GroupRatio: 1},
+			}
+
+			applyTencentTokenHubSearchPreConsume(info, &priceData)
+
+			assert.Equal(t, tc.wantQuota, priceData.QuotaToPreConsume)
+			assert.Equal(t, tc.wantFree, priceData.FreeModel)
+		})
+	}
+}
 
 func TestModelPriceHelperTieredUsesPreloadedRequestInput(t *testing.T) {
 	gin.SetMode(gin.TestMode)
