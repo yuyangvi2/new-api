@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/setting/config"
 )
 
@@ -20,10 +21,12 @@ import (
 // ---------------------------------------------------------------------------
 
 var defaultToolPrices = map[string]float64{
-	"web_search":         10.0, // OpenAI web search (all models) / Claude web search
-	"web_search_preview": 10.0, // OpenAI web search preview (default: reasoning models)
-	"file_search":        2.5,  // OpenAI file search (Responses API)
-	"google_search":      14.0, // Gemini Grounding with Google Search
+	"web_search":                             10.0,        // OpenAI web search (all models) / Claude web search
+	"web_search_preview":                     10.0,        // OpenAI web search preview (default: reasoning models)
+	"file_search":                            2.5,         // OpenAI file search (Responses API)
+	"google_search":                          14.0,        // Gemini Grounding with Google Search
+	constant.ToolNameTencentWebSearchLite:     7.0 / 7.14,  // Tencent TokenHub: CNY 7 / 1K calls, converted to USD
+	constant.ToolNameTencentWebSearchStandard: 12.0 / 7.14, // Tencent TokenHub: CNY 12 / 1K calls, converted to USD
 }
 
 var defaultToolPriceOverrides = map[string]float64{

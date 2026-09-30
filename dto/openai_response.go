@@ -228,6 +228,7 @@ type Usage struct {
 	UsageSemantic        string        `json:"usage_semantic,omitempty"`
 	UsageSource          string        `json:"usage_source,omitempty"`
 	BillingUsage         *BillingUsage `json:"-"`
+	ToolUsage            *ToolUsage    `json:"tool_usage,omitempty"`
 
 	PromptTokensDetails    InputTokenDetails  `json:"prompt_tokens_details"`
 	CompletionTokenDetails OutputTokenDetails `json:"completion_tokens_details"`
@@ -241,6 +242,10 @@ type Usage struct {
 
 	// OpenRouter Params
 	Cost any `json:"cost,omitempty"`
+}
+
+type ToolUsage struct {
+	WebSearchCall int `json:"web_search_call,omitempty"`
 }
 
 type OpenAIVideoResponse struct {
