@@ -9,6 +9,7 @@ import (
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/shopspring/decimal"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -108,6 +109,25 @@ func TestTryTieredSettleFallsBackToFrozenPreConsumeOnExprError(t *testing.T) {
 	if result != nil {
 		t.Fatalf("result = %#v, want nil", result)
 	}
+}
+
+func TestTryTieredSettleErrorFallbackExcludesReservedToolQuota(t *testing.T) {
+	relayInfo := &relaycommon.RelayInfo{
+		FinalPreConsumedQuota:    321,
+		ToolCallPreConsumedQuota: 21,
+		TieredBillingSnapshot: &billingexpr.BillingSnapshot{
+			BillingMode:              "tiered_expr",
+			ExprString:               `invalid +-+ expr`,
+			ExprHash:                 billingexpr.ExprHashString(`invalid +-+ expr`),
+			GroupRatio:               1.0,
+			EstimatedQuotaAfterGroup: 123,
+		},
+	}
+
+	ok, quota, result := TryTieredSettle(relayInfo, billingexpr.TokenParams{P: 100})
+	require.True(t, ok)
+	assert.Equal(t, 300, quota)
+	assert.Nil(t, result)
 }
 
 // ---------------------------------------------------------------------------
