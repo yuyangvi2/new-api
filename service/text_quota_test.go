@@ -11,11 +11,106 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/config"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCalculateTextQuotaSummaryBillsTencentTokenHubSearchUsage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	saved := map[string]string{}
+	require.NoError(t, config.GlobalConfig.SaveToDB(func(key, value string) error {
+		saved[key] = value
+		return nil
+	}))
+	t.Cleanup(func() {
+		require.NoError(t, config.GlobalConfig.LoadFromDB(saved))
+		operation_setting.RebuildToolPriceIndex()
+	})
+
+	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{
+		"tool_price_setting.prices": `{"tencent_web_search_lite":0.98,"tencent_web_search_standard":1.68}`,
+	}))
+	operation_setting.RebuildToolPriceIndex()
+
+	enabled := true
+	tests := []struct {
+		name      string
+		baseURL   string
+		source    string
+		callCount int
+		wantQuota int
+		wantPrice float64
+	}{
+		{
+			name:      "lite search charges reported calls",
+			baseURL:   "https://tokenhub.tencentmaas.com",
+			source:    "lite",
+			callCount: 2,
+			wantQuota: 981,
+			wantPrice: 0.98,
+		},
+		{
+			name:      "standard is the default source",
+			baseURL:   "https://tokenhub.tencentmaas.com/v1",
+			callCount: 1,
+			wantQuota: 841,
+			wantPrice: 1.68,
+		},
+		{
+			name:      "zero reported calls adds no search charge",
+			baseURL:   "https://tokenhub.tencentmaas.com",
+			source:    "lite",
+			callCount: 0,
+			wantQuota: 1,
+		},
+		{
+			name:      "same usage field from another host is ignored",
+			baseURL:   "https://api.openai.com",
+			source:    "lite",
+			callCount: 1,
+			wantQuota: 1,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(recorder)
+			info := &relaycommon.RelayInfo{
+				OriginModelName: "deepseek-v4-flash",
+				StartTime:       time.Now(),
+				Request: &dto.GeneralOpenAIRequest{
+					WebSearchOptions: &dto.WebSearchOptions{Enable: &enabled, SearchSource: tc.source},
+				},
+				ChannelMeta: &relaycommon.ChannelMeta{ChannelBaseUrl: tc.baseURL},
+				PriceData: types.PriceData{
+					ModelRatio:      1,
+					CompletionRatio: 1,
+					GroupRatioInfo:  types.GroupRatioInfo{GroupRatio: 1},
+				},
+			}
+			usage := &dto.Usage{
+				PromptTokens: 1,
+				TotalTokens:  1,
+				ToolUsage: dto.ToolUsage{
+					WebSearchCall: tc.callCount,
+				},
+			}
+
+			summary := calculateTextQuotaSummary(ctx, info, usage)
+
+			assert.Equal(t, tc.wantQuota, summary.Quota)
+			assert.Equal(t, tc.callCount > 0 && tc.baseURL != "https://api.openai.com", summary.WebSearchCallCount > 0)
+			assert.Equal(t, tc.wantPrice, summary.WebSearchPrice)
+		})
+	}
+}
 
 func TestCalculateTextQuotaSummaryUnifiedForClaudeSemantic(t *testing.T) {
 	gin.SetMode(gin.TestMode)
