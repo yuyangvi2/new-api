@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
@@ -48,6 +49,40 @@ func TestGeneralOpenAIRequestPreserveExplicitZeroValues(t *testing.T) {
 	require.True(t, gjson.GetBytes(encoded, "dimensions").Exists())
 	require.True(t, gjson.GetBytes(encoded, "return_images").Exists())
 	require.True(t, gjson.GetBytes(encoded, "return_related_questions").Exists())
+}
+
+func TestGeneralOpenAIRequestPreservesTokenHubWebSearchOptions(t *testing.T) {
+	tests := []struct {
+		name   string
+		enable bool
+	}{
+		{name: "enabled", enable: true},
+		{name: "explicitly disabled", enable: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw := []byte(fmt.Sprintf(`{
+				"model":"deepseek-v4-flash",
+				"web_search_options":{
+					"enable":%t,
+					"search_source":"lite"
+				}
+			}`, tt.enable))
+
+			var req GeneralOpenAIRequest
+			err := common.Unmarshal(raw, &req)
+			require.NoError(t, err)
+
+			encoded, err := common.Marshal(req)
+			require.NoError(t, err)
+
+			enable := gjson.GetBytes(encoded, "web_search_options.enable")
+			require.True(t, enable.Exists())
+			require.Equal(t, tt.enable, enable.Bool())
+			require.Equal(t, "lite", gjson.GetBytes(encoded, "web_search_options.search_source").String())
+		})
+	}
 }
 
 func TestOpenAIResponsesRequestPreserveExplicitZeroValues(t *testing.T) {
