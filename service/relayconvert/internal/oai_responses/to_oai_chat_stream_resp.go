@@ -69,7 +69,7 @@ func (s *ResponsesToChatStreamState) UsageText() string {
 }
 
 func ResponsesStreamEventToChatChunks(event *dto.ResponsesStreamResponse, state *ResponsesToChatStreamState) ([]dto.ChatCompletionsStreamResponse, error) {
-	if event == nil || state == nil {
+	if event == nil || state == nil || state.finalized {
 		return nil, nil
 	}
 
@@ -90,18 +90,21 @@ func ResponsesStreamEventToChatChunks(event *dto.ResponsesStreamResponse, state 
 		if event.Item == nil || !isResponsesToolOutputType(event.Item.Type) {
 			return nil, nil
 		}
-		return state.toolItem(event), nil
+		return state.toolItem(event)
 	case responsesEventFunctionArgsDelta, responsesEventCustomToolInputDelta:
 		return state.toolArgumentsDelta(event), nil
 	case responsesEventFunctionArgsDone, responsesEventCustomToolInputDone:
-		return state.flushPendingTool(event), nil
+		return state.flushPendingTool(event)
 	case responsesEventCompleted, responsesEventDone, responsesEventIncomplete:
 		response := event.Response
 		if event.Type == responsesEventIncomplete {
 			response = ensureIncompleteResponse(response)
 		}
 		state.applyResponseMetadata(response)
-		chunks := state.terminalOutputChunks(response)
+		chunks, err := state.terminalOutputChunks(response)
+		if err != nil {
+			return nil, err
+		}
 		chunks = append(chunks, state.finalize(response)...)
 		return chunks, nil
 	case responsesEventFailed, responsesEventError:
@@ -160,9 +163,9 @@ func (s *ResponsesToChatStreamState) textDelta(delta string) []dto.ChatCompletio
 	return chunks
 }
 
-func (s *ResponsesToChatStreamState) terminalOutputChunks(response *dto.OpenAIResponsesResponse) []dto.ChatCompletionsStreamResponse {
+func (s *ResponsesToChatStreamState) terminalOutputChunks(response *dto.OpenAIResponsesResponse) ([]dto.ChatCompletionsStreamResponse, error) {
 	if s == nil || response == nil || len(response.Output) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	var chunks []dto.ChatCompletionsStreamResponse
@@ -193,10 +196,14 @@ func (s *ResponsesToChatStreamState) terminalOutputChunks(response *dto.OpenAIRe
 			}
 			chunks = append(chunks, s.reasoningDelta(reasoning.String())...)
 		case isResponsesToolOutputType(out.Type):
-			chunks = append(chunks, s.toolItem(&dto.ResponsesStreamResponse{Item: out})...)
+			toolChunks, err := s.toolItem(&dto.ResponsesStreamResponse{OutputIndex: &i, Item: out})
+			if err != nil {
+				return nil, err
+			}
+			chunks = append(chunks, toolChunks...)
 		}
 	}
-	return chunks
+	return chunks, nil
 }
 
 func (s *ResponsesToChatStreamState) reasoningDelta(delta string) []dto.ChatCompletionsStreamResponse {
@@ -223,16 +230,28 @@ func (s *ResponsesToChatStreamState) reasoningDelta(delta string) []dto.ChatComp
 	return chunks
 }
 
-func (s *ResponsesToChatStreamState) toolItem(event *dto.ResponsesStreamResponse) []dto.ChatCompletionsStreamResponse {
+func (s *ResponsesToChatStreamState) toolItem(event *dto.ResponsesStreamResponse) ([]dto.ChatCompletionsStreamResponse, error) {
 	tool := s.ensureToolForEvent(event)
 	if tool == nil {
+		return nil, nil
+	}
+	if err := tool.applyArgumentsSnapshot(event.Item.ArgumentsString()); err != nil {
+		return nil, err
+	}
+	return s.toolDelta(tool), nil
+}
+
+// Completion events contain a snapshot, not another arguments delta. Bytes
+// already sent cannot be replaced, so only an exact prefix can be supplemented.
+func (tool *responsesStreamTool) applyArgumentsSnapshot(arguments string) error {
+	if arguments == "" {
 		return nil
 	}
-	args := event.Item.ArgumentsString()
-	if args != "" {
-		tool.Arguments = args
+	if tool.ArgsSentAt > len(tool.Arguments) || !strings.HasPrefix(arguments, tool.Arguments[:tool.ArgsSentAt]) {
+		return fmt.Errorf("responses tool arguments snapshot conflicts with streamed arguments")
 	}
-	return s.toolDelta(tool, "")
+	tool.Arguments = arguments
+	return nil
 }
 
 func (s *ResponsesToChatStreamState) toolArgumentsDelta(event *dto.ResponsesStreamResponse) []dto.ChatCompletionsStreamResponse {
@@ -249,21 +268,21 @@ func (s *ResponsesToChatStreamState) toolArgumentsDelta(event *dto.ResponsesStre
 		return nil
 	}
 	tool.Arguments += event.Delta
-	return s.toolDelta(tool, event.Delta)
+	return s.toolDelta(tool)
 }
 
-func (s *ResponsesToChatStreamState) flushPendingTool(event *dto.ResponsesStreamResponse) []dto.ChatCompletionsStreamResponse {
+func (s *ResponsesToChatStreamState) flushPendingTool(event *dto.ResponsesStreamResponse) ([]dto.ChatCompletionsStreamResponse, error) {
 	tool := s.findToolForEvent(event)
 	if tool == nil {
 		tool = s.ensureFallbackToolForEvent(event)
 	}
 	if tool == nil {
-		return nil
+		return nil, nil
 	}
-	if arguments := dto.ResponsesArgumentsString(event.Arguments); arguments != "" && len(arguments) > len(tool.Arguments) {
-		tool.Arguments = arguments
+	if err := tool.applyArgumentsSnapshot(dto.ResponsesArgumentsString(event.Arguments)); err != nil {
+		return nil, err
 	}
-	return s.toolDelta(tool, "")
+	return s.toolDelta(tool), nil
 }
 
 func (s *ResponsesToChatStreamState) ensureToolForEvent(event *dto.ResponsesStreamResponse) *responsesStreamTool {
@@ -285,24 +304,9 @@ func (s *ResponsesToChatStreamState) ensureToolForEvent(event *dto.ResponsesStre
 		s.toolByKey[key] = tool
 	}
 
-	if event.OutputIndex != nil {
-		s.outputIndexToKey[*event.OutputIndex] = key
-		if pending := s.pendingArgsByOutputIndex[*event.OutputIndex]; pending != "" {
-			tool.Arguments += pending
-			delete(s.pendingArgsByOutputIndex, *event.OutputIndex)
-		}
-	}
-	if itemID := responseStreamEventItemID(event); itemID != "" {
-		tool.ItemID = itemID
-		s.itemIDToKey[itemID] = key
-		if pending := s.pendingArgsByItemID[itemID]; pending != "" {
-			tool.Arguments += pending
-			delete(s.pendingArgsByItemID, itemID)
-		}
-	}
+	s.bindToolEvent(tool, event)
 	if callID := strings.TrimSpace(event.Item.CallId); callID != "" {
 		tool.CallID = callID
-		s.callIDToKey[callID] = key
 	} else if tool.CallID == "" {
 		tool.CallID = strings.TrimSpace(event.Item.ID)
 	}
@@ -313,38 +317,19 @@ func (s *ResponsesToChatStreamState) ensureToolForEvent(event *dto.ResponsesStre
 }
 
 func (s *ResponsesToChatStreamState) findToolForEvent(event *dto.ResponsesStreamResponse) *responsesStreamTool {
-	if event == nil {
-		return nil
+	key := s.keyForEvent(event)
+	tool := s.toolByKey[key]
+	if tool != nil {
+		s.bindToolEvent(tool, event)
 	}
-	if event.OutputIndex != nil {
-		if key := s.outputIndexToKey[*event.OutputIndex]; key != "" {
-			return s.toolByKey[key]
-		}
-	}
-	if itemID := strings.TrimSpace(event.ItemID); itemID != "" {
-		if key := s.itemIDToKey[itemID]; key != "" {
-			return s.toolByKey[key]
-		}
-	}
-	if event.Item != nil {
-		if key := s.keyForEvent(event); key != "" {
-			return s.toolByKey[key]
-		}
-	}
-	return nil
+	return tool
 }
 
 func (s *ResponsesToChatStreamState) ensureFallbackToolForEvent(event *dto.ResponsesStreamResponse) *responsesStreamTool {
 	if event == nil {
 		return nil
 	}
-	key := ""
-	if event.OutputIndex != nil {
-		key = fmt.Sprintf("output:%d", *event.OutputIndex)
-	}
-	if key == "" && strings.TrimSpace(event.ItemID) != "" {
-		key = "item:" + strings.TrimSpace(event.ItemID)
-	}
+	key := s.keyForEvent(event)
 	if key == "" {
 		return nil
 	}
@@ -358,31 +343,23 @@ func (s *ResponsesToChatStreamState) ensureFallbackToolForEvent(event *dto.Respo
 		s.nextToolIndex++
 		s.toolByKey[key] = tool
 	}
-	if event.OutputIndex != nil {
-		s.outputIndexToKey[*event.OutputIndex] = key
-		if pending := s.pendingArgsByOutputIndex[*event.OutputIndex]; pending != "" {
-			tool.Arguments += pending
-			delete(s.pendingArgsByOutputIndex, *event.OutputIndex)
-		}
-	}
-	if itemID := responseStreamEventItemID(event); itemID != "" {
-		tool.ItemID = itemID
-		s.itemIDToKey[itemID] = key
-		if pending := s.pendingArgsByItemID[itemID]; pending != "" {
-			tool.Arguments += pending
-			delete(s.pendingArgsByItemID, itemID)
-		}
-	}
+	s.bindToolEvent(tool, event)
 	return tool
 }
 
-func (s *ResponsesToChatStreamState) toolDelta(tool *responsesStreamTool, explicitDelta string) []dto.ChatCompletionsStreamResponse {
+func (s *ResponsesToChatStreamState) toolDelta(tool *responsesStreamTool) []dto.ChatCompletionsStreamResponse {
 	if tool == nil {
 		return nil
 	}
 
-	argsDelta := explicitDelta
-	if argsDelta == "" && len(tool.Arguments) > tool.ArgsSentAt {
+	// Argument events may precede the item carrying the real call ID and name.
+	// Keep them buffered until that item arrives, or flush at end of stream.
+	if !tool.Sent && tool.Name == "" && !s.finalized {
+		return nil
+	}
+
+	argsDelta := ""
+	if len(tool.Arguments) > tool.ArgsSentAt {
 		argsDelta = tool.Arguments[tool.ArgsSentAt:]
 	}
 	if tool.Sent && argsDelta == "" && (tool.Name == "" || tool.NameSent) {
@@ -504,7 +481,7 @@ func (s *ResponsesToChatStreamState) flushAllPendingTools() []dto.ChatCompletion
 			tool.Arguments += s.pendingArgsByItemID[itemID]
 			delete(s.pendingArgsByItemID, itemID)
 		}
-		chunks = append(chunks, s.toolDelta(tool, "")...)
+		chunks = append(chunks, s.toolDelta(tool)...)
 	}
 	return chunks
 }
@@ -529,21 +506,54 @@ func (s *ResponsesToChatStreamState) keyForEvent(event *dto.ResponsesStreamRespo
 	if event == nil {
 		return ""
 	}
+	// Events and terminal snapshots may identify the same call differently.
+	// Resolve known aliases before choosing a key for a new tool.
+	if event.OutputIndex != nil {
+		if key := s.outputIndexToKey[*event.OutputIndex]; key != "" {
+			return key
+		}
+	}
+	if itemID := responseStreamEventItemID(event); itemID != "" {
+		if key := s.itemIDToKey[itemID]; key != "" {
+			return key
+		}
+	}
+	if event.Item != nil {
+		if key := s.callIDToKey[strings.TrimSpace(event.Item.CallId)]; key != "" {
+			return key
+		}
+	}
 	if event.OutputIndex != nil {
 		return fmt.Sprintf("output:%d", *event.OutputIndex)
 	}
+	if itemID := responseStreamEventItemID(event); itemID != "" {
+		return "item:" + itemID
+	}
 	if event.Item != nil {
-		if itemID := strings.TrimSpace(event.Item.ID); itemID != "" {
-			return "item:" + itemID
-		}
 		if callID := strings.TrimSpace(event.Item.CallId); callID != "" {
 			return "call:" + callID
 		}
 	}
-	if itemID := strings.TrimSpace(event.ItemID); itemID != "" {
-		return "item:" + itemID
-	}
 	return ""
+}
+
+func (s *ResponsesToChatStreamState) bindToolEvent(tool *responsesStreamTool, event *dto.ResponsesStreamResponse) {
+	if event.OutputIndex != nil {
+		s.outputIndexToKey[*event.OutputIndex] = tool.Key
+		tool.Arguments += s.pendingArgsByOutputIndex[*event.OutputIndex]
+		delete(s.pendingArgsByOutputIndex, *event.OutputIndex)
+	}
+	if itemID := responseStreamEventItemID(event); itemID != "" {
+		tool.ItemID = itemID
+		s.itemIDToKey[itemID] = tool.Key
+		tool.Arguments += s.pendingArgsByItemID[itemID]
+		delete(s.pendingArgsByItemID, itemID)
+	}
+	if event.Item != nil {
+		if callID := strings.TrimSpace(event.Item.CallId); callID != "" {
+			s.callIDToKey[callID] = tool.Key
+		}
+	}
 }
 
 type ResponsesBufferedAccumulator struct {
