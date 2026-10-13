@@ -1,0 +1,17 @@
+data: {"type":"response.created","response":{"id":"resp_test","model":"gpt-5.6-luna","created_at":1791882842}}
+
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"fc_test","type":"function_call","call_id":"call_test","name":"read","arguments":""}}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_test","delta":"{\"limit\":2000,"}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_test","delta":"\"path\":\"template/reusable-skill/SKILL.md\"}"}
+
+data: {"type":"response.function_call_arguments.done","output_index":0,"item_id":"fc_test","arguments":"{\"limit\":2000,\"path\":\"template/reusable-skill/SKILL.md\"}"}
+
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"fc_test","type":"function_call","call_id":"call_test","name":"read","arguments":"{\"limit\":2000,\"path\":\"template/reusable-skill/SKILL.md\"}"}}
+
+data: {"type":"response.completed","response":{"id":"resp_test","model":"gpt-5.6-luna","status":"completed","output":[{"id":"fc_test","type":"function_call","call_id":"call_test","name":"read","arguments":"{\"limit\":2000,\"path\":\"template/reusable-skill/SKILL.md\"}"}],"usage":{"input_tokens":125,"output_tokens":30,"total_tokens":155}}}
+
+data: [DONE]
+
+: end of stream
