@@ -130,7 +130,7 @@ func (a *ImageAdaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.Rel
 
 	fileInfos, err := synchronousInputFileInfos(c, request)
 	if err != nil {
-		return nil, err
+		return nil, types.NewErrorWithStatusCode(err, types.ErrorCodeConvertRequestFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
 	}
 	if strings.TrimSpace(request.Prompt) == "" && len(fileInfos) == 0 {
 		return nil, errors.New("prompt is required when no reference image is provided")
@@ -506,16 +506,41 @@ func synchronousInputFileInfos(c *gin.Context, request dto.ImageRequest) ([]inpu
 		if !hasJSONValue(raw) {
 			continue
 		}
-		var single string
-		if err := common.Unmarshal(raw, &single); err == nil {
-			values = append(values, single)
-			continue
+		var references []json.RawMessage
+		if common.GetJsonType(raw) == "array" {
+			if err := common.Unmarshal(raw, &references); err != nil {
+				return nil, fmt.Errorf("invalid reference image array: %w", err)
+			}
+		} else {
+			references = []json.RawMessage{raw}
 		}
-		var multiple []string
-		if err := common.Unmarshal(raw, &multiple); err != nil {
-			return nil, errors.New("image must be a string or an array of strings")
+		for _, reference := range references {
+			var imageURL string
+			switch common.GetJsonType(reference) {
+			case "string":
+				if err := common.Unmarshal(reference, &imageURL); err != nil {
+					return nil, fmt.Errorf("invalid reference image: %w", err)
+				}
+			case "object":
+				var image struct {
+					ImageURL string `json:"image_url"`
+					FileID   string `json:"file_id"`
+				}
+				if err := common.Unmarshal(reference, &image); err != nil {
+					return nil, fmt.Errorf("invalid reference image object: %w", err)
+				}
+				if image.FileID != "" {
+					return nil, errors.New("Tencent VOD OG does not support file_id references; use image_url with an http(s) URL or base64 image")
+				}
+				imageURL = image.ImageURL
+			default:
+				return nil, errors.New("reference image must be a string or an object with image_url")
+			}
+			if strings.TrimSpace(imageURL) == "" {
+				return nil, errors.New("reference image URL cannot be empty")
+			}
+			values = append(values, imageURL)
 		}
-		values = append(values, multiple...)
 	}
 	fileInfos, err := buildInputFileInfos(values)
 	if err != nil {
@@ -537,6 +562,11 @@ func synchronousInputFileInfos(c *gin.Context, request dto.ImageRequest) ([]inpu
 	}
 	sort.Strings(keys)
 	totalBytes := 0
+	for _, fileInfo := range fileInfos {
+		if fileInfo.Type == "Base64" {
+			totalBytes += base64.StdEncoding.DecodedLen(len(fileInfo.Base64)) - strings.Count(fileInfo.Base64, "=")
+		}
+	}
 	for _, key := range keys {
 		for _, fileHeader := range form.File[key] {
 			file, openErr := fileHeader.Open()
